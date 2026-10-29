@@ -1,0 +1,39 @@
+"""Health facilities (hospitals and maternities)."""
+from django.db import models
+
+from core.mixins import BaseModel, CreatedByMixin
+
+
+class Hospital(BaseModel, CreatedByMixin):
+    """
+    Health facility that issues birth declarations.
+    Never physically deleted: ``is_active=False`` retires it from new declarations while
+    keeping historical links and statistics; ``is_archived`` hides it from lists.
+    """
+
+    class FacilityType(models.TextChoices):
+        HOSPITAL = 'HOSPITAL', 'Hôpital'
+        MATERNITY = 'MATERNITY', 'Maternité'
+        CLINIC = 'CLINIC', 'Clinique'
+        HEALTH_CENTER = 'HEALTH_CENTER', 'Centre de santé'
+        OTHER = 'OTHER', 'Autre'
+
+    code = models.CharField("Code", max_length=20, unique=True)
+    name = models.CharField("Nom officiel", max_length=200)
+    facility_type = models.CharField(
+        "Type", max_length=20, choices=FacilityType.choices, default=FacilityType.HOSPITAL)
+    region = models.CharField("Région", max_length=100, blank=True, default='Conakry')
+    commune = models.CharField("Commune", max_length=100, blank=True, default='Ratoma')
+    address = models.TextField("Adresse", blank=True)
+    contact_name = models.CharField("Contact administratif", max_length=150, blank=True)
+    phone = models.CharField("Téléphone", max_length=20, blank=True)
+    email = models.EmailField("Email", blank=True)
+    is_active = models.BooleanField("Actif", default=True)
+
+    class Meta(BaseModel.Meta):
+        verbose_name = "Établissement de santé"
+        verbose_name_plural = "Établissements de santé"
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
