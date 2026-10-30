@@ -57,7 +57,11 @@ class Command(BaseCommand):
             with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as z:
                 z.write(dump, dump.name)
                 root = Path(settings.PRIVATE_MEDIA_ROOT)
-                if root.exists():
+                if settings.DOCUMENTS_S3_BUCKET:
+                    self.stdout.write(self.style.WARNING(
+                        "Documents stockés dans un bucket S3 : non inclus dans cette sauvegarde "
+                        "(activez le versionnement / la réplication du bucket)."))
+                elif root.exists():
                     for f in root.rglob('*'):
                         if f.is_file():
                             z.write(f, Path('private_media') / f.relative_to(root))

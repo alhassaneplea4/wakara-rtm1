@@ -43,6 +43,7 @@ const FIELD_LABELS: Record<string, string> = {
 /** Extracts a readable message from a DRF error response. */
 export function errorMessage(err: any, fallback = "Une erreur est survenue. Veuillez réessayer."): string {
   const e = err?.error;
+  if (err?.status === 413) return 'Fichier trop volumineux pour le serveur (4 Mo maximum). Réduisez-le ou prenez une photo moins lourde.';
   if (!e) return err?.status === 0 ? 'Serveur injoignable. Vérifiez votre connexion.' : fallback;
   if (typeof e === 'string') return fallback;
   if (e.detail) return String(e.detail);

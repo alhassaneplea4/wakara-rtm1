@@ -7,6 +7,7 @@ import os
 import sys
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import parse_qs, unquote, urlparse
 
 from decouple import Csv, config
 
@@ -18,6 +19,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
+# Vercel injects the deployment hostnames: allow them automatically (no wildcard).
+VERCEL_HOSTS = [h for h in (os.environ.get(k, '') for k in (
+    'VERCEL_URL', 'VERCEL_BRANCH_URL', 'VERCEL_PROJECT_PRODUCTION_URL')) if h]
+ALLOWED_HOSTS += VERCEL_HOSTS
 
 # ──────────────────────────────────────────────
 # Application definition
@@ -83,8 +88,26 @@ WSGI_APPLICATION = 'wakara.wsgi.application'
 # Database
 # ──────────────────────────────────────────────
 DB_ENGINE = config('DB_ENGINE', default='django.db.backends.sqlite3')
+DATABASE_URL = config('DATABASE_URL', default='')  # postgres://user:pass@host:port/name?sslmode=require
 
-if DB_ENGINE == 'django.db.backends.sqlite3':
+if DATABASE_URL:
+    # Hosted PostgreSQL (Neon, Supabase, Vercel Postgres…). Serverless: no persistent connection is kept,
+    # and server-side cursors are disabled so that connection poolers (pgbouncer) work.
+    _url = urlparse(DATABASE_URL)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': unquote(_url.path.lstrip('/')),
+            'USER': unquote(_url.username or ''),
+            'PASSWORD': unquote(_url.password or ''),
+            'HOST': _url.hostname or 'localhost',
+            'PORT': str(_url.port or 5432),
+            'CONN_MAX_AGE': 0,
+            'DISABLE_SERVER_SIDE_CURSORS': True,
+            'OPTIONS': {k: v[0] for k, v in parse_qs(_url.query).items() if k in ('sslmode', 'options')},
+        }
+    }
+elif DB_ENGINE == 'django.db.backends.sqlite3':
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -135,6 +158,37 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 PRIVATE_MEDIA_ROOT = Path(config('PRIVATE_MEDIA_ROOT', default=str(BASE_DIR / 'private_media')))
+
+# Private documents: local folder by default; a PRIVATE S3-compatible bucket (AWS S3, Cloudflare R2,
+# Supabase Storage…) when DOCUMENTS_S3_BUCKET is set. This is mandatory on serverless hosts such as Vercel,
+# whose filesystem is read-only and not persistent. Objects are never public: files are streamed by the
+# authenticated download endpoint.
+DOCUMENTS_S3_BUCKET = config('DOCUMENTS_S3_BUCKET', default='')
+if DOCUMENTS_S3_BUCKET:
+    _private_storage = {
+        'BACKEND': 'storages.backends.s3.S3Storage',
+        'OPTIONS': {
+            'bucket_name': DOCUMENTS_S3_BUCKET,
+            'access_key': config('DOCUMENTS_S3_ACCESS_KEY'),
+            'secret_key': config('DOCUMENTS_S3_SECRET_KEY'),
+            'endpoint_url': config('DOCUMENTS_S3_ENDPOINT_URL', default='') or None,
+            'region_name': config('DOCUMENTS_S3_REGION', default='') or None,
+            'default_acl': None,
+            'querystring_auth': True,
+            'file_overwrite': False,
+            'location': 'wakara/private',
+        },
+    }
+else:
+    _private_storage = {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        'OPTIONS': {'location': str(PRIVATE_MEDIA_ROOT), 'base_url': None},
+    }
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+    'private': _private_storage,
+}
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -240,7 +294,7 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=31536000, cast=int)
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
-    CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
+    CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv()) + [f'https://{h}' for h in VERCEL_HOSTS]
 X_FRAME_OPTIONS = 'DENY'
 
 # ──────────────────────────────────────────────

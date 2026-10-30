@@ -30,7 +30,7 @@ class Migration(migrations.Migration):
                 ('archived_at', models.DateTimeField(blank=True, null=True, verbose_name="Date d'archivage")),
                 ('uuid', models.UUIDField(db_index=True, default=uuid.uuid4, editable=False, unique=True)),
                 ('kind', models.CharField(choices=[('HOSPITAL_FORM', 'Déclaration hospitalière (scan)'), ('PARENT_ID', "Pièce d'identité d'un parent"), ('DECLARANT_ID', "Pièce d'identité du déclarant"), ('OTHER', 'Autre pièce')], default='OTHER', max_length=20, verbose_name='Type')),
-                ('file', models.FileField(max_length=255, storage=django.core.files.storage.FileSystemStorage(base_url=None, location=pathlib.PureWindowsPath('C:/Users/elhadj/Desktop/github/wakara-rtm1/backend/private_media')), upload_to=documents.models.upload_path)),
+                ('file', models.FileField(max_length=255, storage=documents.models.private_storage, upload_to=documents.models.upload_path)),
                 ('original_name', models.CharField(max_length=255, verbose_name="Nom d'origine")),
                 ('content_type', models.CharField(max_length=100, verbose_name='Type MIME')),
                 ('size', models.PositiveIntegerField(verbose_name='Taille (octets)')),

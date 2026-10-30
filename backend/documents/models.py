@@ -4,12 +4,14 @@ import os
 import uuid as uuid_lib
 
 from django.conf import settings
-from django.core.files.storage import FileSystemStorage
+from django.core.files.storage import storages
 from django.db import models
 
 from core.mixins import BaseModel
 
-private_storage = FileSystemStorage(location=settings.PRIVATE_MEDIA_ROOT, base_url=None)
+def private_storage():
+    """Private storage configured in settings.STORAGES['private'] (local folder or private S3 bucket)."""
+    return storages['private']
 
 
 def upload_path(instance, filename):

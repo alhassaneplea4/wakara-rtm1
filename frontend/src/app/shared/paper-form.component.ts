@@ -10,19 +10,25 @@ interface Pending { file: File; preview: string | null; }
 interface Saved { doc: SupportingDocument; url: string | null; }
 
 const MAX_SIDE = 2400;          // longest side of an uploaded photo, in pixels
-const RECOMPRESS_ABOVE = 1.5e6; // bytes: smaller photos are sent untouched
+const RECOMPRESS_ABOVE = 1e6;   // bytes: smaller photos are sent untouched
+const TARGET_SIZE = 3.5e6;      // bytes: stays under the 4.5 MB request limit of serverless hosting
 
 /** Re-encodes a phone photo as a reasonably sized JPEG; falls back to the original if the browser cannot decode it. */
 async function shrink(file: File): Promise<File> {
   if (!file.type.startsWith('image/') || file.size <= RECOMPRESS_ABOVE) return file;
   try {
     const bitmap = await createImageBitmap(file);
-    const k = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(bitmap.width * k); canvas.height = Math.round(bitmap.height * k);
-    canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    let blob: Blob | null = null;
+    // Re-encode, then shrink step by step until the file is light enough.
+    for (const [side, quality] of [[MAX_SIDE, 0.85], [2000, 0.78], [1600, 0.7]] as const) {
+      const k = Math.min(1, side / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(bitmap.width * k); canvas.height = Math.round(bitmap.height * k);
+      canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', quality));
+      if (blob && blob.size <= TARGET_SIZE) break;
+    }
     bitmap.close();
-    const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', 0.85));
     if (!blob || blob.size >= file.size) return file;
     return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
   } catch { return file; }

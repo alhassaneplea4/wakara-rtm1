@@ -12,8 +12,11 @@ python-decouple>=3.8
 # CORS
 django-cors-headers>=4.3
 
-# Database (PostgreSQL-ready)
-# psycopg2-binary>=2.9  # Uncomment for PostgreSQL
+# Database (PostgreSQL: DATABASE_URL or DB_* variables)
+psycopg[binary]>=3.1
+
+# Private document storage on an S3-compatible bucket (DOCUMENTS_S3_BUCKET) — required on Vercel
+django-storages[s3]>=1.14
 
 # File handling
 Pillow>=10.0
