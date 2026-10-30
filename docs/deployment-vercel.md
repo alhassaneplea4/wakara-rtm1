@@ -1,5 +1,9 @@
 # Déploiement sur Vercel (front Angular + API Django dans un seul projet)
 
+> **État** : déployé sur <https://wakara-rtm.vercel.app> (projet Vercel `wakara-rtm`, base Neon `wakara-db` en `iad1`, plan gratuit).
+> Réglages faits dans Vercel : Framework Preset = *Services*, dépôt Git = `alhassaneplea4/wakara-rtm1`, `DATABASE_URL` fournie par l'intégration Neon, `WAKARA_ADMIN_USERNAME=admin.wakara`.
+> **Reste à faire** : ajouter la variable `WAKARA_ADMIN_PASSWORD` (type *Secret*, environnement *Production*) puis redéployer pour créer le premier administrateur.
+
 Le fichier [`vercel.json`](../vercel.json) à la racine déclare deux *services* (Vercel Services, en bêta) sur un même domaine :
 
 | Service | Dossier | Chemin public |
