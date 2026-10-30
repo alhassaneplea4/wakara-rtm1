@@ -13,7 +13,7 @@
 ```bash
 cd backend
 python -m venv venv
-venv\Scripts\activate                 # Linux/macOS : source venv/bin/activate
+venv\Scripts\activate                 # PowerShell : .\venv\Scripts\Activate.ps1 — Linux/macOS : source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 ```
@@ -65,6 +65,18 @@ L'URL de l'API se règle dans `frontend/src/environments/environment.ts` (dével
 cd backend && python manage.py check && python manage.py test tests
 cd frontend && npm run build
 ```
+
+## Dépannage : « No module named django »
+
+Le Python global n'a pas les dépendances : le serveur doit être lancé **avec l'environnement virtuel** du dossier `backend`.
+Depuis la racine du projet, sans l'activer :
+
+```powershell
+backend\venv\Scripts\python.exe backend\manage.py runserver 8000
+```
+
+Ou, depuis `backend`, après `.\venv\Scripts\Activate.ps1` (si PowerShell bloque les scripts :
+`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`) : `python manage.py runserver 8000`, sans le préfixe `backend/`.
 
 ## Dépannage : « le menu ne répond plus » / « la déconnexion ne fait rien »
 

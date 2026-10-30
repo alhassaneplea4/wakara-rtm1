@@ -20,6 +20,7 @@ def upload_path(instance, filename):
 
 class SupportingDocument(BaseModel):
     class Kind(models.TextChoices):
+        PAPER_FORM = 'PAPER_FORM', "Fiche de déclaration physique (photo / scan)"
         HOSPITAL_FORM = 'HOSPITAL_FORM', "Déclaration hospitalière (scan)"
         PARENT_ID = 'PARENT_ID', "Pièce d'identité d'un parent"
         DECLARANT_ID = 'DECLARANT_ID', "Pièce d'identité du déclarant"

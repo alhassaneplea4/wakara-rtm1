@@ -203,6 +203,25 @@ class DocumentTests(WakaraTestCase):
         self.transition(self.admin, d['uuid'], 'REJECTED', reason='Doublon')
         self.assertEqual(self.upload(self.secretary, d['uuid']).status_code, 403)
 
+    def test_paper_form_photo_is_attached_listed_and_archived_by_the_agent(self):
+        jpeg = b'\xff\xd8\xff\xe0' + b'0' * 64
+        d = self.create_declaration(self.agent)
+        r = self.upload(self.agent, d['uuid'], 'IMG_0001.jpg', jpeg, kind='PAPER_FORM')
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(r.data['kind'], 'PAPER_FORM')
+        self.assertEqual(r.data['content_type'], 'image/jpeg')
+        # a second page, then both are listed for the dossier (agent and secretary), filtered by kind
+        self.upload(self.agent, d['uuid'], 'verso.png', b'\x89PNG' + b'0' * 64, kind='PAPER_FORM')
+        self.upload(self.agent, d['uuid'], 'cni.pdf', PDF, kind='PARENT_ID')
+        for user in (self.agent, self.secretary):
+            res = self.client_for(user).get(f'/api/documents/?declaration={d["uuid"]}&kind=PAPER_FORM')
+            self.assertEqual(res.data['count'], 2)
+        self.assertEqual(self.client_for(self.agent2).get(f'/api/documents/?declaration={d["uuid"]}').data['count'], 0)
+        # a wrongly taken photo can be archived while the dossier is editable, never physically deleted
+        self.assertEqual(self.client_for(self.agent).delete(f'/api/documents/{r.data["uuid"]}/').status_code, 204)
+        self.assertEqual(self.client_for(self.agent).get(f'/api/documents/?declaration={d["uuid"]}&kind=PAPER_FORM').data['count'], 1)
+        self.assertTrue(SupportingDocument.all_objects.filter(uuid=r.data['uuid']).exists())
+
     def test_stored_name_is_random_and_not_publicly_routable(self):
         d = self.create_declaration()
         r = self.upload(self.agent, d['uuid'], 'passeport_aminata.pdf')

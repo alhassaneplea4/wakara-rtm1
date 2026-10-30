@@ -4,6 +4,7 @@ import {
   ArcElement, BarController, BarElement, CategoryScale, Chart, ChartConfiguration, DoughnutController, Filler, Legend,
   LineController, LineElement, LinearScale, PointElement, Tooltip,
 } from 'chart.js';
+import { RouterLink } from '@angular/router';
 import { STATUS_LABELS, STATUS_TONE, Status } from '../core/models';
 import { ToastService } from '../core/toast.service';
 
@@ -37,6 +38,8 @@ const ICONS: Record<string, string> = {
   clock: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2',
   baby: 'M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM5 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2',
   upload: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12',
+  camera: 'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+  back: 'M19 12H5M12 19l-7-7 7-7',
   edit: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z',
   history: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2',
   paper: 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
@@ -58,18 +61,14 @@ export class IconComponent {
   selector: 'wk-logo', standalone: true, imports: [CommonModule],
   template: `
     <div class="logo" [class.light]="light" [class.big]="big">
-      <svg viewBox="0 0 64 64" aria-hidden="true">
-        <defs><linearGradient id="wkg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f9bff"/><stop offset="1" stop-color="#1f5ed8"/></linearGradient></defs>
-        <path d="M44 10C30 4 12 14 12 33c0 15 10 24 22 24 9 0 17-5 19-14" fill="none" stroke="url(#wkg)" stroke-width="6" stroke-linecap="round"/>
-        <circle cx="36" cy="24" r="7" fill="url(#wkg)"/>
-        <path d="M24 46c1-8 6-12 12-12s11 4 12 12c-4 5-8 7-12 7s-9-2-12-7z" fill="url(#wkg)"/>
-      </svg>
+      <img class="mark" src="assets/logo-mark.png" alt="" aria-hidden="true" />
       <div class="txt"><strong>Wakara</strong><span>{{ subtitle }}</span></div>
     </div>`,
   styles: [`
     .logo{display:flex;align-items:center;gap:10px}
-    svg{width:38px;height:38px;flex:none}
-    .big svg{width:64px;height:64px}
+    .mark{width:38px;height:38px;flex:none;object-fit:contain}
+    .big .mark{width:64px;height:64px}
+    .light .mark{background:#fff;border-radius:10px;padding:3px}
     .txt{display:flex;flex-direction:column;line-height:1.1}
     strong{font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--wk-navy-800)}
     .big strong{font-size:44px}
@@ -208,8 +207,24 @@ export class ConfirmComponent {
 /* ── Page header ─────────────────────────────────── */
 @Component({
   selector: 'wk-page-header', standalone: true,
-  template: `<div class="page-header"><div><h1>{{ title }}</h1>@if (subtitle) {<p>{{ subtitle }}</p>}</div><div class="row"><ng-content /></div></div>`,
+  imports: [RouterLink, IconComponent],
+  template: `
+    @if (back) {
+      <a class="back-link" [routerLink]="back" [attr.aria-label]="backLabel"><wk-icon name="back" [size]="16" /> {{ backLabel }}</a>
+    }
+    <div class="page-header"><div><h1>{{ title }}</h1>@if (subtitle) {<p>{{ subtitle }}</p>}</div><div class="row"><ng-content /></div></div>`,
+  styles: [`
+    :host{display:block}
+    .back-link{display:inline-flex;align-items:center;gap:6px;margin:0 0 10px;padding:6px 12px 6px 8px;border-radius:999px;font-size:13px;font-weight:600;color:var(--wk-royal);background:var(--wk-info-bg);text-decoration:none}
+    .back-link:hover{background:#dbe8ff}
+  `],
 })
-export class PageHeaderComponent { @Input() title = ''; @Input() subtitle = ''; }
+export class PageHeaderComponent {
+  @Input() title = '';
+  @Input() subtitle = '';
+  /** Router link of the parent screen; shows a « Retour » link above the title when set. */
+  @Input() back: string | any[] | null = null;
+  @Input() backLabel = 'Retour';
+}
 
 export const SHARED_UI = [IconComponent, LogoComponent, StatusBadgeComponent, PaginationComponent, ChartComponent, ConfirmComponent, PageHeaderComponent] as const;

@@ -10,7 +10,11 @@ La cloche indique les dossiers qui attendent votre action.
    père si connu). Seule la date de naissance est exigée pour un brouillon.
 2. **Enregistrer le brouillon** pour continuer plus tard, ou **Enregistrer et transmettre** : la transmission vérifie
    les informations minimales (date de naissance, sexe, nom de l'enfant, nom de la mère).
-3. Joignez le scan du formulaire (PDF, JPG ou PNG, 10 Mo max) depuis la fiche du dossier.
+3. **Fiche de déclaration physique** : en haut du formulaire, **Prendre une photo** (sur téléphone, ouvre l'appareil photo)
+   ou **Importer un fichier** (sur ordinateur, choisissez une image ou un PDF). Vous pouvez joindre plusieurs pages ; les
+   photos sont enregistrées avec le dossier et restent visibles sur sa fiche (clic pour agrandir, **Retirer** tant que le
+   dossier est modifiable). Formats : JPG, PNG ou PDF, 10 Mo max (les grosses photos sont réduites automatiquement).
+   Les autres pièces (identités, etc.) s'ajoutent depuis la fiche du dossier.
 4. Si le dossier vous est retourné (**À corriger — collecte**), le motif est affiché : corrigez puis retransmettez.
 
 Vous ne voyez que vos propres déclarations. Vous ne pouvez plus modifier un dossier transmis.

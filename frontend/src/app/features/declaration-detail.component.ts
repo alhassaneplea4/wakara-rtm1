@@ -7,6 +7,7 @@ import { ApiService, errorMessage } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { Acte, AuditEntry, AvailableTransition, DeclarationDetail, Page, STATUS_LABELS, Status, SupportingDocument } from '../core/models';
 import { ToastService } from '../core/toast.service';
+import { PaperFormComponent } from '../shared/paper-form.component';
 import { ConfirmComponent, IconComponent, PageHeaderComponent, StatusBadgeComponent } from '../shared/ui';
 
 const ACTION: Partial<Record<Status, { label: string; icon: string; cls: string; confirm?: string }>> = {
@@ -21,11 +22,11 @@ const ACTION: Partial<Record<Status, { label: string; icon: string; cls: string;
 
 @Component({
   selector: 'wk-declaration-detail', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, StatusBadgeComponent, ConfirmComponent],
+  imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, StatusBadgeComponent, ConfirmComponent, PaperFormComponent],
   template: `
     @if (d(); as d) {
       <div class="page">
-        <wk-page-header [title]="d.reference" [subtitle]="(d.child_name || 'Enfant non nommé') + ' · ' + (d.hospital_name || 'Établissement non identifié')">
+        <wk-page-header [title]="d.reference" [back]="['/declarations']" backLabel="Retour aux déclarations" [subtitle]="(d.child_name || 'Enfant non nommé') + ' · ' + (d.hospital_name || 'Établissement non identifié')">
           <wk-status [status]="d.status" />
           @if (d.can_edit) { <a class="btn" [routerLink]="['/declarations', d.uuid, 'edit']"><wk-icon name="edit" [size]="16" /> Modifier</a> }
           @if (d.acte_uuid && auth.can('acte.view')) {
@@ -99,11 +100,14 @@ const ACTION: Partial<Record<Status, { label: string; icon: string; cls: string;
 
         @if (auth.can('document.view')) {
           <section class="card" style="margin-top:16px">
+            <wk-paper-form [declaration]="d.uuid" [editable]="auth.can('document.upload') && !frozen(d)" />
+          </section>
+          <section class="card" style="margin-top:16px">
             <div class="card-title"><h2>Pièces justificatives</h2>
               @if (auth.can('document.upload') && !frozen(d)) {
                 <div class="row">
                   <select class="input kind" [(ngModel)]="kind" aria-label="Type de pièce">
-                    <option value="HOSPITAL_FORM">Déclaration hospitalière</option><option value="PARENT_ID">Pièce d'un parent</option>
+                    <option value="PARENT_ID">Pièce d'un parent</option><option value="HOSPITAL_FORM">Déclaration hospitalière</option>
                     <option value="DECLARANT_ID">Pièce du déclarant</option><option value="OTHER">Autre</option></select>
                   <label class="btn btn-sm"><wk-icon name="upload" [size]="14" /> Ajouter (PDF, JPG, PNG)
                     <input type="file" hidden accept=".pdf,.jpg,.jpeg,.png" (change)="upload($event)" /></label>
@@ -196,13 +200,13 @@ export class DeclarationDetailComponent implements OnInit {
   busy = signal(false);
   pending = signal<AvailableTransition | null>(null);
   archiving = signal(false);
-  kind = 'HOSPITAL_FORM';
+  kind = 'PARENT_ID';
   num: { annee: number | null; registre: string; feuillet: string; numero_acte: string } = { annee: null, registre: '', feuillet: '', numero_acte: '' };
 
   ngOnInit() { this.route.paramMap.subscribe(() => this.load()); }
 
   private uuid() { return this.route.snapshot.paramMap.get('uuid')!; }
-  kindLabel(k: string) { return ({ HOSPITAL_FORM: 'Déclaration hospitalière', PARENT_ID: "Pièce d'un parent", DECLARANT_ID: 'Pièce du déclarant', OTHER: 'Autre pièce' } as Record<string, string>)[k] ?? k; }
+  kindLabel(k: string) { return ({ PAPER_FORM: 'Fiche de déclaration physique', HOSPITAL_FORM: 'Déclaration hospitalière', PARENT_ID: "Pièce d'un parent", DECLARANT_ID: 'Pièce du déclarant', OTHER: 'Autre pièce' } as Record<string, string>)[k] ?? k; }
   sizeLabel(bytes: number) { return bytes < 1024 ? '< 1 Ko' : bytes < 1048576 ? `${Math.round(bytes / 1024)} Ko` : `${(bytes / 1048576).toFixed(1)} Mo`; }
   label(s: string) { return STATUS_LABELS[s as Status] ?? s; }
   meta(t: AvailableTransition) { return ACTION[t.target] ?? { label: t.target, icon: 'arrow', cls: '' }; }
@@ -228,7 +232,7 @@ export class DeclarationDetailComponent implements OnInit {
             error: () => this.journal.set([]),
           });
         }
-        if (this.auth.can('document.view')) this.api.get<Page<SupportingDocument>>('/documents/', { declaration: d.uuid }).subscribe(p => this.docs.set(p.results));
+        if (this.auth.can('document.view')) this.api.get<Page<SupportingDocument>>('/documents/', { declaration: d.uuid, page_size: 100 }).subscribe(p => this.docs.set(p.results.filter(x => x.kind !== 'PAPER_FORM')));
       },
       error: e => this.error.set(errorMessage(e)),
     });

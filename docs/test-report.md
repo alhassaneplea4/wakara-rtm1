@@ -2,7 +2,7 @@
 
 Dernière mise à jour : 29/10/2026 — Windows 11, Python 3.14, Django 5.2, Node 24, Angular 17.
 
-## 1. Backend — `python manage.py test tests` : **76 tests, tous réussis**
+## 1. Backend — `python manage.py test tests` : **77 tests, tous réussis**
 
 | Domaine | Fichier | Ce qui est vérifié |
 |---|---|---|
@@ -14,7 +14,7 @@ Dernière mise à jour : 29/10/2026 — Windows 11, Python 3.14, Django 5.2, Nod
 | Documents d'acte | idem | Aperçu non officiel avant validation ; impression / délivrance refusées avant validation et à l'agent |
 | Intégrité | `test_integrity.py` | `delete()` bloqué partout ; `DELETE` API = archivage tracé ; établissement utilisé désactivé / archivé sans perte ; `AuditLog` et `StatusHistory` en ajout seul ; API d'audit en lecture seule |
 | Audit | idem | `created_by` / `updated_by` côté serveur ; diff des champs ; consultation et export du journal tracés ; exports réservés ; événements de gestion des comptes |
-| Pièces | idem | Dépôt, SHA-256, téléchargement authentifié et audité ; extension / signature / taille ; accès hors visibilité refusé ; dossier figé ; nom aléatoire |
+| Pièces | idem | Photo / scan de la fiche physique (`PAPER_FORM`, plusieurs pages, archivage) ; dépôt, SHA-256, téléchargement authentifié et audité ; extension / signature / taille ; accès hors visibilité refusé ; dossier figé ; nom aléatoire |
 | Statistiques | idem | KPI, répartitions, série mensuelle = données de la base ; filtres ; périmètre ; compteurs de notifications |
 | Divers | `test_misc.py` | Filtre « responsable » (sans doublon, réservé aux profils autorisés) ; textes publics de connexion seuls exposés ; édition des paramètres protégée et auditée ; journal filtrable par dossier |
 | Sauvegarde | `test_backup.py` | Sauvegarde → corruption → restauration SQLite |

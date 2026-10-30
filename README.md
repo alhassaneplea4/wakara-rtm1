@@ -67,7 +67,7 @@ la complétude des données, puis écrit l'historique et le journal d'audit dans
 ## Tests
 
 ```bash
-cd backend && python manage.py test tests        # 76 tests (workflow, permissions, audit, intégrité, documents, stats, sauvegarde)
+cd backend && python manage.py test tests        # 77 tests (workflow, permissions, audit, intégrité, documents, stats, sauvegarde)
 cd frontend && npm run build                     # compilation stricte
 ```
 

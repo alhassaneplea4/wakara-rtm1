@@ -1,10 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService, errorMessage, fieldErrors } from '../core/api.service';
 import { DeclarationDetail, Hospital, Page } from '../core/models';
 import { ToastService } from '../core/toast.service';
+import { PaperFormComponent } from '../shared/paper-form.component';
 import { IconComponent, PageHeaderComponent } from '../shared/ui';
 
 type PersonForm = { first_names: string; last_name: string; age: number | null; nationality: string; profession: string; address: string; phone: string; date_of_birth: string; birth_place: string; id_type: string; id_number: string };
@@ -13,7 +14,7 @@ const nullIfEmpty = (v: unknown) => (v === '' || v === undefined ? null : v);
 
 @Component({
   selector: 'wk-declaration-form', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, IconComponent, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, RouterLink, IconComponent, PageHeaderComponent, PaperFormComponent],
   template: `
     <div class="page">
       <wk-page-header [title]="uuid ? 'Modifier la déclaration' : 'Nouvelle déclaration de naissance'"
@@ -25,6 +26,10 @@ const nullIfEmpty = (v: unknown) => (v === '' || v === undefined ? null : v);
 
       @if (loaded()) {
         <form (ngSubmit)="save(false)" class="stack" #f="ngForm">
+          <section class="card">
+            <wk-paper-form [declaration]="uuid" [editable]="true" />
+          </section>
+
           <section class="card">
             <div class="card-title"><h2>Établissement de santé</h2></div>
             <div class="form-grid">
@@ -129,6 +134,8 @@ export class DeclarationFormComponent implements OnInit {
   private router = inject(Router);
   private toast = inject(ToastService);
 
+  @ViewChild(PaperFormComponent) paper?: PaperFormComponent;
+
   uuid = '';
   ref = '';
   status = 'DRAFT';
@@ -200,7 +207,10 @@ export class DeclarationFormComponent implements OnInit {
     this.busy.set(true); this.transmitting = transmit;
     const req = this.uuid ? this.api.patch<DeclarationDetail>(`/declarations/${this.uuid}/`, this.payload()) : this.api.post<DeclarationDetail>('/declarations/', this.payload());
     req.subscribe({
-      next: d => {
+      next: async d => {
+        // New dossier: the photos taken before saving are attached now that the dossier exists.
+        const failed = this.uuid ? 0 : (await this.paper?.uploadPending(d.uuid)) ?? 0;
+        if (failed) this.toast.error(`${failed} fichier(s) de la fiche n'ont pas pu être joints : rouvrez le dossier pour les ajouter à nouveau.`);
         if (!transmit) { this.busy.set(false); this.toast.success(this.uuid ? 'Modifications enregistrées.' : `Brouillon ${d.reference} enregistré.`); this.router.navigate(['/declarations', d.uuid]); return; }
         this.api.post<DeclarationDetail>(`/declarations/${d.uuid}/transition/`, { status: 'TRANSMITTED' }).subscribe({
           next: () => { this.busy.set(false); this.toast.success(`Déclaration ${d.reference} transmise au secrétariat.`); this.router.navigate(['/declarations', d.uuid]); },

@@ -6,7 +6,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { environment } from '@env/environment';
 import { errorMessage } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
-import { IconComponent, LogoComponent } from '../shared/ui';
+import { IconComponent } from '../shared/ui';
 
 interface PublicSettings { [key: string]: string; }
 
@@ -19,13 +19,12 @@ const FALLBACK: PublicSettings = {
 
 @Component({
   selector: 'wk-login', standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent, LogoComponent],
+  imports: [CommonModule, FormsModule, IconComponent],
   template: `
     <div class="login">
       <section class="left">
         <div class="box">
-          <wk-logo [big]="true" subtitle="État civil de la mairie de Ratoma" />
-          <div class="rule"></div>
+          <img class="brand" src="assets/logo-full.png" alt="Wakara — État civil de la mairie de Ratoma" width="1572" height="581" />
           <h1>Bienvenue sur Wakara</h1>
           <p class="intro">Connectez-vous à votre espace de travail pour accéder à la gestion des déclarations et actes de naissance.</p>
 
@@ -70,10 +69,7 @@ const FALLBACK: PublicSettings = {
             <path d="M400 320h400M470 60l-40-30h330l-40 30"/>
           </g>
           <text x="440" y="48" fill="#9cc4ff" opacity=".5" font-size="22" font-weight="700" letter-spacing="3" transform="rotate(-3 440 48)">MAIRIE DE RATOMA</text>
-          <g transform="translate(440 300) scale(5.2)" opacity=".16" fill="#fff">
-            <circle cx="36" cy="24" r="7"/><path d="M24 46c1-8 6-12 12-12s11 4 12 12c-4 5-8 7-12 7s-9-2-12-7z"/>
-            <path d="M44 10C30 4 12 14 12 33c0 15 10 24 22 24 9 0 17-5 19-14" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
-          </g>
+          <image href="assets/logo-mark.png" x="440" y="290" width="330" height="330" opacity=".12" style="filter:brightness(0) invert(1)"/>
         </svg>
 
         <div class="content">
@@ -108,8 +104,7 @@ const FALLBACK: PublicSettings = {
     .login{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);height:100vh;min-height:620px;background:#fff;overflow:hidden}
     .left{display:grid;place-items:center;padding:24px;background:radial-gradient(900px 500px at 0% 0%,#eaf2ff 0,#fff 60%);overflow-y:auto}
     .box{width:min(480px,100%);display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px}
-    .box>wk-logo{align-self:center}
-    .rule{width:44px;height:3px;background:var(--wk-royal);border-radius:3px;margin-top:-4px}
+    .brand{width:min(380px,92%);height:auto;align-self:center}
     h1{font-size:28px;font-weight:800;margin-top:10px}
     .intro{color:var(--wk-text-soft);max-width:400px}
     form{width:100%;display:flex;flex-direction:column;gap:14px;margin-top:8px;text-align:left}
@@ -142,14 +137,11 @@ const FALLBACK: PublicSettings = {
     .ico{width:54px;height:54px;border-radius:14px;display:grid;place-items:center;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);margin-bottom:6px}
 
     @media (max-width:1100px){.features{grid-template-columns:repeat(2,minmax(0,1fr))}}
-    @media (max-width:900px){
-      .login{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto;height:auto;min-height:100vh;overflow:visible}
-      .left{padding:32px 20px}
-      .right{min-height:0}
-      .content{padding:32px 20px;gap:14px}
-      h2{font-size:28px}
-      .features{display:none}
-      .desc{font-size:14px}
+    /* Mobile and tablet: the sign-in form only, without the information panel. */
+    @media (max-width:1024px){
+      .login{grid-template-columns:minmax(0,1fr);height:auto;min-height:100vh;overflow:visible}
+      .right{display:none}
+      .left{padding:32px 20px;min-height:100vh}
     }
     @media (max-width:420px){h1{font-size:24px}.control{height:52px}}
   `],
