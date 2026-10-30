@@ -1,0 +1,7 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "wakara-api", "runtimeExecutable": "backend/venv/Scripts/python.exe", "runtimeArgs": ["backend/manage.py", "runserver", "8000", "--noreload"], "port": 8000 },
+    { "name": "wakara-web", "runtimeExecutable": "npm", "runtimeArgs": ["--prefix", "frontend", "start", "--", "--port", "4200"], "port": 4200 }
+  ]
+}
