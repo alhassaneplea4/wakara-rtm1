@@ -159,12 +159,14 @@ STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 PRIVATE_MEDIA_ROOT = Path(config('PRIVATE_MEDIA_ROOT', default=str(BASE_DIR / 'private_media')))
 
-# Private documents: local folder by default; a PRIVATE S3-compatible bucket (AWS S3, Cloudflare R2,
-# Supabase Storage…) when DOCUMENTS_S3_BUCKET is set. This is mandatory on serverless hosts such as Vercel,
-# whose filesystem is read-only and not persistent. Objects are never public: files are streamed by the
+# Private documents: local folder by default; inside the PostgreSQL database (DOCUMENTS_STORAGE=database, the
+# default on Vercel); or a PRIVATE S3-compatible bucket (AWS S3, Cloudflare R2, Supabase Storage…) when
+# DOCUMENTS_S3_BUCKET is set. A serverless host such as Vercel has a read-only, non-persistent filesystem. Objects are never public: files are streamed by the
 # authenticated download endpoint.
 DOCUMENTS_S3_BUCKET = config('DOCUMENTS_S3_BUCKET', default='')
-if DOCUMENTS_S3_BUCKET:
+# filesystem | s3 | database. Default: s3 when a bucket is given, database on Vercel, folder otherwise.
+DOCUMENTS_STORAGE = config('DOCUMENTS_STORAGE', default='s3' if DOCUMENTS_S3_BUCKET else ('database' if os.environ.get('VERCEL') else 'filesystem'))
+if DOCUMENTS_STORAGE == 's3':
     _private_storage = {
         'BACKEND': 'storages.backends.s3.S3Storage',
         'OPTIONS': {
@@ -179,6 +181,8 @@ if DOCUMENTS_S3_BUCKET:
             'location': 'wakara/private',
         },
     }
+elif DOCUMENTS_STORAGE == 'database':
+    _private_storage = {'BACKEND': 'documents.storage.DatabaseStorage'}
 else:
     _private_storage = {
         'BACKEND': 'django.core.files.storage.FileSystemStorage',

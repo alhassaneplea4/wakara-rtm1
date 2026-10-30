@@ -57,7 +57,7 @@ class Command(BaseCommand):
             with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as z:
                 z.write(dump, dump.name)
                 root = Path(settings.PRIVATE_MEDIA_ROOT)
-                if settings.DOCUMENTS_S3_BUCKET:
+                if settings.DOCUMENTS_STORAGE == 's3':
                     self.stdout.write(self.style.WARNING(
                         "Documents stockés dans un bucket S3 : non inclus dans cette sauvegarde "
                         "(activez le versionnement / la réplication du bucket)."))

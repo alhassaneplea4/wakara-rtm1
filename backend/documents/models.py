@@ -10,7 +10,7 @@ from django.db import models
 from core.mixins import BaseModel
 
 def private_storage():
-    """Private storage configured in settings.STORAGES['private'] (local folder or private S3 bucket)."""
+    """Private storage configured in settings.STORAGES['private'] (local folder, private S3 bucket or database)."""
     return storages['private']
 
 
@@ -18,6 +18,16 @@ def upload_path(instance, filename):
     # Random name on disk: the original name is kept in the DB only.
     ext = os.path.splitext(filename)[1].lower()
     return f"declarations/{instance.declaration.uuid}/{uuid_lib.uuid4().hex}{ext}"
+
+
+class StoredFile(models.Model):
+    """Content of a document when DOCUMENTS_STORAGE=database (see documents.storage)."""
+    name = models.CharField(max_length=255, unique=True)
+    content = models.BinaryField()
+    size = models.PositiveIntegerField(default=0)
+
+    def __str__(self):
+        return self.name
 
 
 class SupportingDocument(BaseModel):

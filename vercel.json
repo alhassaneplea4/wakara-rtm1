@@ -3,7 +3,8 @@
   "services": {
     "backend": {
       "root": "backend",
-      "framework": "django"
+      "framework": "django",
+      "buildCommand": "python build.py"
     },
     "frontend": {
       "root": "frontend",
