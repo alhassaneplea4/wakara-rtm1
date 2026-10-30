@@ -16,7 +16,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ──────────────────────────────────────────────
 # Security
 # ──────────────────────────────────────────────
-SECRET_KEY = config('SECRET_KEY')
+ON_VERCEL = bool(os.environ.get('VERCEL'))
+SECRET_KEY = config('SECRET_KEY', default='')
+if not SECRET_KEY and ON_VERCEL and os.environ.get('DATABASE_URL'):
+    # No SECRET_KEY configured on Vercel: derive a stable, private one from the database credentials
+    # (random, known only to Vercel and Neon). Define SECRET_KEY explicitly to use your own value.
+    import hashlib
+    import hmac
+    SECRET_KEY = hmac.new(os.environ['DATABASE_URL'].encode(), b'wakara-django-secret-key-v1', hashlib.sha256).hexdigest()
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY manquante : renseignez-la dans backend/.env (voir .env.example).")
 DEBUG = config('DEBUG', default=False, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
 # Vercel injects the deployment hostnames: allow them automatically (no wildcard).
@@ -165,7 +174,7 @@ PRIVATE_MEDIA_ROOT = Path(config('PRIVATE_MEDIA_ROOT', default=str(BASE_DIR / 'p
 # authenticated download endpoint.
 DOCUMENTS_S3_BUCKET = config('DOCUMENTS_S3_BUCKET', default='')
 # filesystem | s3 | database. Default: s3 when a bucket is given, database on Vercel, folder otherwise.
-DOCUMENTS_STORAGE = config('DOCUMENTS_STORAGE', default='s3' if DOCUMENTS_S3_BUCKET else ('database' if os.environ.get('VERCEL') else 'filesystem'))
+DOCUMENTS_STORAGE = config('DOCUMENTS_STORAGE', default='s3' if DOCUMENTS_S3_BUCKET else ('database' if ON_VERCEL else 'filesystem'))
 if DOCUMENTS_STORAGE == 's3':
     _private_storage = {
         'BACKEND': 'storages.backends.s3.S3Storage',
@@ -284,7 +293,8 @@ SPECTACULAR_SETTINGS = {
 # ──────────────────────────────────────────────
 # File uploads
 # ──────────────────────────────────────────────
-MAX_UPLOAD_SIZE = config('MAX_UPLOAD_SIZE_MB', default=10, cast=int) * 1024 * 1024
+# Vercel functions accept 4.5 MB per request at most, hence 4 MB by default there.
+MAX_UPLOAD_SIZE = config('MAX_UPLOAD_SIZE_MB', default=4 if ON_VERCEL else 10, cast=int) * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE
 
 # ──────────────────────────────────────────────

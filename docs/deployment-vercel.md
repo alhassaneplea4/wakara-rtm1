@@ -21,11 +21,9 @@ Le disque d'une fonction Vercel est en lecture seule et non persistant : SQLite 
 
 | Variable | Valeur |
 |---|---|
-| `SECRET_KEY` | `python -c "import secrets; print(secrets.token_urlsafe(64))"` |
-| `DEBUG` | `False` |
+| `SECRET_KEY` | *(facultatif)* sur Vercel, une clé est dérivée des identifiants de la base si elle est absente. Pour la fixer : `python -c "import secrets; print(secrets.token_urlsafe(64))"` |
 | `DATABASE_URL` | ajoutée par l'intégration Neon (sinon : URL PostgreSQL avec `?sslmode=require`) |
-| `MAX_UPLOAD_SIZE_MB` | `4` : une fonction Vercel refuse les requêtes de plus de 4,5 Mo |
-| `WAKARA_ADMIN_USERNAME`, `WAKARA_ADMIN_PASSWORD` | premier administrateur technique (voir ci-dessous) |
+| `WAKARA_ADMIN_USERNAME`, `WAKARA_ADMIN_PASSWORD` | **à ajouter par vous** : premier administrateur technique (voir ci-dessous) |
 | `ALLOWED_HOSTS` / `CSRF_TRUSTED_ORIGINS` | seulement pour un domaine personnalisé (`domaine.com` / `https://domaine.com`) ; les noms `*.vercel.app` sont autorisés automatiquement |
 | *(facultatif)* `DOCUMENTS_S3_BUCKET`, `DOCUMENTS_S3_ACCESS_KEY`, `DOCUMENTS_S3_SECRET_KEY`, `DOCUMENTS_S3_ENDPOINT_URL`, `DOCUMENTS_S3_REGION` | documents dans un bucket S3 privé au lieu de la base |
 
