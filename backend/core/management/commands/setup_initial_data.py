@@ -51,21 +51,33 @@ class Command(BaseCommand):
 
         if options['skip_admin']:
             return
-        username = config('WAKARA_ADMIN_USERNAME', default='')
-        password = config('WAKARA_ADMIN_PASSWORD', default='')
-        if not username or not password:
-            self.stdout.write(self.style.WARNING(
-                "WAKARA_ADMIN_USERNAME / WAKARA_ADMIN_PASSWORD absents du .env : aucun administrateur créé."))
-            return
-        user, created = User.objects.get_or_create(
-            username=username,
-            defaults={'email': config('WAKARA_ADMIN_EMAIL', default=''),
-                      'first_name': 'Administrateur', 'last_name': 'Technique'})
-        if created:
-            user.set_password(password)
-            user.save()  # NOT a Django superuser: business role only
-            self.stdout.write(self.style.SUCCESS(f"Administrateur technique créé : {username}"))
-        UserRole.objects.get_or_create(user=user, role=Role.objects.get(codename='admin'),
-                                       defaults={'assigned_by': user})
-        if not created:
-            self.stdout.write(f"Administrateur existant : {username}")
+        # (variable prefix, role, first name, last name, label). Only the administrator is mandatory;
+        # the others are optional starter accounts. Passwords are read only when the account is created.
+        accounts = [
+            ('WAKARA_ADMIN', 'admin', 'Administrateur', 'Technique', 'Administrateur technique'),
+            ('WAKARA_SECRETARY', 'secretary', 'Secrétaire', "d'état civil", "Secrétaire d'état civil"),
+            ('WAKARA_AGENT', 'collection_agent', 'Agent', 'de collecte', 'Agent de collecte'),
+        ]
+        admin_user = None
+        for prefix, role_code, first, last, label in accounts:
+            username = config(f'{prefix}_USERNAME', default='')
+            password = config(f'{prefix}_PASSWORD', default='')
+            if not username or not password:
+                if prefix == 'WAKARA_ADMIN':
+                    self.stdout.write(self.style.WARNING(
+                        "WAKARA_ADMIN_USERNAME / WAKARA_ADMIN_PASSWORD absents : aucun administrateur créé."))
+                continue
+            user, created = User.objects.get_or_create(
+                username=username,
+                defaults={'email': config(f'{prefix}_EMAIL', default=''), 'first_name': first, 'last_name': last})
+            if created:
+                user.set_password(password)
+                user.must_change_password = True  # chosen by the person at the first sign-in
+                user.save()  # NOT a Django superuser: business role only
+                self.stdout.write(self.style.SUCCESS(f"{label} créé : {username}"))
+            else:
+                self.stdout.write(f"{label} existant : {username}")
+            if prefix == 'WAKARA_ADMIN':
+                admin_user = user
+            UserRole.objects.get_or_create(user=user, role=Role.objects.get(codename=role_code),
+                                           defaults={'assigned_by': admin_user or user})

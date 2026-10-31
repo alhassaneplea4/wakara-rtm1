@@ -28,6 +28,7 @@ Le disque d'une fonction Vercel est en lecture seule et non persistant : SQLite 
 | `SECRET_KEY` | *(facultatif)* sur Vercel, une clé est dérivée des identifiants de la base si elle est absente. Pour la fixer : `python -c "import secrets; print(secrets.token_urlsafe(64))"` |
 | `DATABASE_URL` | ajoutée par l'intégration Neon (sinon : URL PostgreSQL avec `?sslmode=require`) |
 | `WAKARA_ADMIN_USERNAME`, `WAKARA_ADMIN_PASSWORD` | **à ajouter par vous** : premier administrateur technique (voir ci-dessous) |
+| *(facultatif)* `WAKARA_SECRETARY_USERNAME` / `_PASSWORD`, `WAKARA_AGENT_USERNAME` / `_PASSWORD` | comptes de départ secrétaire et agent de collecte, créés de la même façon |
 | `ALLOWED_HOSTS` / `CSRF_TRUSTED_ORIGINS` | seulement pour un domaine personnalisé (`domaine.com` / `https://domaine.com`) ; les noms `*.vercel.app` sont autorisés automatiquement |
 | *(facultatif)* `DOCUMENTS_S3_BUCKET`, `DOCUMENTS_S3_ACCESS_KEY`, `DOCUMENTS_S3_SECRET_KEY`, `DOCUMENTS_S3_ENDPOINT_URL`, `DOCUMENTS_S3_REGION` | documents dans un bucket S3 privé au lieu de la base |
 
@@ -41,6 +42,7 @@ python manage.py setup_initial_data
 ```
 
 - Les deux commandes sont idempotentes : permissions, rôles et paramètres sont créés une fois, les migrations ajoutées plus tard s'appliquent seules.
+- Les comptes créés ainsi doivent **changer leur mot de passe à la première connexion**. Un mot de passe `WAKARA_*_PASSWORD` n'est lu que si le compte n'existe pas encore.
 - `WAKARA_ADMIN_PASSWORD` n'est lu que si l'administrateur n'existe pas encore. **Une fois connecté, changez son mot de passe puis supprimez cette variable de Vercel.**
 - Les déploiements *Preview* ne touchent jamais à la base. Le build de production échoue avec un message clair si `DATABASE_URL` est absente.
 - `seed_demo` est refusé en production (c'est voulu).

@@ -48,3 +48,31 @@ class DossierAuditTrailTests(WakaraTestCase):
         actions = {e['action'] for e in r.data['results']}
         self.assertTrue({'create', 'transmit'} <= actions)
         self.assertEqual(self.client_for(self.agent).get(f'/api/audit/?object_id={d["uuid"]}').status_code, 403)
+
+
+class StarterAccountsTests(WakaraTestCase):
+    ENV = {
+        'WAKARA_ADMIN_USERNAME': 'adm.prod', 'WAKARA_ADMIN_PASSWORD': 'Adm-Initial-Pass-1!',
+        'WAKARA_SECRETARY_USERNAME': 'sec.prod', 'WAKARA_SECRETARY_PASSWORD': 'Sec-Initial-Pass-1!',
+        'WAKARA_AGENT_USERNAME': 'agt.prod', 'WAKARA_AGENT_PASSWORD': 'Agt-Initial-Pass-1!',
+    }
+
+    def test_setup_creates_the_three_starter_accounts_idempotently(self):
+        from unittest import mock
+
+        from django.contrib.auth import get_user_model
+        from django.core.management import call_command
+
+        User = get_user_model()
+        with mock.patch.dict('os.environ', self.ENV):
+            call_command('setup_initial_data', verbosity=0)
+            call_command('setup_initial_data', verbosity=0)  # second run: nothing duplicated or reset
+        expected = {'adm.prod': 'admin', 'sec.prod': 'secretary', 'agt.prod': 'collection_agent'}
+        for username, role in expected.items():
+            u = User.objects.get(username=username)
+            self.assertFalse(u.is_superuser)
+            self.assertTrue(u.must_change_password)
+            self.assertEqual(list(u.user_roles.values_list('role__codename', flat=True)), [role])
+        # they can sign in with the initial password
+        r = APIClient().post('/api/auth/login/', {'username': 'sec.prod', 'password': self.ENV['WAKARA_SECRETARY_PASSWORD']}, format='json')
+        self.assertEqual(r.status_code, 200)
