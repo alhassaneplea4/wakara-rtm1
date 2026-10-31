@@ -111,9 +111,9 @@ class AppendOnlyTests(WakaraTestCase):
 class AuditTraceabilityTests(WakaraTestCase):
     def test_created_by_and_updated_by_are_server_side(self):
         c = self.client_for(self.admin)
-        r = c.post('/api/hospitals/', {'code': 'hnd', 'name': 'Hôpital Donka', 'created_by': self.agent.pk}, format='json')
+        r = c.post('/api/hospitals/', {'name': 'Hôpital Donka', 'created_by': self.agent.pk}, format='json')
         self.assertEqual(r.status_code, 201, r.content)
-        h = Hospital.objects.get(code='HND')
+        h = Hospital.objects.get(name='Hôpital Donka')
         self.assertEqual(h.created_by, self.admin)
         c.patch(f'/api/hospitals/{h.uuid}/', {'name': 'Donka'}, format='json')
         h.refresh_from_db()

@@ -49,9 +49,10 @@ const TYPES = [['HOSPITAL', 'Hôpital'], ['MATERNITY', 'Maternité'], ['CLINIC',
       <div class="modal-backdrop" (click)="form.set(null)">
         <div class="modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
           <h2>{{ editing ? 'Modifier l\\'établissement' : 'Nouvel établissement' }}</h2>
+          @if (!editing) { <p class="soft" style="margin-bottom:12px">Le code (format <span class="mono">WH-0001-26</span>) est attribué automatiquement à l'enregistrement.</p> }
           @if (formError()) { <div class="alert alert-danger" style="margin-bottom:12px">{{ formError() }}</div> }
           <div class="form-grid">
-            <div class="field"><label class="req">Code</label><input class="input" [(ngModel)]="f.code" [class.invalid]="errs()['code']" /><span class="field-error">{{ errs()['code'] }}</span></div>
+            @if (editing) { <div class="field"><label>Code</label><input class="input mono" [value]="editing.code" readonly aria-readonly="true" /></div> }
             <div class="field"><label>Type</label><select class="input" [(ngModel)]="f.facility_type">@for (t of types; track t[0]) { <option [value]="t[0]">{{ t[1] }}</option> }</select></div>
             <div class="field wide"><label class="req">Nom officiel</label><input class="input" [(ngModel)]="f.name" [class.invalid]="errs()['name']" /><span class="field-error">{{ errs()['name'] }}</span></div>
             <div class="field"><label>Région</label><input class="input" [(ngModel)]="f.region" /></div>
@@ -92,11 +93,11 @@ export class HospitalsComponent implements OnInit {
   }
   edit(h: Hospital | null) {
     this.editing = h; this.formError.set(''); this.errs.set({});
-    this.form.set(h ? { ...h } : { code: '', name: '', facility_type: 'HOSPITAL', region: 'Conakry', commune: 'Ratoma', address: '', contact_name: '', phone: '', email: '' });
+    this.form.set(h ? { ...h } : { name: '', facility_type: 'HOSPITAL', region: 'Conakry', commune: 'Ratoma', address: '', contact_name: '', phone: '', email: '' });
   }
   save() {
     const f = this.form(); this.busy.set(true); this.formError.set(''); this.errs.set({});
-    const body = { code: f.code, name: f.name, facility_type: f.facility_type, region: f.region, commune: f.commune, address: f.address, contact_name: f.contact_name, phone: f.phone, email: f.email };
+    const body = { name: f.name, facility_type: f.facility_type, region: f.region, commune: f.commune, address: f.address, contact_name: f.contact_name, phone: f.phone, email: f.email };
     const req = this.editing ? this.api.patch<Hospital>(`/hospitals/${this.editing.uuid}/`, body) : this.api.post<Hospital>('/hospitals/', body);
     req.subscribe({
       next: () => { this.busy.set(false); this.form.set(null); this.toast.success('Établissement enregistré.'); this.load(); },

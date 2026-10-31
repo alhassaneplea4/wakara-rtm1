@@ -67,8 +67,8 @@ class Command(BaseCommand):
 
         hospitals = []
         for code, name, kind in HOSPITALS:
-            h, _ = Hospital.objects.get_or_create(
-                code=code, defaults={'name': name, 'facility_type': kind, 'created_by': admin})
+            h, _ = Hospital.objects.get_or_create(  # the code WH-0001-26 is generated automatically
+                name=name, defaults={'facility_type': kind, 'created_by': admin})
             hospitals.append(h)
 
         agent, secretary = users['collection_agent'], users['secretary']

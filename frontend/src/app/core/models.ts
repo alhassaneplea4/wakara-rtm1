@@ -30,7 +30,7 @@ export const STATUS_TONE: Record<Status, 'success' | 'warning' | 'danger' | 'inf
 
 export interface DeclarationListItem {
   uuid: string; reference: string; status: Status; status_label: string; hospital: string | null;
-  hospital_name: string | null; birth_date: string; received_at: string; child_name: string;
+  hospital_name: string | null; hospital_code?: string | null; birth_date: string; received_at: string; child_name: string;
   assigned_to_name: string; official_number: string | null; updated_at: string; created_at: string;
 }
 

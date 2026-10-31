@@ -47,6 +47,7 @@ def _full_name(user):
 class DeclarationListSerializer(serializers.ModelSerializer):
     hospital = serializers.SlugRelatedField(slug_field='uuid', read_only=True)
     hospital_name = serializers.CharField(source='hospital.name', read_only=True, default=None)
+    hospital_code = serializers.CharField(source='hospital.code', read_only=True, default=None)
     child_name = serializers.SerializerMethodField()
     status_label = serializers.CharField(source='get_status_display', read_only=True)
     assigned_to_name = serializers.SerializerMethodField()
@@ -55,7 +56,7 @@ class DeclarationListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Declaration
         fields = [
-            'uuid', 'reference', 'status', 'status_label', 'hospital', 'hospital_name',
+            'uuid', 'reference', 'status', 'status_label', 'hospital', 'hospital_name', 'hospital_code',
             'birth_date', 'received_at', 'child_name', 'assigned_to_name', 'official_number',
             'updated_at', 'created_at',
         ]

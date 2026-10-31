@@ -59,7 +59,7 @@ const ACTION: Partial<Record<Status, { label: string; icon: string; cls: string;
             <dl class="kv">
               <dt>Date</dt><dd>{{ d.birth_date | date: 'dd/MM/yyyy' }} {{ d.birth_time ? 'à ' + d.birth_time.slice(0,5) : '' }}</dd>
               <dt>Lieu</dt><dd>{{ d.birth_place || '—' }}</dd>
-              <dt>Établissement</dt><dd>{{ d.hospital_name || 'Non identifié' }}</dd>
+              <dt>Établissement</dt><dd>{{ d.hospital_name || 'Non identifié' }} @if (d.hospital_code) { <span class="mono muted">({{ d.hospital_code }})</span> }</dd>
               <dt>Réf. hospitalière</dt><dd>{{ d.hospital_document_ref || '—' }}</dd>
               <dt>Médecin</dt><dd>{{ d.doctor_name || '—' }}</dd><dt>Sage-femme</dt><dd>{{ d.midwife_name || '—' }}</dd>
               <dt>Reçue le</dt><dd>{{ d.received_at | date: 'dd/MM/yyyy' }}</dd><dt>Responsable</dt><dd>{{ d.assigned_to_name || '—' }}</dd>

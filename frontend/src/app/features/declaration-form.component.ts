@@ -36,7 +36,7 @@ const nullIfEmpty = (v: unknown) => (v === '' || v === undefined ? null : v);
               <div class="field"><label>Établissement</label>
                 <select class="input" name="hospital" [(ngModel)]="m.hospital" [class.invalid]="err('hospital')">
                   <option [ngValue]="null">— Non identifié —</option>
-                  @for (h of hospitals(); track h.uuid) { <option [ngValue]="h.uuid">{{ h.name }}</option> }
+                  @for (h of hospitals(); track h.uuid) { <option [ngValue]="h.uuid">{{ h.name }} ({{ h.code }})</option> }
                 </select><span class="field-error">{{ err('hospital') }}</span></div>
               <div class="field"><label>Référence du document hospitalier</label><input class="input" name="ref" [(ngModel)]="m.hospital_document_ref" /></div>
               <div class="field"><label>Médecin</label><input class="input" name="doc" [(ngModel)]="m.doctor_name" /></div>

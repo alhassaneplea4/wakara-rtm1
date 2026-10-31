@@ -28,3 +28,9 @@ avant la mise en production. Légende : ⏳ à confirmer.
 | 20 | **Champs du modèle officiel** | Champs déduits des deux formulaires de référence (hôpital : établissement, réf., médecin, sage-femme, enfant, mère ; acte : année, registre, feuillet, n°, région, préfecture, commune, centre, parents, déclarant, mentions). Liste exacte à confirmer | `declarations/models.py`, `actes/models.py` |
 | 21 | **Valeurs par défaut géographiques** | Région / préfecture : Conakry, commune : Ratoma, centre : « Centre d'état civil de Ratoma » — à confirmer | écran Paramètres |
 | 22 | **Réinitialisation de mot de passe** | Par l'administrateur (mot de passe temporaire). Pas d'envoi d'e-mail | — |
+
+## Code des établissements de santé
+
+- Format automatique **WH-0001-26** : `WH` (Wakara Hôpital), numéro d'ordre sur 4 chiffres, année sur 2 chiffres.
+- **Décision prise (à valider)** : la numérotation **repart à 0001 chaque année** (WH-0001-27 en 2027). Si la mairie préfère un numéro continu d'une année à l'autre, il suffit de ne plus remettre le compteur à zéro (une ligne dans `hospitals/services.py`).
+- Le code est attribué à la création, ne se saisit ni ne se modifie. Les établissements créés avant cette règle gardent leur ancien code.
