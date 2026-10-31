@@ -6,7 +6,8 @@ import sys
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'wakara.settings')
+    # Forced (not setdefault): a stray DJANGO_SETTINGS_MODULE in the hosting environment must not break the app.
+    os.environ['DJANGO_SETTINGS_MODULE'] = 'wakara.settings'
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
