@@ -106,7 +106,7 @@ export interface SupportingDocument {
 
 export interface Dashboard {
   period: { year: number; date_from: string; date_to: string };
-  kpis: { births_declared: number; declarations_received: number; in_progress: number; pending_validation: number; validated: number; rejected: number; delivered: number };
+  kpis: { births_declared: number; declarations_received: number; in_progress: number; pending_validation: number; to_correct: number; validated: number; rejected: number; delivered: number };
   monthly: { month: string; received: number; validated: number }[];
   by_hospital: { name: string; count: number }[];
   by_status: { status: Status; label: string; count: number }[];
@@ -114,4 +114,4 @@ export interface Dashboard {
   delays: { avg_days_transmission_to_validation: number | null };
 }
 
-export interface Inbox { total: number; items: { code: string; label: string; count: number; status: Status }[]; }
+export interface Inbox { total: number; items: { code: string; label: string; count: number; status: Status }[]; badges: Record<string, number>; }

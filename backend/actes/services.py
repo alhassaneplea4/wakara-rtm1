@@ -41,7 +41,11 @@ def ensure_acte(declaration: Declaration, user) -> Acte:
 
 def can_edit_acte(user, acte) -> bool:
     from core.permissions import user_has_perm
-    return acte.declaration.status in Status.ACTE_EDITABLE and user_has_perm(user, 'acte.update')
+    status = acte.declaration.status
+    if not user_has_perm(user, 'acte.update'):
+        return False
+    return status in Status.ACTE_EDITABLE or (
+        status in Status.VALIDATOR_EDITABLE and user_has_perm(user, 'dossier.validate'))
 
 
 @transaction.atomic

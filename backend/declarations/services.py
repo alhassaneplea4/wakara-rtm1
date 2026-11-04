@@ -36,8 +36,10 @@ def can_edit_data(user, declaration) -> bool:
     status = declaration.status
     if status in Status.DECLARATION_EDITABLE and user_has_perm(user, 'declaration.update'):
         return user_has_perm(user, 'declaration.view_all') or declaration.created_by_id == user.id
-    if status in Status.ACTE_EDITABLE and user_has_perm(user, 'acte.update'):
-        return True
+    if status in Status.SECRETARIAT_DATA_EDITABLE and user_has_perm(user, 'acte.update'):
+        return True  # the secretariat may correct what the agent transmitted
+    if status in Status.VALIDATOR_EDITABLE and user_has_perm(user, 'acte.update')             and user_has_perm(user, 'dossier.validate'):
+        return True  # a validator working on the dossier: it stays in the validation queue
     return False
 
 
@@ -107,8 +109,15 @@ FIELD_LABELS = {
 # ── Creation ──────────────────────────────────────
 
 @transaction.atomic
+def _secretariat_only_child_fields(user, child):
+    """Weight and length are not collected by the agent: they are filled by the secretariat."""
+    if child and not user_has_perm(user, 'acte.update'):
+        child = {k: v for k, v in child.items() if k not in ('birth_weight', 'birth_length')}
+    return child
+
+
 def create_declaration(user, data: dict) -> Declaration:
-    child = data.pop('child', None) or {}
+    child = _secretariat_only_child_fields(user, data.pop('child', None) or {})
     mother = data.pop('mother', None)
     father = data.pop('father', None)
     declarant = data.pop('declarant', None)
@@ -138,7 +147,7 @@ def update_declaration(user, declaration: Declaration, data: dict) -> Declaratio
         raise PermissionDenied("Ce dossier ne peut pas être modifié dans son état actuel ou par vous.")
 
     before = _full_snapshot(declaration)
-    child = data.pop('child', None)
+    child = _secretariat_only_child_fields(user, data.pop('child', None))
     mother = data.pop('mother', None)
     father = data.pop('father', None)
     declarant = data.pop('declarant', None)

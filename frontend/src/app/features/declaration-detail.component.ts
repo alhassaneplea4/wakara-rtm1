@@ -1,10 +1,11 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { ApiService, errorMessage } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { AutoRefreshService } from '../core/auto-refresh.service';
 import { Acte, AuditEntry, AvailableTransition, DeclarationDetail, Page, STATUS_LABELS, Status, SupportingDocument } from '../core/models';
 import { ToastService } from '../core/toast.service';
 import { PaperFormComponent } from '../shared/paper-form.component';
@@ -190,6 +191,8 @@ export class DeclarationDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private toast = inject(ToastService);
+  private destroyRef = inject(DestroyRef);
+  private autoRefresh = inject(AutoRefreshService);
   auth = inject(AuthService);
 
   d = signal<DeclarationDetail | null>(null);
@@ -203,7 +206,11 @@ export class DeclarationDetailComponent implements OnInit {
   kind = 'PARENT_ID';
   num: { annee: number | null; registre: string; feuillet: string; numero_acte: string } = { annee: null, registre: '', feuillet: '', numero_acte: '' };
 
-  ngOnInit() { this.route.paramMap.subscribe(() => this.load()); }
+  ngOnInit() {
+    this.route.paramMap.subscribe(() => this.load());
+    // every 30 s, unless the user is in the middle of a decision (confirmation dialog)
+    this.autoRefresh.on(this.destroyRef, () => { if (!this.pending() && !this.archiving() && !this.busy()) this.load(); });
+  }
 
   private uuid() { return this.route.snapshot.paramMap.get('uuid')!; }
   kindLabel(k: string) { return ({ PAPER_FORM: 'Fiche de déclaration physique', HOSPITAL_FORM: 'Déclaration hospitalière', PARENT_ID: "Pièce d'un parent", DECLARANT_ID: 'Pièce du déclarant', OTHER: 'Autre pièce' } as Record<string, string>)[k] ?? k; }

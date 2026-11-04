@@ -17,6 +17,8 @@ La cloche indique les dossiers qui attendent votre action.
    Les autres pièces (identités, etc.) s'ajoutent depuis la fiche du dossier.
 4. Si le dossier vous est retourné (**À corriger — collecte**), le motif est affiché : corrigez puis retransmettez.
 
+Poids et taille de l'enfant ne sont pas saisis par la collecte : ils sont renseignés par le secrétariat.
+
 Vous ne voyez que vos propres déclarations. Vous ne pouvez plus modifier un dossier transmis.
 
 ## Secrétaire d'état civil

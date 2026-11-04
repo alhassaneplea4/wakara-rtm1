@@ -1,9 +1,10 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { ApiService, errorMessage } from '../core/api.service';
+import { ApiService, Query, errorMessage } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { AutoRefreshService } from '../core/auto-refresh.service';
 import { DeclarationListItem, Hospital, Page, STATUS_LABELS, Status } from '../core/models';
 import { ToastService } from '../core/toast.service';
 import { IconComponent, PageHeaderComponent, PaginationComponent, StatusBadgeComponent } from '../shared/ui';
@@ -105,6 +106,9 @@ export class DeclarationsListComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private toast = inject(ToastService);
+  private destroyRef = inject(DestroyRef);
+  private autoRefresh = inject(AutoRefreshService);
+  private lastQuery: Query | null = null;
   auth = inject(AuthService);
 
   mode: Mode = 'all';
@@ -123,6 +127,8 @@ export class DeclarationsListComponent implements OnInit {
   ngOnInit() {
     this.mode = (this.route.snapshot.data['mode'] as Mode) ?? 'all';
     this.text = MODE_TEXT[this.mode];
+    // every 30 s: same filters as the last search the user applied, without the loading flash
+    this.autoRefresh.on(this.destroyRef, () => this.silentReload());
     this.statusOptions = this.mode === 'all' ? (Object.keys(STATUS_LABELS) as Status[]) : this.text.statuses;
     this.route.queryParamMap.subscribe(q => {
       this.search = q.get('search') ?? '';
@@ -153,9 +159,17 @@ export class DeclarationsListComponent implements OnInit {
     };
   }
 
+  private silentReload() {
+    if (!this.lastQuery) return;
+    this.api.get<Page<DeclarationListItem>>('/declarations/', this.lastQuery).subscribe({
+      next: p => { this.rows.set(p.results); this.total.set(p.count); this.error.set(''); }, error: () => undefined,
+    });
+  }
+
   load() {
     this.loading.set(true);
-    this.api.get<Page<DeclarationListItem>>('/declarations/', this.query()).subscribe({
+    this.lastQuery = this.query();
+    this.api.get<Page<DeclarationListItem>>('/declarations/', this.lastQuery).subscribe({
       next: p => { this.rows.set(p.results); this.total.set(p.count); this.loading.set(false); this.error.set(''); },
       error: e => { this.loading.set(false); this.error.set(errorMessage(e)); },
     });

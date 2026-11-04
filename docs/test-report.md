@@ -2,7 +2,7 @@
 
 Dernière mise à jour : 29/10/2026 — Windows 11, Python 3.14, Django 5.2, Node 24, Angular 17.
 
-## 1. Backend — `python manage.py test tests` : **77 tests, tous réussis**
+## 1. Backend — `python manage.py test tests` : **92 tests, tous réussis**
 
 | Domaine | Fichier | Ce qui est vérifié |
 |---|---|---|

@@ -5,8 +5,10 @@ import { FormsModule } from '@angular/forms';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { ApiService } from '../core/api.service';
+import { AutoRefreshService } from '../core/auto-refresh.service';
 import { AuthService } from '../core/auth.service';
 import { Inbox } from '../core/models';
+import { ToastService } from '../core/toast.service';
 import { IconComponent, LogoComponent } from '../shared/ui';
 
 interface NavItem { label: string; icon: string; link: string; perms: string[]; }
@@ -38,6 +40,7 @@ const NAV: NavItem[] = [
           @for (item of items(); track item.link) {
             <a [routerLink]="item.link" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: false }" ariaCurrentWhenActive="page" (click)="navOpen.set(false)">
               <wk-icon [name]="item.icon" /><span>{{ item.label }}</span>
+              @if (badge(item.link); as n) { <span class="count" aria-hidden="true">{{ n > 99 ? '99+' : n }}</span><span class="sr-only">{{ n }} à traiter</span> }
             </a>
           }
         </nav>
@@ -101,6 +104,9 @@ const NAV: NavItem[] = [
     .sidebar a:hover,.sidebar .logout:hover{background:rgba(255,255,255,.08);text-decoration:none}
     .sidebar a.active{background:var(--wk-royal);color:#fff;box-shadow:0 6px 16px rgba(31,94,216,.4)}
     .sidebar a:focus-visible,.sidebar .logout:focus-visible{outline:2px solid #fff;outline-offset:-2px}
+    .count{margin-left:auto;background:var(--wk-danger);color:#fff;border-radius:999px;font-size:11px;font-weight:700;min-width:22px;height:22px;line-height:22px;text-align:center;padding:0 6px;box-shadow:0 0 0 2px rgba(255,255,255,.18)}
+    .sidebar a.active .count{background:#fff;color:var(--wk-royal);box-shadow:none}
+    .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
     .bottom{display:flex;flex-direction:column;gap:4px;border-top:1px solid rgba(255,255,255,.12);padding-top:12px;flex:none}
     .main{min-width:0;display:flex;flex-direction:column}
     .topbar{height:var(--topbar-h);background:var(--wk-surface);border-bottom:1px solid var(--wk-border);display:flex;align-items:center;gap:14px;padding:0 24px;position:sticky;top:0;z-index:100}
@@ -139,6 +145,8 @@ export class ShellComponent implements OnInit {
   private api = inject(ApiService);
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
+  private refresh = inject(AutoRefreshService);
+  private toast = inject(ToastService);
 
   navOpen = signal(false);
   open = signal<'' | 'inbox' | 'account'>('');
@@ -151,14 +159,26 @@ export class ShellComponent implements OnInit {
     return ((u?.first_name?.[0] ?? u?.username?.[0] ?? '?') + (u?.last_name?.[0] ?? '')).toUpperCase();
   };
 
+  /** Number of dossiers waiting for the user behind a menu entry (0 hides the badge). */
+  badge(link: string): number { return this.inbox()?.badges?.[link] ?? 0; }
+
   ngOnInit() {
     this.loadInbox();
+    // every 30 s: menu badges (the open screen refreshes itself)
+    this.refresh.on(this.destroyRef, () => this.loadInbox(true));
     this.router.events.pipe(filter(e => e instanceof NavigationEnd), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => { this.open.set(''); this.navOpen.set(false); this.loadInbox(); });
   }
-  private loadInbox() {
+  private loadInbox(announce = false) {
     if (!this.auth.can('declaration.view')) return;
-    this.api.get<Inbox>('/inbox/').subscribe({ next: i => this.inbox.set(i), error: () => this.inbox.set(null) });
+    this.api.get<Inbox>('/inbox/').subscribe({
+      next: i => {
+        const before = this.inbox();
+        if (announce && before && i.total > before.total) this.toast.info('Nouveau dossier à traiter.');
+        this.inbox.set(i);
+      },
+      error: () => this.inbox.set(null),
+    });
   }
   toggle(menu: 'inbox' | 'account') { this.open.set(this.open() === menu ? '' : menu); }
   @HostListener('document:click') closeMenus() { this.open.set(''); }

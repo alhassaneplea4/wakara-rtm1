@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService, errorMessage, fieldErrors } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { AutoRefreshService } from '../core/auto-refresh.service';
 import { Hospital, Page } from '../core/models';
 import { ToastService } from '../core/toast.service';
 import { ConfirmComponent, IconComponent, PageHeaderComponent, PaginationComponent } from '../shared/ui';
@@ -77,6 +78,8 @@ const TYPES = [['HOSPITAL', 'Hôpital'], ['MATERNITY', 'Maternité'], ['CLINIC',
 export class HospitalsComponent implements OnInit {
   private api = inject(ApiService);
   private toast = inject(ToastService);
+  private destroyRef = inject(DestroyRef);
+  private autoRefresh = inject(AutoRefreshService);
   auth = inject(AuthService);
   types = TYPES;
   search = ''; active = ''; archived = false; page = 1;
@@ -84,7 +87,7 @@ export class HospitalsComponent implements OnInit {
   form = signal<any>(null); editing: Hospital | null = null; formError = signal(''); errs = signal<Record<string, string>>({}); busy = signal(false);
   toArchive = signal<Hospital | null>(null);
 
-  ngOnInit() { this.load(); }
+  ngOnInit() { this.load(); this.autoRefresh.on(this.destroyRef, () => { if (!this.form() && !this.toArchive()) this.load(); }); }
   reload() { this.page = 1; this.load(); }
   load() {
     this.api.get<Page<Hospital>>('/hospitals/', { search: this.search, is_active: this.active, archived: this.archived ? 'true' : '', page: this.page }).subscribe({

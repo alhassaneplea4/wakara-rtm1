@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { ApiService, errorMessage } from '../core/api.service';
+import { ApiService, Query, errorMessage } from '../core/api.service';
+import { AutoRefreshService } from '../core/auto-refresh.service';
 import { Acte, Page, STATUS_LABELS, Status } from '../core/models';
 import { PageHeaderComponent, PaginationComponent, StatusBadgeComponent } from '../shared/ui';
 
@@ -42,16 +43,24 @@ import { PageHeaderComponent, PaginationComponent, StatusBadgeComponent } from '
 export class ActesListComponent implements OnInit {
   private api = inject(ApiService);
   private router = inject(Router);
+  private destroyRef = inject(DestroyRef);
+  private autoRefresh = inject(AutoRefreshService);
+  private last: Query | null = null;
   labels = STATUS_LABELS;
   statuses: Status[] = ['IN_COMPLETION', 'PENDING_VALIDATION', 'TO_CORRECT_SECRETARIAT', 'VALIDATED', 'DELIVERED'];
   search = ''; status = ''; annee: number | null = null; page = 1;
   rows = signal<Acte[]>([]); total = signal(0); error = signal('');
 
-  ngOnInit() { this.load(); }
+  ngOnInit() { this.load(); this.autoRefresh.on(this.destroyRef, () => this.fetch(this.last)); }
   reload() { this.page = 1; this.load(); }
   open(a: Acte) { this.router.navigate(['/declarations', a.declaration_uuid]); }
   load() {
-    this.api.get<Page<Acte>>('/actes/', { search: this.search, status: this.status ? [this.status] : [], annee: this.annee, page: this.page, ordering: '-updated_at' }).subscribe({
+    this.last = { search: this.search, status: this.status ? [this.status] : [], annee: this.annee, page: this.page, ordering: '-updated_at' };
+    this.fetch(this.last);
+  }
+  private fetch(query: Query | null) {
+    if (!query) return;
+    this.api.get<Page<Acte>>('/actes/', query).subscribe({
       next: p => { this.rows.set(p.results); this.total.set(p.count); this.error.set(''); },
       error: e => this.error.set(errorMessage(e)),
     });

@@ -162,8 +162,37 @@ class StateRuleTests(WakaraTestCase):
         # the agent can no longer edit once transmitted
         r = self.client_for(self.agent).patch(f'/api/declarations/{d["uuid"]}/', {'notes': 'x'}, format='json')
         self.assertEqual(r.status_code, 403)
-        # the secretary cannot edit before taking charge
+        # another agent cannot edit it either
+        r = self.client_for(self.agent2).patch(f'/api/declarations/{d["uuid"]}/', {'notes': 'x'}, format='json')
+        self.assertIn(r.status_code, (403, 404))
+
+    def test_secretary_can_correct_a_transmitted_dossier_and_it_stays_where_it_is(self):
+        d = self.create_declaration()
+        self.transition(self.agent, d['uuid'], 'TRANSMITTED')
+        c = self.client_for(self.secretary)
+        r = c.patch(f'/api/declarations/{d["uuid"]}/', {'notes': 'Corrigé par le secrétariat', 'birth_place': 'Ratoma'}, format='json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.data['status'], 'TRANSMITTED')  # editing never moves the dossier
+        self.assertTrue(r.data['can_edit'])
+        # ... also after taking charge, then it goes to the administrator's validation queue
+        self.transition(self.secretary, d['uuid'], 'IN_COMPLETION')
+        self.assertEqual(c.patch(f'/api/declarations/{d["uuid"]}/', {'notes': 'Encore'}, format='json').status_code, 200)
+
+    def test_only_a_validator_can_still_edit_while_pending_validation_and_status_is_kept(self):
+        d = self.create_declaration()
+        self.advance_to_pending(d['uuid'])
+        # the secretary's work is done: she can no longer touch it
         r = self.client_for(self.secretary).patch(f'/api/declarations/{d["uuid"]}/', {'notes': 'x'}, format='json')
+        self.assertEqual(r.status_code, 403)
+        # the administrator can work on it and it stays in his validation queue
+        r = self.client_for(self.admin).patch(f'/api/declarations/{d["uuid"]}/', {'notes': "Vérifié par l'admin"}, format='json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.data['status'], 'PENDING_VALIDATION')
+        queue = self.client_for(self.admin).get('/api/declarations/?status=PENDING_VALIDATION').data['results']
+        self.assertIn(d['uuid'], [x['uuid'] for x in queue])
+        # once validated, nobody edits any more
+        self.transition(self.admin, d['uuid'], 'VALIDATED', numero_acte='7001', annee=2026, registre='R1')
+        r = self.client_for(self.admin).patch(f'/api/declarations/{d["uuid"]}/', {'notes': 'trop tard'}, format='json')
         self.assertEqual(r.status_code, 403)
 
     def test_future_birth_date_rejected(self):

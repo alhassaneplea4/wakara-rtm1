@@ -253,7 +253,7 @@ class StatisticsTests(WakaraTestCase):
         k = self.client_for(self.admin).get('/api/stats/dashboard/').data['kpis']
         self.assertEqual(k, {
             'births_declared': 6, 'declarations_received': 4, 'in_progress': 1,
-            'pending_validation': 1, 'validated': 1, 'rejected': 1, 'delivered': 0})
+            'pending_validation': 1, 'to_correct': 0, 'validated': 1, 'rejected': 1, 'delivered': 0})
 
     def test_breakdowns_and_monthly_series(self):
         data = self.client_for(self.admin).get('/api/stats/dashboard/').data

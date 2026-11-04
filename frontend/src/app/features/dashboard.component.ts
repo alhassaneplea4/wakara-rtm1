@@ -1,10 +1,11 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ChartConfiguration } from 'chart.js';
 import { ApiService, errorMessage } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { AutoRefreshService } from '../core/auto-refresh.service';
 import { Dashboard, DeclarationListItem, Page } from '../core/models';
 import { ChartComponent, IconComponent, PageHeaderComponent, StatusBadgeComponent } from '../shared/ui';
 
@@ -52,6 +53,22 @@ const PALETTE = ['#1f5ed8', '#4f9bff', '#12a36a', '#8b7cf6', '#e58a0a', '#c3cde0
           }
         </section>
       </div>
+
+      <section class="card status-card">
+        <div class="card-title"><h2>Répartition par statut</h2><a routerLink="/declarations">Voir les dossiers</a></div>
+        @if (data() && !data()!.by_status.length) { <p class="empty">Aucune donnée sur la période.</p> }
+        @else if (data()) {
+          <ul class="status-list">
+            @for (s of data()!.by_status; track s.status) {
+              <li><a [routerLink]="['/declarations']" [queryParams]="{ status: s.status }">
+                <span class="name">{{ s.label }}</span>
+                <span class="track"><i [style.width.%]="pct(s.count)"></i></span>
+                <b class="mono">{{ s.count }}</b>
+              </a></li>
+            }
+          </ul>
+        }
+      </section>
 
       <div class="grid bottom">
         <section class="card flush">
@@ -114,6 +131,13 @@ const PALETTE = ['#1f5ed8', '#4f9bff', '#12a36a', '#8b7cf6', '#e58a0a', '#c3cde0
     .leg li{display:grid;grid-template-columns:10px minmax(0,1fr) auto auto;gap:8px;align-items:center}
     .leg i{width:9px;height:9px;border-radius:50%}.leg span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .leg em{font-style:normal;color:var(--wk-text-mute);min-width:34px;text-align:right}
+    .status-card{margin-bottom:var(--s4)}
+    .status-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+    .status-list a{display:grid;grid-template-columns:minmax(120px,220px) minmax(0,1fr) auto;gap:12px;align-items:center;color:inherit;text-decoration:none;font-size:13px;padding:4px 6px;border-radius:8px}
+    .status-list a:hover{background:var(--wk-sky-50)}
+    .track{height:8px;border-radius:999px;background:var(--wk-info-bg);overflow:hidden}
+    .track i{display:block;height:100%;background:var(--wk-royal);border-radius:999px;min-width:2px}
+    @media (max-width:520px){.status-list a{grid-template-columns:minmax(0,1fr) auto}.track{display:none}}
     .pad{padding:var(--s5) var(--s5) 0}
     .delay{margin-top:var(--s4);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
     @media (max-width:1100px){.charts,.bottom{grid-template-columns:minmax(0,1fr)}}
@@ -123,6 +147,8 @@ const PALETTE = ['#1f5ed8', '#4f9bff', '#12a36a', '#8b7cf6', '#e58a0a', '#c3cde0
 export class DashboardComponent implements OnInit {
   private api = inject(ApiService);
   private router = inject(Router);
+  private destroyRef = inject(DestroyRef);
+  private autoRefresh = inject(AutoRefreshService);
   auth = inject(AuthService);
 
   currentYear = new Date().getFullYear();
@@ -145,6 +171,7 @@ export class DashboardComponent implements OnInit {
       { label: 'Dossiers rejetés', value: v(k?.rejected), icon: 'x', tone: 'danger' },
       { label: 'Dossiers en cours', value: v(k?.in_progress), icon: 'clock', tone: 'warning' },
       { label: 'En attente de validation', value: v(k?.pending_validation), icon: 'shield', tone: 'warning' },
+      { label: 'À corriger', value: v(k?.to_correct), icon: 'history', tone: 'danger' },
       { label: 'Actes délivrés', value: v(k?.delivered), icon: 'certificate', tone: 'success' },
     ];
   };
@@ -153,7 +180,7 @@ export class DashboardComponent implements OnInit {
   pct(n: number) { const t = this.data()?.kpis.births_declared || 0; return t ? Math.round((n / t) * 100) : 0; }
   open(uuid: string) { this.router.navigate(['/declarations', uuid]); }
 
-  ngOnInit() { this.load(); }
+  ngOnInit() { this.load(); this.autoRefresh.on(this.destroyRef, () => this.load()); }
 
   load() {
     this.error.set('');

@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ChartConfiguration } from 'chart.js';
 import { ApiService, errorMessage } from '../core/api.service';
+import { AutoRefreshService } from '../core/auto-refresh.service';
 import { Dashboard, Hospital, Page, STATUS_LABELS, Status } from '../core/models';
 import { ChartComponent, PageHeaderComponent } from '../shared/ui';
 
@@ -52,6 +53,8 @@ const COLORS: Record<string, string> = { DRAFT: '#c3cde0', TRANSMITTED: '#4f9bff
 })
 export class StatisticsComponent implements OnInit {
   private api = inject(ApiService);
+  private destroyRef = inject(DestroyRef);
+  private autoRefresh = inject(AutoRefreshService);
   labels = STATUS_LABELS;
   statuses = Object.keys(STATUS_LABELS) as Status[];
   currentYear = new Date().getFullYear();
@@ -63,6 +66,7 @@ export class StatisticsComponent implements OnInit {
 
   ngOnInit() {
     this.load();
+    this.autoRefresh.on(this.destroyRef, () => this.load());
     this.api.get<Page<Hospital>>('/hospitals/', { page_size: 100 }).subscribe({ next: p => this.hospitals.set(p.results), error: () => undefined });
     this.api.get<{ uuid: string; name: string }[]>('/declarations/agents/').subscribe({ next: a => this.agents.set(a), error: () => undefined });
   }

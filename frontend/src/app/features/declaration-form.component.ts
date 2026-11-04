@@ -3,6 +3,7 @@ import { Component, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService, errorMessage, fieldErrors } from '../core/api.service';
+import { AuthService } from '../core/auth.service';
 import { DeclarationDetail, Hospital, Page } from '../core/models';
 import { ToastService } from '../core/toast.service';
 import { PaperFormComponent } from '../shared/paper-form.component';
@@ -55,8 +56,10 @@ const nullIfEmpty = (v: unknown) => (v === '' || v === undefined ? null : v);
                 <span class="field-error">{{ err('birth_date') }}</span></div>
               <div class="field"><label>Heure de naissance</label><input class="input" type="time" name="bt" [(ngModel)]="m.birth_time" /></div>
               <div class="field"><label>Lieu de naissance</label><input class="input" name="bp" [(ngModel)]="m.birth_place" /></div>
-              <div class="field"><label>Poids (kg)</label><input class="input" type="number" step="0.01" min="0" name="w" [(ngModel)]="m.child.birth_weight" /></div>
-              <div class="field"><label>Taille (cm)</label><input class="input" type="number" step="0.1" min="0" name="l" [(ngModel)]="m.child.birth_length" /></div>
+              @if (showBody) {
+                <div class="field"><label>Poids (kg)</label><input class="input" type="number" step="0.01" min="0" name="w" [(ngModel)]="m.child.birth_weight" /></div>
+                <div class="field"><label>Taille (cm)</label><input class="input" type="number" step="0.1" min="0" name="l" [(ngModel)]="m.child.birth_length" /></div>
+              }
             </div>
           </section>
 
@@ -133,6 +136,9 @@ export class DeclarationFormComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private toast = inject(ToastService);
+  auth = inject(AuthService);
+  /** Weight and length are filled by the secretariat, not by the collection agent. */
+  get showBody() { return this.auth.can('acte.update'); }
 
   @ViewChild(PaperFormComponent) paper?: PaperFormComponent;
 
@@ -192,7 +198,8 @@ export class DeclarationFormComponent implements OnInit {
     const body: any = {
       hospital: m.hospital, hospital_document_ref: m.hospital_document_ref, doctor_name: m.doctor_name, midwife_name: m.midwife_name,
       birth_date: m.birth_date, birth_time: nullIfEmpty(m.birth_time), birth_place: m.birth_place, notes: m.notes,
-      child: { ...m.child, birth_weight: nullIfEmpty(m.child.birth_weight), birth_length: nullIfEmpty(m.child.birth_length) },
+      child: this.showBody ? { ...m.child, birth_weight: nullIfEmpty(m.child.birth_weight), birth_length: nullIfEmpty(m.child.birth_length) }
+        : (({ birth_weight, birth_length, ...rest }) => rest)(m.child),
       mother: this.person(m.mother),
       father: this.hasFather ? this.person(m.father) : (this.uuid ? undefined : null),
       declarant: this.hasDeclarant ? m.declarant : (this.uuid ? undefined : null),

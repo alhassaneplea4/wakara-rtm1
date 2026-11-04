@@ -1,8 +1,9 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { ApiService, errorMessage } from '../core/api.service';
+import { ApiService, Query, errorMessage } from '../core/api.service';
+import { AutoRefreshService } from '../core/auto-refresh.service';
 import { Delivery, Page } from '../core/models';
 import { PageHeaderComponent, PaginationComponent } from '../shared/ui';
 
@@ -34,12 +35,17 @@ import { PageHeaderComponent, PaginationComponent } from '../shared/ui';
 })
 export class DeliveriesComponent implements OnInit {
   private api = inject(ApiService);
+  private destroyRef = inject(DestroyRef);
+  private autoRefresh = inject(AutoRefreshService);
+  private last: Query | null = null;
   search = ''; page = 1;
   rows = signal<Delivery[]>([]); total = signal(0); error = signal('');
-  ngOnInit() { this.load(); }
+  ngOnInit() { this.load(); this.autoRefresh.on(this.destroyRef, () => this.fetch(this.last)); }
   reload() { this.page = 1; this.load(); }
-  load() {
-    this.api.get<Page<Delivery>>('/actes/deliveries/', { search: this.search, page: this.page }).subscribe({
+  load() { this.last = { search: this.search, page: this.page }; this.fetch(this.last); }
+  private fetch(query: Query | null) {
+    if (!query) return;
+    this.api.get<Page<Delivery>>('/actes/deliveries/', query).subscribe({
       next: p => { this.rows.set(p.results); this.total.set(p.count); this.error.set(''); }, error: e => this.error.set(errorMessage(e)),
     });
   }

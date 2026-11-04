@@ -82,4 +82,20 @@ class InboxView(APIView):
         if user_has_perm(request.user, 'declaration.update') and mine.exists():
             items.append({'code': 'to_correct_collection', 'label': 'Déclarations à corriger',
                           'count': mine.count(), 'status': Status.TO_CORRECT_COLLECTION})
-        return Response({'total': sum(i['count'] for i in items), 'items': items})
+
+        # Badges of the side menu: number of dossiers waiting for THIS user, per menu entry.
+        badges = {}
+
+        def badge(route, count, allowed):
+            if allowed and count:
+                badges[route] = count
+
+        has = lambda perm: user_has_perm(request.user, perm)  # noqa: E731
+        badge('/secretariat', qs.filter(status__in=Status.SECRETARIAT_DATA_EDITABLE).count(),
+              has('acte.complete') or has('acte.update'))
+        badge('/validation', qs.filter(status=Status.PENDING_VALIDATION).count(), has('dossier.validate'))
+        # agent: corrections requested + own drafts still to finish
+        to_fill = qs.filter(status=Status.TO_CORRECT_COLLECTION).count()             + qs.filter(status=Status.DRAFT, created_by=request.user).count()
+        badge('/declarations', to_fill, has('declaration.update'))
+        badge('/actes', qs.filter(status=Status.VALIDATED).count(), has('acte.deliver'))
+        return Response({'total': sum(i['count'] for i in items), 'items': items, 'badges': badges})

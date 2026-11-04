@@ -5,6 +5,7 @@ Definitions (to be confirmed, see docs/business-decisions.md):
   births_declared       declarations registered in the period, drafts included (1 declaration = 1 child)
   declarations_received declarations transmitted to the secretariat (any status except DRAFT)
   in_progress           transmitted / in completion / to correct
+  to_correct            sent back for correction (collection or secretariat)
   pending_validation    waiting for the final decision
   validated             validated definitively (VALIDATED + DELIVERED)
   rejected              closed as rejected
@@ -65,6 +66,7 @@ class DashboardView(APIView):
             'declarations_received': received.count(),
             'in_progress': qs.filter(status__in=Status.IN_PROGRESS).count(),
             'pending_validation': qs.filter(status=Status.PENDING_VALIDATION).count(),
+            'to_correct': qs.filter(status__in=(Status.TO_CORRECT_COLLECTION, Status.TO_CORRECT_SECRETARIAT)).count(),
             'validated': qs.filter(status__in=validated_statuses).count(),
             'rejected': qs.filter(status=Status.REJECTED).count(),
             'delivered': qs.filter(status=Status.DELIVERED).count(),
