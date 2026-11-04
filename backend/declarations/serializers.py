@@ -11,7 +11,7 @@ from .services import can_edit_data, user_transitions
 class ChildSerializer(serializers.ModelSerializer):
     class Meta:
         model = Child
-        fields = ['first_names', 'last_name', 'gender', 'birth_weight', 'birth_length']
+        fields = ['first_names', 'last_name', 'gender']
 
 
 class ParentSerializer(serializers.ModelSerializer):

@@ -101,8 +101,8 @@ const FALLBACK: PublicSettings = {
     }
   `,
   styles: [`
-    .login{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);height:100vh;min-height:620px;background:#fff;overflow:hidden}
-    .left{display:grid;place-items:center;padding:24px;background:radial-gradient(900px 500px at 0% 0%,#eaf2ff 0,#fff 60%);overflow-y:auto}
+    .login{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);height:100vh;height:100dvh;background:#fff;overflow:hidden}
+    .left{display:grid;grid-template-columns:minmax(0,1fr);place-items:center;padding:24px;background:radial-gradient(900px 500px at 0% 0%,#eaf2ff 0,#fff 60%);overflow-y:auto;min-height:0}
     .box{width:min(480px,100%);display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px}
     .brand{width:min(380px,92%);height:auto;align-self:center}
     h1{font-size:28px;font-weight:800;margin-top:10px}
@@ -137,13 +137,31 @@ const FALLBACK: PublicSettings = {
     .ico{width:54px;height:54px;border-radius:14px;display:grid;place-items:center;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);margin-bottom:6px}
 
     @media (max-width:1100px){.features{grid-template-columns:repeat(2,minmax(0,1fr))}}
-    /* Mobile and tablet: the sign-in form only, without the information panel. */
+    /* Mobile and tablet: the sign-in form only, centred in the screen, without scrolling. */
     @media (max-width:1024px){
-      .login{grid-template-columns:minmax(0,1fr);height:auto;min-height:100vh;overflow:visible}
+      .login{grid-template-columns:minmax(0,1fr)}
       .right{display:none}
-      .left{padding:32px 20px;min-height:100vh}
+      .left{padding:16px 20px}
     }
     @media (max-width:420px){h1{font-size:24px}.control{height:52px}}
+    /* Short screens (small phones, landscape): the form is compacted so that it always fits. */
+    @media (max-height:780px){
+      .box{gap:10px}
+      .brand{width:min(300px,84%)}
+      h1{font-size:24px;margin-top:2px}
+      .intro{display:none}
+      form{gap:10px;margin-top:2px}
+      .control{height:48px}
+      .submit{height:50px}
+      .foot{margin-top:4px}
+    }
+    @media (max-height:640px){
+      .brand{width:min(230px,66%)}
+      h1{font-size:21px}
+      .control{height:44px}
+      .submit{height:46px}
+      .foot{display:none}
+    }
   `],
 })
 export class LoginComponent implements OnInit {

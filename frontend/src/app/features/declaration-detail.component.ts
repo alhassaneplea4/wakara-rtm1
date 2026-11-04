@@ -71,18 +71,17 @@ const ACTION: Partial<Record<Status, { label: string; icon: string; cls: string;
             @if (d.child) { <dl class="kv">
               <dt>Prénoms</dt><dd>{{ d.child.first_names || '—' }}</dd><dt>Nom</dt><dd>{{ d.child.last_name || '—' }}</dd>
               <dt>Sexe</dt><dd>{{ d.child.gender === 'M' ? 'Masculin' : d.child.gender === 'F' ? 'Féminin' : '—' }}</dd>
-              <dt>Poids</dt><dd>{{ d.child.birth_weight ? d.child.birth_weight + ' kg' : '—' }}</dd>
-              <dt>Taille</dt><dd>{{ d.child.birth_length ? d.child.birth_length + ' cm' : '—' }}</dd></dl> }</section>
-
-          <section class="card"><div class="card-title"><h2>Mère</h2></div>
-            @if (d.mother) { <dl class="kv"><dt>Prénoms</dt><dd>{{ d.mother.first_names || '—' }}</dd><dt>Nom</dt><dd>{{ d.mother.last_name || '—' }}</dd>
-              <dt>Âge</dt><dd>{{ d.mother.age ?? '—' }}</dd><dt>Profession</dt><dd>{{ d.mother.profession || '—' }}</dd>
-              <dt>Nationalité</dt><dd>{{ d.mother.nationality || '—' }}</dd><dt>Domicile</dt><dd>{{ d.mother.address || '—' }}</dd></dl> } @else { <p class="muted">Non renseignée.</p> }</section>
+            </dl> }</section>
 
           <section class="card"><div class="card-title"><h2>Père</h2></div>
             @if (d.father) { <dl class="kv"><dt>Prénoms</dt><dd>{{ d.father.first_names || '—' }}</dd><dt>Nom</dt><dd>{{ d.father.last_name || '—' }}</dd>
               <dt>Âge</dt><dd>{{ d.father.age ?? '—' }}</dd><dt>Profession</dt><dd>{{ d.father.profession || '—' }}</dd>
               <dt>Nationalité</dt><dd>{{ d.father.nationality || '—' }}</dd><dt>Domicile</dt><dd>{{ d.father.address || '—' }}</dd></dl> } @else { <p class="muted">Non renseigné.</p> }</section>
+
+          <section class="card"><div class="card-title"><h2>Mère</h2></div>
+            @if (d.mother) { <dl class="kv"><dt>Prénoms</dt><dd>{{ d.mother.first_names || '—' }}</dd><dt>Nom</dt><dd>{{ d.mother.last_name || '—' }}</dd>
+              <dt>Âge</dt><dd>{{ d.mother.age ?? '—' }}</dd><dt>Profession</dt><dd>{{ d.mother.profession || '—' }}</dd>
+              <dt>Nationalité</dt><dd>{{ d.mother.nationality || '—' }}</dd><dt>Domicile</dt><dd>{{ d.mother.address || '—' }}</dd></dl> } @else { <p class="muted">Non renseignée.</p> }</section>
 
           <section class="card"><div class="card-title"><h2>Déclarant</h2></div>
             @if (d.declarant) { <dl class="kv"><dt>Nom</dt><dd>{{ d.declarant.first_names }} {{ d.declarant.last_name }}</dd>
@@ -177,7 +176,9 @@ const ACTION: Partial<Record<Status, { label: string; icon: string; cls: string;
     .actions.decision{border-left-color:var(--wk-success);background:linear-gradient(90deg,#f1fbf6,#fff)}
     .doc{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--wk-border)}
     .doc div{display:flex;flex-direction:column}
-    .kind{width:auto;min-height:32px;padding:4px 8px}
+    .kind{width:auto;max-width:100%;min-height:32px;padding:4px 8px}
+    .card-title{flex-wrap:wrap;gap:10px}
+    .card-title .row{flex-wrap:wrap;min-width:0;max-width:100%}
     .timeline{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
     .timeline li{display:flex;gap:12px}
     .timeline li>div{display:flex;flex-direction:column}

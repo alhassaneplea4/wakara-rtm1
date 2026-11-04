@@ -37,8 +37,7 @@ avant la mise en production. Légende : ⏳ à confirmer.
 
 ## Modification des dossiers et file de validation
 
-- Le **secrétariat** (permission « Compléter un acte ») peut corriger les données d'une déclaration dès qu'elle est **transmise**, et pendant le complément, y compris poids et taille. La modification ne change pas le statut du dossier.
+- Le **secrétariat** (permission « Compléter un acte ») peut corriger les données d'une déclaration dès qu'elle est **transmise**, et pendant le complément. La modification ne change pas le statut du dossier.
 - Quand le secrétariat a fini, il **soumet à validation** : le dossier passe dans la **file de validation** de l'administrateur et le secrétariat ne peut plus le modifier.
 - L'**administrateur** peut travailler sur un dossier en attente de validation (déclaration et acte) : il **reste dans sa file de validation** jusqu'à la décision (valider, retourner ou rejeter). Après validation, plus personne ne modifie.
-- La **collecte** ne saisit ni poids ni taille (masqués côté interface, ignorés côté serveur).
 - Pastilles du menu : *File du secrétariat* (dossiers transmis, en complément ou à corriger côté secrétariat), *File de validation* (en attente de décision), *Déclarations* (pour l'agent : brouillons et dossiers retournés), *Actes de naissance* (actes validés à délivrer). Les écrans et les pastilles se rafraîchissent toutes les 30 secondes tant que la session est ouverte et l'onglet visible.

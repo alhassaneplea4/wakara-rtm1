@@ -6,8 +6,8 @@ La cloche indique les dossiers qui attendent votre action.
 
 ## Agent de collecte
 
-1. **Déclarations → Nouvelle déclaration** : saisissez le formulaire reçu de l'hôpital (établissement, enfant, mère,
-   père si connu). Seule la date de naissance est exigée pour un brouillon.
+1. **Déclarations → Nouvelle déclaration** : saisissez le formulaire reçu de l'hôpital (établissement, enfant, père,
+   mère). Seule la date de naissance est exigée pour un brouillon.
 2. **Enregistrer le brouillon** pour continuer plus tard, ou **Enregistrer et transmettre** : la transmission vérifie
    les informations minimales (date de naissance, sexe, nom de l'enfant, nom de la mère).
 3. **Fiche de déclaration physique** : en haut du formulaire, **Prendre une photo** (sur téléphone, ouvre l'appareil photo)
@@ -16,8 +16,6 @@ La cloche indique les dossiers qui attendent votre action.
    dossier est modifiable). Formats : JPG, PNG ou PDF, 10 Mo max (les grosses photos sont réduites automatiquement).
    Les autres pièces (identités, etc.) s'ajoutent depuis la fiche du dossier.
 4. Si le dossier vous est retourné (**À corriger — collecte**), le motif est affiché : corrigez puis retransmettez.
-
-Poids et taille de l'enfant ne sont pas saisis par la collecte : ils sont renseignés par le secrétariat.
 
 Vous ne voyez que vos propres déclarations. Vous ne pouvez plus modifier un dossier transmis.
 

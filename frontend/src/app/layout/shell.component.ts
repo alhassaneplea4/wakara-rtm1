@@ -109,9 +109,13 @@ const NAV: NavItem[] = [
     .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
     .bottom{display:flex;flex-direction:column;gap:4px;border-top:1px solid rgba(255,255,255,.12);padding-top:12px;flex:none}
     .main{min-width:0;display:flex;flex-direction:column}
-    .topbar{height:var(--topbar-h);background:var(--wk-surface);border-bottom:1px solid var(--wk-border);display:flex;align-items:center;gap:14px;padding:0 24px;position:sticky;top:0;z-index:100}
-    .search{display:flex;align-items:center;gap:8px;background:var(--wk-bg);border:1px solid var(--wk-border);border-radius:12px;padding:0 14px;height:42px;width:min(460px,100%);color:var(--wk-text-mute)}
-    .search input{border:0;background:none;outline:none;flex:1;font:inherit;color:var(--wk-text);min-width:0}
+    .topbar{height:var(--topbar-h);background:var(--wk-surface);border-bottom:1px solid var(--wk-border);display:flex;align-items:center;gap:14px;padding:0 24px;position:sticky;top:0;z-index:100;min-width:0}
+    .topbar>*{min-width:0}
+    .topbar .menu,.topbar .menu-wrap{flex:none}
+    .spacer{flex:1 1 0}
+    .search{display:flex;align-items:center;gap:8px;background:var(--wk-bg);border:1px solid var(--wk-border);border-radius:12px;padding:0 14px;height:42px;flex:0 1 460px;min-width:0;color:var(--wk-text-mute)}
+    .search input{border:0;background:none;outline:none;flex:1;font:inherit;color:var(--wk-text);min-width:0;width:100%;text-overflow:ellipsis}
+    .search wk-icon{flex:none}
     .content{flex:1;min-width:0}
     .menu{display:none}
     .menu-wrap{position:relative}
@@ -136,7 +140,13 @@ const NAV: NavItem[] = [
       .nav-open .backdrop{display:block;position:fixed;inset:0;background:rgba(8,34,79,.45);z-index:350}
       .menu{display:inline-flex}
       .who{display:none}
-      .topbar{padding:0 12px}
+      .topbar{padding:0 12px;gap:8px}
+    }
+    @media (max-width:420px){
+      .topbar{padding:0 8px;gap:6px}
+      .search{padding:0 10px;gap:6px;height:40px}
+      .account{padding:2px}
+      .avatar{width:34px;height:34px;font-size:13px}
     }
   `],
 })

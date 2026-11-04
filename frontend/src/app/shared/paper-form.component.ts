@@ -101,6 +101,7 @@ async function shrink(file: File): Promise<File> {
     :host{display:block}
     .head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px}
     .head h2{font-size:16px}
+    .head .row{flex-wrap:wrap}
     .head p{margin-top:4px;max-width:560px}
     .photo{background:var(--wk-royal);border-color:var(--wk-royal);color:#fff}
     .pages{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}

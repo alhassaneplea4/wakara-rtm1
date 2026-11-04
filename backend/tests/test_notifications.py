@@ -36,21 +36,20 @@ class MenuBadgeTests(WakaraTestCase):
         self.assertNotIn('/actes', self.badges(self.agent))
 
 
-class AgentFieldsTests(WakaraTestCase):
+class ChildFieldsTests(WakaraTestCase):
     def child_of(self, uuid, user):
         return self.client_for(user).get(f'/api/declarations/{uuid}/').data['child']
 
-    def test_weight_and_length_are_ignored_for_the_agent_and_kept_for_the_secretariat(self):
+    def test_weight_and_length_no_longer_exist(self):
         d = self.create_declaration(child={'first_names': 'A', 'last_name': 'B', 'gender': 'F',
                                            'birth_weight': '3.2', 'birth_length': '50'})
         child = self.child_of(d['uuid'], self.agent)
-        self.assertIsNone(child['birth_weight'])
-        self.assertIsNone(child['birth_length'])
-        self.transition(self.agent, d['uuid'], 'TRANSMITTED')
-        r = self.client_for(self.secretary).patch(
-            f'/api/declarations/{d["uuid"]}/', {'child': {'birth_weight': '3.4', 'birth_length': '51'}}, format='json')
+        self.assertEqual(set(child), {'first_names', 'last_name', 'gender'})
+        # sending them again (old client) is harmless: unknown keys are ignored
+        r = self.client_for(self.agent).patch(
+            f'/api/declarations/{d["uuid"]}/', {'child': {'birth_weight': '3.4', 'last_name': 'Camara'}}, format='json')
         self.assertEqual(r.status_code, 200, r.content)
-        self.assertEqual(str(self.child_of(d['uuid'], self.secretary)['birth_weight']), '3.40')
+        self.assertEqual(self.child_of(d['uuid'], self.agent)['last_name'], 'Camara')
 
     def test_admin_can_edit_acte_data_while_the_dossier_stays_in_the_validation_queue(self):
         d = self.create_declaration()

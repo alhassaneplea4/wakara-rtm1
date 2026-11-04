@@ -3,7 +3,6 @@ import { Component, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService, errorMessage, fieldErrors } from '../core/api.service';
-import { AuthService } from '../core/auth.service';
 import { DeclarationDetail, Hospital, Page } from '../core/models';
 import { ToastService } from '../core/toast.service';
 import { PaperFormComponent } from '../shared/paper-form.component';
@@ -56,23 +55,6 @@ const nullIfEmpty = (v: unknown) => (v === '' || v === undefined ? null : v);
                 <span class="field-error">{{ err('birth_date') }}</span></div>
               <div class="field"><label>Heure de naissance</label><input class="input" type="time" name="bt" [(ngModel)]="m.birth_time" /></div>
               <div class="field"><label>Lieu de naissance</label><input class="input" name="bp" [(ngModel)]="m.birth_place" /></div>
-              @if (showBody) {
-                <div class="field"><label>Poids (kg)</label><input class="input" type="number" step="0.01" min="0" name="w" [(ngModel)]="m.child.birth_weight" /></div>
-                <div class="field"><label>Taille (cm)</label><input class="input" type="number" step="0.1" min="0" name="l" [(ngModel)]="m.child.birth_length" /></div>
-              }
-            </div>
-          </section>
-
-          <section class="card">
-            <div class="card-title"><h2>Mère</h2></div>
-            <div class="form-grid">
-              <div class="field"><label>Prénoms</label><input class="input" name="m_fn" [(ngModel)]="m.mother.first_names" /></div>
-              <div class="field"><label>Nom</label><input class="input" name="m_ln" [(ngModel)]="m.mother.last_name" /></div>
-              <div class="field"><label>Âge</label><input class="input" type="number" min="0" max="120" name="m_age" [(ngModel)]="m.mother.age" /></div>
-              <div class="field"><label>Profession</label><input class="input" name="m_pr" [(ngModel)]="m.mother.profession" /></div>
-              <div class="field"><label>Nationalité</label><input class="input" name="m_na" [(ngModel)]="m.mother.nationality" /></div>
-              <div class="field"><label>Téléphone</label><input class="input" name="m_ph" [(ngModel)]="m.mother.phone" /></div>
-              <div class="field wide"><label>Domicile</label><input class="input" name="m_ad" [(ngModel)]="m.mother.address" /></div>
             </div>
           </section>
 
@@ -90,6 +72,19 @@ const nullIfEmpty = (v: unknown) => (v === '' || v === undefined ? null : v);
                 <div class="field wide"><label>Domicile</label><input class="input" name="f_ad" [(ngModel)]="m.father.address" /></div>
               </div>
             } @else { <p class="muted">Père non renseigné (inconnu ou absent).</p> }
+          </section>
+
+          <section class="card">
+            <div class="card-title"><h2>Mère</h2></div>
+            <div class="form-grid">
+              <div class="field"><label>Prénoms</label><input class="input" name="m_fn" [(ngModel)]="m.mother.first_names" /></div>
+              <div class="field"><label>Nom</label><input class="input" name="m_ln" [(ngModel)]="m.mother.last_name" /></div>
+              <div class="field"><label>Âge</label><input class="input" type="number" min="0" max="120" name="m_age" [(ngModel)]="m.mother.age" /></div>
+              <div class="field"><label>Profession</label><input class="input" name="m_pr" [(ngModel)]="m.mother.profession" /></div>
+              <div class="field"><label>Nationalité</label><input class="input" name="m_na" [(ngModel)]="m.mother.nationality" /></div>
+              <div class="field"><label>Téléphone</label><input class="input" name="m_ph" [(ngModel)]="m.mother.phone" /></div>
+              <div class="field wide"><label>Domicile</label><input class="input" name="m_ad" [(ngModel)]="m.mother.address" /></div>
+            </div>
           </section>
 
           <section class="card">
@@ -136,9 +131,6 @@ export class DeclarationFormComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private toast = inject(ToastService);
-  auth = inject(AuthService);
-  /** Weight and length are filled by the secretariat, not by the collection agent. */
-  get showBody() { return this.auth.can('acte.update'); }
 
   @ViewChild(PaperFormComponent) paper?: PaperFormComponent;
 
@@ -157,7 +149,7 @@ export class DeclarationFormComponent implements OnInit {
 
   m: any = {
     hospital: null, hospital_document_ref: '', doctor_name: '', midwife_name: '', birth_date: '', birth_time: '', birth_place: '', notes: '',
-    child: { first_names: '', last_name: '', gender: '', birth_weight: null, birth_length: null },
+    child: { first_names: '', last_name: '', gender: '' },
     mother: blankPerson(), father: blankPerson(),
     declarant: { first_names: '', last_name: '', relationship: '', profession: '', phone: '', address: '', id_type: '', id_number: '' },
   };
@@ -167,7 +159,7 @@ export class DeclarationFormComponent implements OnInit {
   ngOnInit() {
     this.uuid = this.route.snapshot.paramMap.get('uuid') ?? '';
     this.api.get<Page<Hospital>>('/hospitals/', { is_active: true, page_size: 100 }).subscribe({ next: p => this.hospitals.set(p.results), error: () => undefined });
-    if (!this.uuid) { this.loaded.set(true); return; }
+    if (!this.uuid) { this.hasFather = true; this.loaded.set(true); return; }  // the father is asked first
     this.api.get<DeclarationDetail>(`/declarations/${this.uuid}/`).subscribe({
       next: d => {
         this.ref = d.reference; this.status = d.status;
@@ -189,6 +181,9 @@ export class DeclarationFormComponent implements OnInit {
 
   private clean(o: any) { return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v ?? ''])); }
 
+  /** A father section left empty is not saved as a (blank) father. */
+  private isBlank(p: PersonForm) { return ![p.first_names, p.last_name, p.age, p.profession, p.nationality, p.address, p.phone].some(v => v !== '' && v !== null && v !== undefined); }
+
   private person(p: PersonForm) {
     return { ...p, age: nullIfEmpty(p.age), date_of_birth: nullIfEmpty(p.date_of_birth) };
   }
@@ -198,10 +193,9 @@ export class DeclarationFormComponent implements OnInit {
     const body: any = {
       hospital: m.hospital, hospital_document_ref: m.hospital_document_ref, doctor_name: m.doctor_name, midwife_name: m.midwife_name,
       birth_date: m.birth_date, birth_time: nullIfEmpty(m.birth_time), birth_place: m.birth_place, notes: m.notes,
-      child: this.showBody ? { ...m.child, birth_weight: nullIfEmpty(m.child.birth_weight), birth_length: nullIfEmpty(m.child.birth_length) }
-        : (({ birth_weight, birth_length, ...rest }) => rest)(m.child),
+      child: { ...m.child },
       mother: this.person(m.mother),
-      father: this.hasFather ? this.person(m.father) : (this.uuid ? undefined : null),
+      father: this.hasFather && !this.isBlank(m.father) ? this.person(m.father) : (this.uuid ? undefined : null),
       declarant: this.hasDeclarant ? m.declarant : (this.uuid ? undefined : null),
     };
     Object.keys(body).forEach(k => body[k] === undefined && delete body[k]);

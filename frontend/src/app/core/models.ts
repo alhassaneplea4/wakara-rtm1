@@ -34,7 +34,7 @@ export interface DeclarationListItem {
   assigned_to_name: string; official_number: string | null; updated_at: string; created_at: string;
 }
 
-export interface Child { first_names: string; last_name: string; gender: 'M' | 'F' | ''; birth_weight?: string | null; birth_length?: string | null; }
+export interface Child { first_names: string; last_name: string; gender: 'M' | 'F' | ''; }
 export interface Person {
   first_names: string; last_name: string; date_of_birth?: string | null; birth_place?: string; age?: number | null;
   nationality?: string; profession?: string; address?: string; phone?: string; id_type?: string; id_number?: string;

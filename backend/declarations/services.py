@@ -109,15 +109,8 @@ FIELD_LABELS = {
 # ── Creation ──────────────────────────────────────
 
 @transaction.atomic
-def _secretariat_only_child_fields(user, child):
-    """Weight and length are not collected by the agent: they are filled by the secretariat."""
-    if child and not user_has_perm(user, 'acte.update'):
-        child = {k: v for k, v in child.items() if k not in ('birth_weight', 'birth_length')}
-    return child
-
-
 def create_declaration(user, data: dict) -> Declaration:
-    child = _secretariat_only_child_fields(user, data.pop('child', None) or {})
+    child = data.pop('child', None) or {}
     mother = data.pop('mother', None)
     father = data.pop('father', None)
     declarant = data.pop('declarant', None)
@@ -147,7 +140,7 @@ def update_declaration(user, declaration: Declaration, data: dict) -> Declaratio
         raise PermissionDenied("Ce dossier ne peut pas être modifié dans son état actuel ou par vous.")
 
     before = _full_snapshot(declaration)
-    child = _secretariat_only_child_fields(user, data.pop('child', None))
+    child = data.pop('child', None)
     mother = data.pop('mother', None)
     father = data.pop('father', None)
     declarant = data.pop('declarant', None)
@@ -190,7 +183,7 @@ def _full_snapshot(declaration) -> dict:
     child = getattr(declaration, 'child', None) if declaration.pk else None
     if child:
         snap.update({f'child.{k}': v for k, v in audit.snapshot(
-            child, ['first_names', 'last_name', 'gender', 'birth_weight', 'birth_length']).items()})
+            child, ['first_names', 'last_name', 'gender']).items()})
     for parent in declaration.parents.all():
         prefix = parent.parent_type.lower()
         snap.update({f'{prefix}.{k}': v for k, v in audit.snapshot(
