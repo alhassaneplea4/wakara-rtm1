@@ -8,6 +8,7 @@ import { AuthService } from '../core/auth.service';
 import { AutoRefreshService } from '../core/auto-refresh.service';
 import { Acte, AuditEntry, AvailableTransition, DeclarationDetail, Page, STATUS_LABELS, Status, SupportingDocument } from '../core/models';
 import { ToastService } from '../core/toast.service';
+import { DateLettersPipe } from '../shared/date-letters.pipe';
 import { PaperFormComponent } from '../shared/paper-form.component';
 import { ConfirmComponent, IconComponent, PageHeaderComponent, StatusBadgeComponent } from '../shared/ui';
 
@@ -23,7 +24,7 @@ const ACTION: Partial<Record<Status, { label: string; icon: string; cls: string;
 
 @Component({
   selector: 'wk-declaration-detail', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, StatusBadgeComponent, ConfirmComponent, PaperFormComponent],
+  imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, StatusBadgeComponent, ConfirmComponent, PaperFormComponent, DateLettersPipe],
   template: `
     @if (d(); as d) {
       <div class="page">
@@ -58,7 +59,7 @@ const ACTION: Partial<Record<Status, { label: string; icon: string; cls: string;
         <div class="grid grid-2">
           <section class="card"><div class="card-title"><h2>Naissance</h2></div>
             <dl class="kv">
-              <dt>Date</dt><dd>{{ d.birth_date | date: 'dd/MM/yyyy' }} {{ d.birth_time ? 'à ' + d.birth_time.slice(0,5) : '' }}</dd>
+              <dt>Date</dt><dd>{{ d.birth_date | date: 'dd/MM/yyyy' }} {{ d.birth_time ? 'à ' + d.birth_time.slice(0,5) : '' }}<span class="letters">{{ d.birth_date | dateLetters }}</span></dd>
               <dt>Lieu</dt><dd>{{ d.birth_place || '—' }}</dd>
               <dt>Établissement</dt><dd>{{ d.hospital_name || 'Non identifié' }} @if (d.hospital_code) { <span class="mono muted">({{ d.hospital_code }})</span> }</dd>
               <dt>Réf. hospitalière</dt><dd>{{ d.hospital_document_ref || '—' }}</dd>
@@ -71,16 +72,18 @@ const ACTION: Partial<Record<Status, { label: string; icon: string; cls: string;
             @if (d.child) { <dl class="kv">
               <dt>Prénoms</dt><dd>{{ d.child.first_names || '—' }}</dd><dt>Nom</dt><dd>{{ d.child.last_name || '—' }}</dd>
               <dt>Sexe</dt><dd>{{ d.child.gender === 'M' ? 'Masculin' : d.child.gender === 'F' ? 'Féminin' : '—' }}</dd>
+              <dt>Nationalité</dt><dd>{{ d.child.nationality || '—' }}</dd>
+              <dt>Rang de naissance</dt><dd>{{ d.child.birth_rank ? d.child.birth_rank + (d.child.birth_rank === 1 ? 'er' : 'e') + ' enfant de la mère' : '—' }}</dd>
             </dl> }</section>
 
           <section class="card"><div class="card-title"><h2>Père</h2></div>
             @if (d.father) { <dl class="kv"><dt>Prénoms</dt><dd>{{ d.father.first_names || '—' }}</dd><dt>Nom</dt><dd>{{ d.father.last_name || '—' }}</dd>
-              <dt>Âge</dt><dd>{{ d.father.age ?? '—' }}</dd><dt>Profession</dt><dd>{{ d.father.profession || '—' }}</dd>
+              <dt>Né(e) le</dt><dd>{{ d.father.date_of_birth ? (d.father.date_of_birth | date: 'dd/MM/yyyy') : '—' }}@if (d.father.date_of_birth) { <span class="letters">{{ d.father.date_of_birth | dateLetters }}</span> }</dd><dt>Lieu de naissance</dt><dd>{{ d.father.birth_place || '—' }}</dd><dt>Âge</dt><dd>{{ d.father.age ?? '—' }}</dd><dt>Profession</dt><dd>{{ d.father.profession || '—' }}</dd>
               <dt>Nationalité</dt><dd>{{ d.father.nationality || '—' }}</dd><dt>Domicile</dt><dd>{{ d.father.address || '—' }}</dd></dl> } @else { <p class="muted">Non renseigné.</p> }</section>
 
           <section class="card"><div class="card-title"><h2>Mère</h2></div>
             @if (d.mother) { <dl class="kv"><dt>Prénoms</dt><dd>{{ d.mother.first_names || '—' }}</dd><dt>Nom</dt><dd>{{ d.mother.last_name || '—' }}</dd>
-              <dt>Âge</dt><dd>{{ d.mother.age ?? '—' }}</dd><dt>Profession</dt><dd>{{ d.mother.profession || '—' }}</dd>
+              <dt>Né(e) le</dt><dd>{{ d.mother.date_of_birth ? (d.mother.date_of_birth | date: 'dd/MM/yyyy') : '—' }}@if (d.mother.date_of_birth) { <span class="letters">{{ d.mother.date_of_birth | dateLetters }}</span> }</dd><dt>Lieu de naissance</dt><dd>{{ d.mother.birth_place || '—' }}</dd><dt>Âge</dt><dd>{{ d.mother.age ?? '—' }}</dd><dt>Profession</dt><dd>{{ d.mother.profession || '—' }}</dd>
               <dt>Nationalité</dt><dd>{{ d.mother.nationality || '—' }}</dd><dt>Domicile</dt><dd>{{ d.mother.address || '—' }}</dd></dl> } @else { <p class="muted">Non renseignée.</p> }</section>
 
           <section class="card"><div class="card-title"><h2>Déclarant</h2></div>
@@ -174,6 +177,7 @@ const ACTION: Partial<Record<Status, { label: string; icon: string; cls: string;
   styles: [`
     .actions{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:16px;border-left:4px solid var(--wk-royal)}
     .actions.decision{border-left-color:var(--wk-success);background:linear-gradient(90deg,#f1fbf6,#fff)}
+    .letters{display:block;color:var(--wk-royal);font-size:12.5px;font-weight:600;margin-top:2px}
     .doc{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--wk-border)}
     .doc div{display:flex;flex-direction:column}
     .kind{width:auto;max-width:100%;min-height:32px;padding:4px 8px}

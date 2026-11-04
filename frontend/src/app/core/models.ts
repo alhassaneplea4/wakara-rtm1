@@ -31,10 +31,10 @@ export const STATUS_TONE: Record<Status, 'success' | 'warning' | 'danger' | 'inf
 export interface DeclarationListItem {
   uuid: string; reference: string; status: Status; status_label: string; hospital: string | null;
   hospital_name: string | null; hospital_code?: string | null; birth_date: string; received_at: string; child_name: string;
-  assigned_to_name: string; official_number: string | null; updated_at: string; created_at: string;
+  assigned_to_name: string; official_number: string | null; can_edit?: boolean; updated_at: string; created_at: string;
 }
 
-export interface Child { first_names: string; last_name: string; gender: 'M' | 'F' | ''; }
+export interface Child { first_names: string; last_name: string; gender: 'M' | 'F' | ''; nationality?: string; birth_rank?: number | null; }
 export interface Person {
   first_names: string; last_name: string; date_of_birth?: string | null; birth_place?: string; age?: number | null;
   nationality?: string; profession?: string; address?: string; phone?: string; id_type?: string; id_number?: string;
@@ -71,7 +71,7 @@ export interface Acte {
 export interface ActeDocument {
   is_official: boolean; status: Status; reference: string; official_number: string | null; annee: number | null;
   registre: string; feuillet: string; region: string; prefecture: string; commune: string; centre: string;
-  declaration_date: string | null; child: { first_names: string; last_name: string; gender: string; birth_date: string; birth_time: string | null; birth_place: string };
+  declaration_date: string | null; child: { first_names: string; last_name: string; gender: string; nationality?: string; birth_rank?: number | null; birth_date: string; birth_time: string | null; birth_place: string };
   father: Person | null; mother: Person | null; declarant: (Person & { relationship: string }) | null;
   hospital: string; mentions: string; officer_name: string; validated_at: string | null;
 }

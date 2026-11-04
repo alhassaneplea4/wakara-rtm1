@@ -80,6 +80,9 @@ class Child(BaseModel):
     last_name = models.CharField("Nom", max_length=100, blank=True)
     gender = models.CharField(
         "Sexe", max_length=1, blank=True, choices=[('M', 'Masculin'), ('F', 'Féminin')])
+    nationality = models.CharField("Nationalité", max_length=100, blank=True)
+    birth_rank = models.PositiveSmallIntegerField(
+        "Rang de naissance chez la mère", null=True, blank=True)
 
     class Meta(BaseModel.Meta):
         verbose_name = "Enfant"

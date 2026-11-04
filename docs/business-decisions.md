@@ -41,3 +41,11 @@ avant la mise en production. Légende : ⏳ à confirmer.
 - Quand le secrétariat a fini, il **soumet à validation** : le dossier passe dans la **file de validation** de l'administrateur et le secrétariat ne peut plus le modifier.
 - L'**administrateur** peut travailler sur un dossier en attente de validation (déclaration et acte) : il **reste dans sa file de validation** jusqu'à la décision (valider, retourner ou rejeter). Après validation, plus personne ne modifie.
 - Pastilles du menu : *File du secrétariat* (dossiers transmis, en complément ou à corriger côté secrétariat), *File de validation* (en attente de décision), *Déclarations* (pour l'agent : brouillons et dossiers retournés), *Actes de naissance* (actes validés à délivrer). Les écrans et les pastilles se rafraîchissent toutes les 30 secondes tant que la session est ouverte et l'onglet visible.
+
+## Traitement par le secrétariat, date en lettres, déclarant
+
+- Quand le secrétariat a traité un dossier transmis (enregistrement + **« Envoyer à la validation de l'administrateur »**), le statut passe **directement** de *Transmis au secrétariat* à **En attente de validation** : le dossier quitte la file du secrétariat et entre dans la **file de validation** de l'administrateur. L'étape « Prendre en charge » reste possible mais n'est plus obligatoire.
+- Si la **date de déclaration** de l'acte n'a pas été saisie, elle est fixée au **jour de l'envoi** à la validation ; l'administrateur peut la corriger sur l'acte avant sa décision. *À confirmer avec la mairie.*
+- La **date de naissance** reste un sélecteur de date ; elle est **affichée en lettres** (« le vingt-huit octobre deux mille vingt-six ») en direct dans le formulaire, sur la fiche du dossier et sur l'acte. La valeur enregistrée reste une date.
+- Enfant : **nationalité** et **rang de naissance chez la mère** ajoutés. Père et mère : **date et lieu de naissance**, nationalité, profession.
+- Déclarant : choix **le père / la mère / une autre personne**. Pour le père ou la mère, leurs informations sont reprises automatiquement (nom, profession, domicile, téléphone, lien) ; seules la pièce d'identité et son numéro restent à saisir.

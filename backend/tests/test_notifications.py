@@ -44,7 +44,7 @@ class ChildFieldsTests(WakaraTestCase):
         d = self.create_declaration(child={'first_names': 'A', 'last_name': 'B', 'gender': 'F',
                                            'birth_weight': '3.2', 'birth_length': '50'})
         child = self.child_of(d['uuid'], self.agent)
-        self.assertEqual(set(child), {'first_names', 'last_name', 'gender'})
+        self.assertEqual(set(child), {'first_names', 'last_name', 'gender', 'nationality', 'birth_rank'})
         # sending them again (old client) is harmless: unknown keys are ignored
         r = self.client_for(self.agent).patch(
             f'/api/declarations/{d["uuid"]}/', {'child': {'birth_weight': '3.4', 'last_name': 'Camara'}}, format='json')
@@ -61,3 +61,47 @@ class ChildFieldsTests(WakaraTestCase):
         self.assertEqual(self.client_for(self.admin).get(f'/api/declarations/{d["uuid"]}/').data['status'], 'PENDING_VALIDATION')
         # the secretary, whose work is done, no longer can
         self.assertFalse(self.client_for(self.secretary).get(f'/api/actes/{det.data["uuid"]}/').data['can_edit'])
+
+
+class SecretariatTreatmentTests(WakaraTestCase):
+    """The secretariat treats a transmitted dossier and sends it straight to the administrator's queue."""
+
+    def test_treated_dossier_goes_to_the_validation_queue_in_one_step(self):
+        d = self.create_declaration()
+        self.transition(self.agent, d['uuid'], 'TRANSMITTED')
+        c = self.client_for(self.secretary)
+        # not ready: the declarant is missing
+        r = self.transition(self.secretary, d['uuid'], 'PENDING_VALIDATION')
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(c.get(f'/api/declarations/{d["uuid"]}/').data['status'], 'TRANSMITTED')
+        # the secretariat completes the dossier (child nationality / rank, declarant = the mother) and sends it
+        r = c.patch(f'/api/declarations/{d["uuid"]}/', {
+            'child': {'nationality': 'Guinéenne', 'birth_rank': 2},
+            'declarant': {'first_names': 'Fatoumata', 'last_name': 'Bah', 'relationship': 'Mère'}}, format='json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.data['child']['birth_rank'], 2)
+        self.assertEqual(self.transition(self.secretary, d['uuid'], 'PENDING_VALIDATION').status_code, 200)
+        det = c.get(f'/api/declarations/{d["uuid"]}/').data
+        self.assertEqual(det['status'], 'PENDING_VALIDATION')
+        acte = c.get(f'/api/actes/{det["acte_uuid"]}/').data
+        self.assertTrue(acte['declaration_date'])  # defaulted: the validator can still correct it
+        queue = self.client_for(self.admin).get('/api/declarations/?status=PENDING_VALIDATION').data['results']
+        self.assertIn(d['uuid'], [x['uuid'] for x in queue])
+        # the secretariat's badge is gone, the validator's appears
+        self.assertNotIn('/secretariat', self.client_for(self.secretary).get('/api/inbox/').data['badges'])
+        self.assertEqual(self.client_for(self.admin).get('/api/inbox/').data['badges'].get('/validation'), 1)
+
+    def test_the_agent_cannot_skip_the_secretariat(self):
+        d = self.create_declaration()
+        self.transition(self.agent, d['uuid'], 'TRANSMITTED')
+        self.assertEqual(self.transition(self.agent, d['uuid'], 'PENDING_VALIDATION').status_code, 403)
+
+    def test_the_child_data_is_in_the_acte_document(self):
+        d = self.create_declaration(child={'first_names': 'A', 'last_name': 'B', 'gender': 'F',
+                                           'nationality': 'Guinéenne', 'birth_rank': 3})
+        self.transition(self.agent, d['uuid'], 'TRANSMITTED')
+        self.transition(self.secretary, d['uuid'], 'IN_COMPLETION')
+        det = self.client_for(self.secretary).get(f'/api/declarations/{d["uuid"]}/').data
+        doc = self.client_for(self.secretary).get(f'/api/actes/{det["acte_uuid"]}/document/').data
+        self.assertEqual(doc['child']['nationality'], 'Guinéenne')
+        self.assertEqual(doc['child']['birth_rank'], 3)

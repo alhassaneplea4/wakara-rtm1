@@ -1,4 +1,5 @@
 import { CommonModule, DatePipe } from '@angular/common';
+import { dateEnLettres } from '../core/date-letters';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -44,8 +45,8 @@ import { IconComponent, PageHeaderComponent } from '../shared/ui';
             <p class="refs">Année : <b>{{ d.annee ?? '…' }}</b> · Registre : <b>{{ d.registre || '…' }}</b> · Feuillet : <b>{{ d.feuillet || '…' }}</b> · N° : <b>{{ d.official_number || '…' }}</b></p>
           </header>
           <section>
-            <p>L'an <b>{{ d.child.birth_date | date: 'yyyy' }}</b>, le <b>{{ d.child.birth_date | date: 'dd/MM/yyyy' }}</b>{{ d.child.birth_time ? ' à ' + d.child.birth_time.slice(0,5) : '' }}, est né(e) à <b>{{ d.child.birth_place || d.hospital || '…' }}</b> :</p>
-            <p class="child">{{ d.child.first_names }} <b>{{ d.child.last_name }}</b> — sexe {{ d.child.gender === 'M' ? 'masculin' : d.child.gender === 'F' ? 'féminin' : '…' }}</p>
+            <p>L'an <b>{{ d.child.birth_date | date: 'yyyy' }}</b>, <b>{{ letters(d.child.birth_date) }}</b> ({{ d.child.birth_date | date: 'dd/MM/yyyy' }}){{ d.child.birth_time ? ' à ' + d.child.birth_time.slice(0,5) : '' }}, est né(e) à <b>{{ d.child.birth_place || d.hospital || '…' }}</b> :</p>
+            <p class="child">{{ d.child.first_names }} <b>{{ d.child.last_name }}</b> — sexe {{ d.child.gender === 'M' ? 'masculin' : d.child.gender === 'F' ? 'féminin' : '…' }}@if (d.child.nationality) { — nationalité {{ d.child.nationality }} }@if (d.child.birth_rank) { — {{ d.child.birth_rank }}{{ d.child.birth_rank === 1 ? 'er' : 'e' }} enfant de la mère }</p>
             <div class="two">
               <div><h3>Père</h3>{{ who(d.father) }}</div>
               <div><h3>Mère</h3>{{ who(d.mother) }}</div>
@@ -108,9 +109,12 @@ export class ActeDocumentComponent implements OnInit {
   dv = { recipient_name: '', recipient_relationship: '', recipient_id_type: '', recipient_id_number: '', notes: '' };
   private uuid = '';
 
+  letters(iso: string) { return dateEnLettres(iso); }
+
   who(p: Person | null) {
     if (!p) return '…';
-    return [`${p.first_names} ${p.last_name}`.trim(), p.profession, p.address].filter(Boolean).join(' — ') || '…';
+    const born = p.date_of_birth ? `né(e) ${dateEnLettres(p.date_of_birth)}${p.birth_place ? ' à ' + p.birth_place : ''}` : (p.birth_place ? `né(e) à ${p.birth_place}` : '');
+    return [`${p.first_names} ${p.last_name}`.trim(), born, p.nationality, p.profession, p.address].filter(Boolean).join(' — ') || '…';
   }
 
   ngOnInit() {

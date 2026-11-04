@@ -2,6 +2,7 @@
 State machine of a birth dossier (declaration + acte), enforced server-side.
 
     DRAFT ──► TRANSMITTED ──► IN_COMPLETION ──► PENDING_VALIDATION ──► VALIDATED ──► DELIVERED
+                          └──────────────────────────►┘ (treated in one go by the secretariat)
                   ▲                 ▲                  │
                   │                 └── TO_CORRECT_SECRETARIAT ◄┤
                   └──────── TO_CORRECT_COLLECTION ◄─────────────┤
@@ -68,6 +69,8 @@ class Transition:
 TRANSITIONS = [
     Transition(Status.DRAFT, Status.TRANSMITTED, 'declaration.transmit'),
     Transition(Status.TRANSMITTED, Status.IN_COMPLETION, 'acte.complete'),
+    # the secretariat may treat a transmitted dossier in one go and send it straight to the validation queue
+    Transition(Status.TRANSMITTED, Status.PENDING_VALIDATION, 'acte.submit'),
     Transition(Status.IN_COMPLETION, Status.PENDING_VALIDATION, 'acte.submit'),
     Transition(Status.PENDING_VALIDATION, Status.VALIDATED, 'dossier.validate'),
     Transition(Status.PENDING_VALIDATION, Status.TO_CORRECT_COLLECTION, 'dossier.reject', True),

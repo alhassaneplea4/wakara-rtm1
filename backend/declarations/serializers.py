@@ -11,7 +11,7 @@ from .services import can_edit_data, user_transitions
 class ChildSerializer(serializers.ModelSerializer):
     class Meta:
         model = Child
-        fields = ['first_names', 'last_name', 'gender']
+        fields = ['first_names', 'last_name', 'gender', 'nationality', 'birth_rank']
 
 
 class ParentSerializer(serializers.ModelSerializer):
@@ -52,14 +52,18 @@ class DeclarationListSerializer(serializers.ModelSerializer):
     status_label = serializers.CharField(source='get_status_display', read_only=True)
     assigned_to_name = serializers.SerializerMethodField()
     official_number = serializers.SerializerMethodField()
+    can_edit = serializers.SerializerMethodField()
 
     class Meta:
         model = Declaration
         fields = [
             'uuid', 'reference', 'status', 'status_label', 'hospital', 'hospital_name', 'hospital_code',
             'birth_date', 'received_at', 'child_name', 'assigned_to_name', 'official_number',
-            'updated_at', 'created_at',
+            'can_edit', 'updated_at', 'created_at',
         ]
+
+    def get_can_edit(self, obj):
+        return can_edit_data(self.context['request'].user, obj)
 
     def get_child_name(self, obj):
         child = getattr(obj, 'child', None)
@@ -83,14 +87,13 @@ class DeclarationDetailSerializer(DeclarationListSerializer):
     created_by_name = serializers.SerializerMethodField()
     validated_by_name = serializers.SerializerMethodField()
     available_transitions = serializers.SerializerMethodField()
-    can_edit = serializers.SerializerMethodField()
 
     class Meta(DeclarationListSerializer.Meta):
         fields = DeclarationListSerializer.Meta.fields + [
             'hospital_document_ref', 'doctor_name', 'midwife_name', 'birth_time', 'birth_place',
             'notes', 'last_decision_reason', 'transmitted_at', 'validated_at',
             'validated_by_name', 'child', 'mother', 'father', 'declarant', 'acte_uuid',
-            'status_history', 'created_by_name', 'available_transitions', 'can_edit',
+            'status_history', 'created_by_name', 'available_transitions',
         ]
 
     def get_child(self, obj):
@@ -129,9 +132,6 @@ class DeclarationDetailSerializer(DeclarationListSerializer):
             {'target': t.target, 'reason_required': t.reason_required, 'permission': t.permission}
             for t in user_transitions(user, obj)
         ]
-
-    def get_can_edit(self, obj):
-        return can_edit_data(self.context['request'].user, obj)
 
 
 class DeclarationWriteSerializer(serializers.ModelSerializer):

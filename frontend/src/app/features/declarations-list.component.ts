@@ -71,9 +71,10 @@ const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Statu
               <th class="sortable" (click)="sort('received_at')">Reçue le {{ arrow('received_at') }}</th>
               <th>Responsable</th><th>Statut</th>
               <th class="sortable" (click)="sort('updated_at')">Modifiée {{ arrow('updated_at') }}</th>
+              <th><span class="sr-only">Actions</span></th>
             </tr></thead>
             <tbody>
-              @if (loading()) { @for (i of [1,2,3,4,5]; track i) { <tr><td colspan="8"><div class="skeleton" style="height:20px"></div></td></tr> } }
+              @if (loading()) { @for (i of [1,2,3,4,5]; track i) { <tr><td colspan="9"><div class="skeleton" style="height:20px"></div></td></tr> } }
               @else {
                 @for (d of rows(); track d.uuid) {
                   <tr class="clickable" (click)="open(d.uuid)" tabindex="0" (keyup.enter)="open(d.uuid)">
@@ -82,9 +83,10 @@ const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Statu
                     <td class="mono">{{ d.birth_date | date: 'dd/MM/yyyy' }}</td><td class="mono">{{ d.received_at | date: 'dd/MM/yyyy' }}</td>
                     <td>{{ d.assigned_to_name || '—' }}</td><td><wk-status [status]="d.status" /></td>
                     <td class="mono">{{ d.updated_at | date: 'dd/MM/yyyy HH:mm' }}</td>
+                    <td class="act">@if (d.can_edit) { <a class="btn btn-sm" [routerLink]="['/declarations', d.uuid, 'edit']" (click)="$event.stopPropagation()"><wk-icon name="edit" [size]="14" /> Modifier</a> }</td>
                   </tr>
                 } @empty {
-                  <tr><td colspan="8"><div class="empty"><strong>Aucun dossier</strong>{{ hasFilters() ? 'Aucun résultat pour ces filtres.' : 'Rien à afficher pour le moment.' }}</div></td></tr>
+                  <tr><td colspan="9"><div class="empty"><strong>Aucun dossier</strong>{{ hasFilters() ? 'Aucun résultat pour ces filtres.' : 'Rien à afficher pour le moment.' }}</div></td></tr>
                 }
               }
             </tbody>
@@ -99,6 +101,8 @@ const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Statu
     .grow{flex:1;min-width:220px}
     .filters .input{min-height:40px}
     .m{margin:16px}
+    .act{text-align:right;white-space:nowrap}
+    .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
   `],
 })
 export class DeclarationsListComponent implements OnInit {

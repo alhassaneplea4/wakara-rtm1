@@ -147,6 +147,8 @@ def build_document(acte: Acte) -> dict:
             'first_names': child.first_names if child else '',
             'last_name': child.last_name if child else '',
             'gender': child.gender if child else '',
+            'nationality': child.nationality if child else '',
+            'birth_rank': child.birth_rank if child else None,
             'birth_date': d.birth_date, 'birth_time': d.birth_time, 'birth_place': d.birth_place,
         },
         'father': person(parents.get('FATHER')),

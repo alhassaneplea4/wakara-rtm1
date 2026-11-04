@@ -183,7 +183,7 @@ def _full_snapshot(declaration) -> dict:
     child = getattr(declaration, 'child', None) if declaration.pk else None
     if child:
         snap.update({f'child.{k}': v for k, v in audit.snapshot(
-            child, ['first_names', 'last_name', 'gender']).items()})
+            child, ['first_names', 'last_name', 'gender', 'nationality', 'birth_rank']).items()})
     for parent in declaration.parents.all():
         prefix = parent.parent_type.lower()
         snap.update({f'{prefix}.{k}': v for k, v in audit.snapshot(
@@ -240,7 +240,13 @@ def transition_status(declaration_pk, target: str, user, reason: str = '', paylo
                 + ', '.join(FIELD_LABELS.get(m, m) for m in missing))})
     if target == Status.PENDING_VALIDATION:
         from actes.services import ensure_acte
-        ensure_acte(declaration, user)
+        acte = ensure_acte(declaration, user)
+        if not acte.declaration_date:
+            # date of the declaration at the civil registry: today, unless the secretariat set it; the
+            # validator can still correct it on the acte before the final decision
+            acte.declaration_date = timezone.localdate()
+            acte.updated_by = user
+            acte.save(update_fields=['declaration_date', 'updated_by', 'updated_at'])
         declaration = Declaration.objects.get(pk=declaration.pk)
         missing = missing_fields(declaration, settings.ACTE_REQUIRED_FOR_SUBMISSION)
         if missing:
