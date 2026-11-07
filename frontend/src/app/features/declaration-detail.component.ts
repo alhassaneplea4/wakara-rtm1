@@ -28,7 +28,7 @@ const ACTION: Partial<Record<Status, { label: string; icon: string; cls: string;
   template: `
     @if (d(); as d) {
       <div class="page">
-        <wk-page-header [title]="d.reference" [back]="['/declarations']" backLabel="Retour aux déclarations" [subtitle]="(d.child_name || 'Enfant non nommé') + ' · ' + (d.hospital_name || 'Établissement non identifié')">
+        <wk-page-header [upper]="true" [title]="d.reference" [back]="['/declarations']" backLabel="Retour aux déclarations" [subtitle]="(d.child_name || 'Enfant non nommé') + ' · ' + (d.hospital_name || 'Établissement non identifié')">
           <wk-status [status]="d.status" />
           @if (d.can_edit) { <a class="btn" [routerLink]="['/declarations', d.uuid, 'edit']"><wk-icon name="edit" [size]="16" /> Modifier</a> }
           @if (d.acte_uuid && auth.can('acte.view')) {
@@ -58,7 +58,7 @@ const ACTION: Partial<Record<Status, { label: string; icon: string; cls: string;
 
         <div class="grid grid-2">
           <section class="card"><div class="card-title"><h2>Naissance</h2></div>
-            <dl class="kv">
+            <dl class="kv uc">
               <dt>Date</dt><dd>{{ d.birth_date | date: 'dd/MM/yyyy' }} {{ d.birth_time ? 'à ' + d.birth_time.slice(0,5) : '' }}<span class="letters">{{ d.birth_date | dateLetters }}</span></dd>
               <dt>Lieu</dt><dd>{{ d.birth_place || '—' }}</dd>
               <dt>Établissement</dt><dd>{{ d.hospital_name || 'Non identifié' }} @if (d.hospital_code) { <span class="mono muted">({{ d.hospital_code }})</span> }</dd>
@@ -69,7 +69,7 @@ const ACTION: Partial<Record<Status, { label: string; icon: string; cls: string;
             </dl></section>
 
           <section class="card"><div class="card-title"><h2>Enfant</h2></div>
-            @if (d.child) { <dl class="kv">
+            @if (d.child) { <dl class="kv uc">
               <dt>Prénoms</dt><dd>{{ d.child.first_names || '—' }}</dd><dt>Nom</dt><dd>{{ d.child.last_name || '—' }}</dd>
               <dt>Sexe</dt><dd>{{ d.child.gender === 'M' ? 'Masculin' : d.child.gender === 'F' ? 'Féminin' : '—' }}</dd>
               <dt>Nationalité</dt><dd>{{ d.child.nationality || '—' }}</dd>
@@ -77,19 +77,19 @@ const ACTION: Partial<Record<Status, { label: string; icon: string; cls: string;
             </dl> }</section>
 
           <section class="card"><div class="card-title"><h2>Père</h2></div>
-            @if (d.father) { <dl class="kv"><dt>Prénoms</dt><dd>{{ d.father.first_names || '—' }}</dd><dt>Nom</dt><dd>{{ d.father.last_name || '—' }}</dd>
+            @if (d.father) { <dl class="kv uc"><dt>Prénoms</dt><dd>{{ d.father.first_names || '—' }}</dd><dt>Nom</dt><dd>{{ d.father.last_name || '—' }}</dd>
               <dt>Né(e) le</dt><dd>{{ d.father.date_of_birth ? (d.father.date_of_birth | date: 'dd/MM/yyyy') : '—' }}@if (d.father.date_of_birth) { <span class="letters">{{ d.father.date_of_birth | dateLetters }}</span> }</dd><dt>Lieu de naissance</dt><dd>{{ d.father.birth_place || '—' }}</dd><dt>Âge</dt><dd>{{ d.father.age ?? '—' }}</dd><dt>Profession</dt><dd>{{ d.father.profession || '—' }}</dd>
-              <dt>Nationalité</dt><dd>{{ d.father.nationality || '—' }}</dd><dt>Domicile</dt><dd>{{ d.father.address || '—' }}</dd></dl> } @else { <p class="muted">Non renseigné.</p> }</section>
+              <dt>Nationalité</dt><dd>{{ d.father.nationality || '—' }}</dd><dt>Téléphone</dt><dd>{{ d.father.phone || '—' }}</dd><dt>Domicile</dt><dd>{{ d.father.address || '—' }}</dd></dl> } @else { <p class="muted">Non renseigné.</p> }</section>
 
           <section class="card"><div class="card-title"><h2>Mère</h2></div>
-            @if (d.mother) { <dl class="kv"><dt>Prénoms</dt><dd>{{ d.mother.first_names || '—' }}</dd><dt>Nom</dt><dd>{{ d.mother.last_name || '—' }}</dd>
+            @if (d.mother) { <dl class="kv uc"><dt>Prénoms</dt><dd>{{ d.mother.first_names || '—' }}</dd><dt>Nom</dt><dd>{{ d.mother.last_name || '—' }}</dd>
               <dt>Né(e) le</dt><dd>{{ d.mother.date_of_birth ? (d.mother.date_of_birth | date: 'dd/MM/yyyy') : '—' }}@if (d.mother.date_of_birth) { <span class="letters">{{ d.mother.date_of_birth | dateLetters }}</span> }</dd><dt>Lieu de naissance</dt><dd>{{ d.mother.birth_place || '—' }}</dd><dt>Âge</dt><dd>{{ d.mother.age ?? '—' }}</dd><dt>Profession</dt><dd>{{ d.mother.profession || '—' }}</dd>
-              <dt>Nationalité</dt><dd>{{ d.mother.nationality || '—' }}</dd><dt>Domicile</dt><dd>{{ d.mother.address || '—' }}</dd></dl> } @else { <p class="muted">Non renseignée.</p> }</section>
+              <dt>Nationalité</dt><dd>{{ d.mother.nationality || '—' }}</dd><dt>Téléphone</dt><dd>{{ d.mother.phone || '—' }}</dd><dt>Domicile</dt><dd>{{ d.mother.address || '—' }}</dd></dl> } @else { <p class="muted">Non renseignée.</p> }</section>
 
           <section class="card"><div class="card-title"><h2>Déclarant</h2></div>
-            @if (d.declarant) { <dl class="kv"><dt>Nom</dt><dd>{{ d.declarant.first_names }} {{ d.declarant.last_name }}</dd>
-              <dt>Lien</dt><dd>{{ d.declarant.relationship || '—' }}</dd><dt>Profession</dt><dd>{{ d.declarant.profession || '—' }}</dd>
-              <dt>Pièce</dt><dd>{{ d.declarant.id_type }} {{ d.declarant.id_number }}</dd><dt>Domicile</dt><dd>{{ d.declarant.address || '—' }}</dd></dl> } @else { <p class="muted">À renseigner par le secrétariat.</p> }</section>
+            @if (d.declarant) { <dl class="kv uc"><dt>Nom</dt><dd>{{ d.declarant.first_names }} {{ d.declarant.last_name }}</dd>
+              <dt>Lien</dt><dd>{{ d.declarant.relationship || '—' }}</dd><dt>Profession</dt><dd>{{ d.declarant.profession || '—' }}</dd><dt>Nationalité</dt><dd>{{ d.declarant.nationality || '—' }}</dd>
+              <dt>Téléphone</dt><dd>{{ d.declarant.phone || '—' }}</dd><dt>Pièce</dt><dd>{{ d.declarant.id_type }} {{ d.declarant.id_number }}</dd><dt>Domicile</dt><dd>{{ d.declarant.address || '—' }}</dd></dl> } @else { <p class="muted">À renseigner par le secrétariat.</p> }</section>
 
           @if (acte(); as a) {
             <section class="card"><div class="card-title"><h2>Acte</h2></div>
@@ -99,7 +99,7 @@ const ACTION: Partial<Record<Status, { label: string; icon: string; cls: string;
           }
         </div>
 
-        @if (d.notes) { <section class="card" style="margin-top:16px"><div class="card-title"><h2>Observations</h2></div><p>{{ d.notes }}</p></section> }
+        @if (d.notes) { <section class="card" style="margin-top:16px"><div class="card-title"><h2>Observations</h2></div><p class="uc">{{ d.notes }}</p></section> }
 
         @if (auth.can('document.view')) {
           <section class="card" style="margin-top:16px">

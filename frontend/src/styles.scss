@@ -173,3 +173,10 @@ table.table.compact { min-width: 0; }
 .modal { background: #fff; border-radius: var(--r-lg); box-shadow: var(--shadow-lg); width: min(560px, 100%); max-height: 92vh; overflow: auto; padding: var(--s6); }
 .modal h2 { margin-bottom: var(--s4); }
 .modal-actions { display: flex; justify-content: flex-end; gap: var(--s3); margin-top: var(--s5); flex-wrap: wrap; }
+
+/* ── Capitales : les informations saisies s'affichent en majuscules (affichage seul, la valeur enregistrée est inchangée) ── */
+.uc { text-transform: uppercase; }
+/* champs de saisie de texte d'un formulaire marqué .uc-form ; e-mail, mot de passe, dates, nombres et téléphones restent tels quels */
+.uc-form input:not([type]), .uc-form input[type='text'], .uc-form input[type='search'], .uc-form textarea, .uc-form select { text-transform: uppercase; }
+.uc-form ::placeholder { text-transform: none; }
+.uc-form input[type='email'], .uc-form input[type='password'] { text-transform: none; }

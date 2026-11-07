@@ -40,7 +40,7 @@ export interface Person {
   nationality?: string; profession?: string; address?: string; phone?: string; id_type?: string; id_number?: string;
 }
 export interface Declarant {
-  first_names: string; last_name: string; relationship?: string; profession?: string; phone?: string;
+  first_names: string; last_name: string; relationship?: string; nationality?: string; profession?: string; phone?: string;
   address?: string; id_type?: string; id_number?: string;
 }
 export interface StatusHistoryEntry { from_status: string; to_status: string; changed_by_name: string; changed_at: string; reason: string; }

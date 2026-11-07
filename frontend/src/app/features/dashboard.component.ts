@@ -79,7 +79,7 @@ const PALETTE = ['#1f5ed8', '#4f9bff', '#12a36a', '#8b7cf6', '#e58a0a', '#c3cde0
               <tbody>
                 @for (d of recent(); track d.uuid) {
                   <tr class="clickable" (click)="open(d.uuid)">
-                    <td class="mono">{{ d.reference }}</td><td>{{ d.child_name || '—' }}</td><td>{{ d.hospital_name || '—' }}</td>
+                    <td class="mono">{{ d.reference }}</td><td class="uc">{{ d.child_name || '—' }}</td><td>{{ d.hospital_name || '—' }}</td>
                     <td><wk-status [status]="d.status" /></td><td class="mono">{{ d.updated_at | date: 'dd/MM/yyyy' }}</td>
                   </tr>
                 } @empty { <tr><td colspan="5"><div class="empty"><strong>Aucun dossier</strong>Les dossiers enregistrés apparaîtront ici.</div></td></tr> }

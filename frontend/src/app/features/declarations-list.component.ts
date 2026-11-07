@@ -79,11 +79,11 @@ const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Statu
                 @for (d of rows(); track d.uuid) {
                   <tr class="clickable" (click)="open(d.uuid)" tabindex="0" (keyup.enter)="open(d.uuid)">
                     <td class="mono"><a [routerLink]="['/declarations', d.uuid]" (click)="$event.stopPropagation()">{{ d.reference }}</a></td>
-                    <td>{{ d.child_name || '—' }}</td><td>{{ d.hospital_name || 'Non renseigné' }}</td>
+                    <td class="uc">{{ d.child_name || '—' }}</td><td class="uc">{{ d.hospital_name || 'Non renseigné' }}</td>
                     <td class="mono">{{ d.birth_date | date: 'dd/MM/yyyy' }}</td><td class="mono">{{ d.received_at | date: 'dd/MM/yyyy' }}</td>
                     <td>{{ d.assigned_to_name || '—' }}</td><td><wk-status [status]="d.status" /></td>
                     <td class="mono">{{ d.updated_at | date: 'dd/MM/yyyy HH:mm' }}</td>
-                    <td class="act">@if (d.can_edit) { <a class="btn btn-sm" [routerLink]="['/declarations', d.uuid, 'edit']" (click)="$event.stopPropagation()"><wk-icon name="edit" [size]="14" /> Modifier</a> }</td>
+                    <td class="act">@if (d.can_edit) { <a class="edit-btn" [routerLink]="['/declarations', d.uuid, 'edit']" (click)="$event.stopPropagation()" (keyup.enter)="$event.stopPropagation()" title="Modifier" [attr.aria-label]="'Modifier la déclaration ' + d.reference"><wk-icon name="edit" [size]="16" /></a> }</td>
                   </tr>
                 } @empty {
                   <tr><td colspan="9"><div class="empty"><strong>Aucun dossier</strong>{{ hasFilters() ? 'Aucun résultat pour ces filtres.' : 'Rien à afficher pour le moment.' }}</div></td></tr>
@@ -101,7 +101,16 @@ const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Statu
     .grow{flex:1;min-width:220px}
     .filters .input{min-height:40px}
     .m{margin:16px}
-    .act{text-align:right;white-space:nowrap}
+    .act{text-align:right;white-space:nowrap;width:1%}
+    /* Pencil icon only. On a mouse the action appears on row hover or keyboard focus; on touch screens it is always visible. */
+    .edit-btn{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:50%;color:var(--wk-royal);border:1px solid transparent;transition:opacity .15s,background .15s}
+    .edit-btn:hover{background:var(--wk-info-bg);text-decoration:none}
+    .edit-btn:focus-visible{outline:2px solid var(--wk-royal);outline-offset:2px}
+    @media (hover:hover) and (pointer:fine){
+      .edit-btn{opacity:0}
+      tr:hover .edit-btn,tr:focus-within .edit-btn,.edit-btn:focus-visible{opacity:1}
+    }
+    @media (hover:none),(pointer:coarse){.edit-btn{opacity:1;width:44px;height:44px;border-color:var(--wk-border);background:#fff}}
     .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
   `],
 })

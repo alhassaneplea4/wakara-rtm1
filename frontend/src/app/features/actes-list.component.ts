@@ -30,7 +30,7 @@ import { PageHeaderComponent, PaginationComponent, StatusBadgeComponent } from '
             @for (a of rows(); track a.uuid) {
               <tr class="clickable" (click)="open(a)">
                 <td class="mono"><strong>{{ a.numero_acte || '—' }}</strong></td><td class="mono">{{ a.annee ?? '—' }}</td><td>{{ a.registre || '—' }}</td><td>{{ a.feuillet || '—' }}</td>
-                <td>{{ a.child_name || '—' }}</td><td class="mono">{{ a.reference }}</td><td>{{ a.hospital_name || '—' }}</td><td><wk-status [status]="a.status" /></td>
+                <td class="uc">{{ a.child_name || '—' }}</td><td class="mono">{{ a.reference }}</td><td>{{ a.hospital_name || '—' }}</td><td><wk-status [status]="a.status" /></td>
               </tr>
             } @empty { <tr><td colspan="8"><div class="empty"><strong>Aucun acte</strong>Les actes apparaissent lorsque le secrétariat prend un dossier en charge.</div></td></tr> }
           </tbody></table></div>

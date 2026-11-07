@@ -1,6 +1,7 @@
 """Serializers for the declarations app."""
 from rest_framework import serializers
 
+from core.validators import normalize_phone
 from core.workflow import Status
 from hospitals.models import Hospital
 
@@ -8,23 +9,38 @@ from .models import Child, Declarant, Declaration, Parent, StatusHistory
 from .services import can_edit_data, user_transitions
 
 
+class PhoneMixin:
+    """Optional phone number: malformed values are refused, valid ones stored as ``+224 624 62 94 77``."""
+
+    def validate_phone(self, value):
+        return normalize_phone(value)
+
+
 class ChildSerializer(serializers.ModelSerializer):
     class Meta:
         model = Child
         fields = ['first_names', 'last_name', 'gender', 'nationality', 'birth_rank']
+        extra_kwargs = {'birth_rank': {'min_value': 1, 'max_value': 30}}
 
 
-class ParentSerializer(serializers.ModelSerializer):
+class ParentSerializer(PhoneMixin, serializers.ModelSerializer):
     class Meta:
         model = Parent
         fields = ['first_names', 'last_name', 'date_of_birth', 'birth_place', 'age',
                   'nationality', 'profession', 'address', 'phone', 'id_type', 'id_number']
+        extra_kwargs = {'age': {'min_value': 0, 'max_value': 120}}
+
+    def validate_date_of_birth(self, value):
+        from django.utils import timezone
+        if value and value > timezone.localdate():
+            raise serializers.ValidationError("La date de naissance ne peut pas être dans le futur.")
+        return value
 
 
-class DeclarantSerializer(serializers.ModelSerializer):
+class DeclarantSerializer(PhoneMixin, serializers.ModelSerializer):
     class Meta:
         model = Declarant
-        fields = ['first_names', 'last_name', 'relationship', 'profession', 'phone',
+        fields = ['first_names', 'last_name', 'relationship', 'nationality', 'profession', 'phone',
                   'address', 'id_type', 'id_number']
 
 

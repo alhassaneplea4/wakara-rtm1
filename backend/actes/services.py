@@ -153,6 +153,7 @@ def build_document(acte: Acte) -> dict:
         },
         'father': person(parents.get('FATHER')),
         'mother': person(parents.get('MOTHER')),
+        # declarant: same identity block as a parent (+ nationality) and the link with the child
         'declarant': {**person(declarant), 'relationship': declarant.relationship} if declarant else None,
         'hospital': d.hospital.name if d.hospital else '',
         'mentions': acte.mentions,

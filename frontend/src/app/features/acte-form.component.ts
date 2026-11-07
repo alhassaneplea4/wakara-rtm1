@@ -12,7 +12,7 @@ import { PageHeaderComponent } from '../shared/ui';
   imports: [CommonModule, FormsModule, RouterLink, PageHeaderComponent],
   template: `
     <div class="page">
-      <wk-page-header title="Complément de l'acte" [subtitle]="ref + ' · ' + childName">
+      <wk-page-header [upper]="true" title="Complément de l'acte" [subtitle]="ref + ' · ' + childName">
         <a class="btn" [routerLink]="['/declarations', uuid]">Retour au dossier</a>
       </wk-page-header>
       @if (error()) { <div class="alert alert-danger" role="alert" style="margin-bottom:16px">{{ error() }}</div> }

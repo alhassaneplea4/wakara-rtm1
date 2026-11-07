@@ -22,7 +22,7 @@ import { PageHeaderComponent, PaginationComponent } from '../shared/ui';
             @for (d of rows(); track d.uuid) {
               <tr><td class="mono">{{ d.delivered_at | date: 'dd/MM/yyyy HH:mm' }}</td>
                 <td class="mono"><a [routerLink]="['/actes', d.acte_uuid, 'document']">{{ d.official_number || d.reference }}</a></td>
-                <td>{{ d.child_name || '—' }}</td><td>{{ d.recipient_name }}</td><td>{{ d.recipient_relationship || '—' }}</td>
+                <td class="uc">{{ d.child_name || '—' }}</td><td>{{ d.recipient_name }}</td><td>{{ d.recipient_relationship || '—' }}</td>
                 <td><span class="badge" [ngClass]="d.is_duplicate ? 'badge-warning' : 'badge-success'">{{ d.is_duplicate ? 'Duplicata' : 'Première délivrance' }}</span></td>
                 <td>{{ d.delivered_by_name }}</td></tr>
             } @empty { <tr><td colspan="7"><div class="empty"><strong>Aucune délivrance</strong>Les délivrances enregistrées apparaîtront ici.</div></td></tr> }

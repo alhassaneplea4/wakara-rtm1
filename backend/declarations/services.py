@@ -192,7 +192,7 @@ def _full_snapshot(declaration) -> dict:
     declarant = getattr(declaration, 'declarant', None)
     if declarant:
         snap.update({f'declarant.{k}': v for k, v in audit.snapshot(
-            declarant, ['first_names', 'last_name', 'relationship', 'profession', 'phone',
+            declarant, ['first_names', 'last_name', 'relationship', 'nationality', 'profession', 'phone',
                         'address', 'id_type', 'id_number']).items()})
     return snap
 

@@ -212,7 +212,7 @@ export class ConfirmComponent {
     @if (back) {
       <a class="back-link" [routerLink]="back" [attr.aria-label]="backLabel"><wk-icon name="back" [size]="16" /> {{ backLabel }}</a>
     }
-    <div class="page-header"><div><h1>{{ title }}</h1>@if (subtitle) {<p>{{ subtitle }}</p>}</div><div class="row"><ng-content /></div></div>`,
+    <div class="page-header"><div><h1>{{ title }}</h1>@if (subtitle) {<p [class.uc]="upper">{{ subtitle }}</p>}</div><div class="row"><ng-content /></div></div>`,
   styles: [`
     :host{display:block}
     .back-link{display:inline-flex;align-items:center;gap:6px;margin:0 0 10px;padding:6px 12px 6px 8px;border-radius:999px;font-size:13px;font-weight:600;color:var(--wk-royal);background:var(--wk-info-bg);text-decoration:none}
@@ -222,6 +222,8 @@ export class ConfirmComponent {
 export class PageHeaderComponent {
   @Input() title = '';
   @Input() subtitle = '';
+  /** Shows the subtitle in capitals (it holds names typed in the declaration form). */
+  @Input() upper = false;
   /** Router link of the parent screen; shows a « Retour » link above the title when set. */
   @Input() back: string | any[] | null = null;
   @Input() backLabel = 'Retour';

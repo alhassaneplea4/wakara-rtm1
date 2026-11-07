@@ -45,14 +45,14 @@ import { IconComponent, PageHeaderComponent } from '../shared/ui';
             <p class="refs">Année : <b>{{ d.annee ?? '…' }}</b> · Registre : <b>{{ d.registre || '…' }}</b> · Feuillet : <b>{{ d.feuillet || '…' }}</b> · N° : <b>{{ d.official_number || '…' }}</b></p>
           </header>
           <section>
-            <p>L'an <b>{{ d.child.birth_date | date: 'yyyy' }}</b>, <b>{{ letters(d.child.birth_date) }}</b> ({{ d.child.birth_date | date: 'dd/MM/yyyy' }}){{ d.child.birth_time ? ' à ' + d.child.birth_time.slice(0,5) : '' }}, est né(e) à <b>{{ d.child.birth_place || d.hospital || '…' }}</b> :</p>
-            <p class="child">{{ d.child.first_names }} <b>{{ d.child.last_name }}</b> — sexe {{ d.child.gender === 'M' ? 'masculin' : d.child.gender === 'F' ? 'féminin' : '…' }}@if (d.child.nationality) { — nationalité {{ d.child.nationality }} }@if (d.child.birth_rank) { — {{ d.child.birth_rank }}{{ d.child.birth_rank === 1 ? 'er' : 'e' }} enfant de la mère }</p>
+            <p>L'an <b>{{ d.child.birth_date | date: 'yyyy' }}</b>, <b>{{ letters(d.child.birth_date) }}</b> ({{ d.child.birth_date | date: 'dd/MM/yyyy' }}){{ d.child.birth_time ? ' à ' + d.child.birth_time.slice(0,5) : '' }}, est né(e) à <b class="uc">{{ d.child.birth_place || d.hospital || '…' }}</b> :</p>
+            <p class="child uc">{{ d.child.first_names }} <b>{{ d.child.last_name }}</b> — sexe {{ d.child.gender === 'M' ? 'masculin' : d.child.gender === 'F' ? 'féminin' : '…' }}@if (d.child.nationality) { — nationalité {{ d.child.nationality }} }@if (d.child.birth_rank) { — {{ d.child.birth_rank }}{{ d.child.birth_rank === 1 ? 'er' : 'e' }} enfant de la mère }</p>
             <div class="two">
-              <div><h3>Père</h3>{{ who(d.father) }}</div>
-              <div><h3>Mère</h3>{{ who(d.mother) }}</div>
+              <div><h3>Père</h3><span class="uc">{{ who(d.father) }}</span></div>
+              <div><h3>Mère</h3><span class="uc">{{ who(d.mother) }}</span></div>
             </div>
             <p>Déclaration faite le <b>{{ d.declaration_date ? (d.declaration_date | date: 'dd/MM/yyyy') : '…' }}</b> par
-              <b>{{ d.declarant ? d.declarant.first_names + ' ' + d.declarant.last_name : '…' }}</b>{{ d.declarant?.relationship ? ' (' + d.declarant!.relationship + ')' : '' }}.</p>
+              <b class="uc">{{ d.declarant ? d.declarant.first_names + ' ' + d.declarant.last_name : '…' }}</b>@if (d.declarant?.relationship) { (<span class="uc">{{ d.declarant!.relationship }}</span>) }@if (d.declarant?.nationality) { , de nationalité <span class="uc">{{ d.declarant!.nationality }}</span> }.</p>
             @if (d.mentions) { <p><b>Mentions :</b> {{ d.mentions }}</p> }
           </section>
           <footer><div>Le déclarant</div><div>L'officier d'état civil<br /><small>{{ d.officer_name }}</small></div></footer>
