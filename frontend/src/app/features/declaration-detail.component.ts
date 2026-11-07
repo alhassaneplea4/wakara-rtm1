@@ -177,7 +177,7 @@ const STEP_TEXT: Record<string, { title: string; help: string; icon: string; ton
 
         @if (auth.can('audit.view')) {
           <section class="card" style="margin-top:16px">
-            <div class="card-title"><h2>Journal d'audit du dossier</h2></div>
+            <div class="card-title"><h2>Journal d'audit du dossier</h2><a class="btn btn-sm" [routerLink]="['/history', d.uuid]"><wk-icon name="search" [size]="14" /> Historique complet</a></div>
             @for (e of journal(); track e.id) {
               <div class="jrow"><span class="mono muted">{{ e.created_at | date: 'dd/MM/yyyy HH:mm' }}</span><strong>{{ e.username || 'Système' }}</strong>
                 <span class="badge badge-info">{{ e.action }}</span><span class="soft">{{ e.object_type }}</span>@if (e.reason) { <em class="soft">« {{ e.reason }} »</em> }</div>

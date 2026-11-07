@@ -129,3 +129,30 @@ export interface Dashboard {
 }
 
 export interface Inbox { total: number; items: { code: string; label: string; count: number; status: Status }[]; badges: Record<string, number>; }
+
+/* ── Historiques des actes (administrator) ───────── */
+
+export interface HistoryRow {
+  uuid: string; reference: string; child_name: string; status: Status; status_label: string; hospital_name: string;
+  official_number: string | null; created_by_name: string; created_at: string; is_archived: boolean;
+  last_event_at: string; event_count: number; last_actor: string; last_action: string;
+}
+
+export interface HistoryEvent {
+  id: number; at: string; kind: string; icon: string; tone: 'info' | 'success' | 'warning' | 'danger'; title: string; milestone: string;
+  who: string; username: string; roles: string[]; reason: string; ip: string | null; object: string;
+  details: { label: string; from?: string; to?: string; value?: string }[];
+}
+
+export interface HistoryDetail {
+  dossier: {
+    uuid: string; reference: string; child_name: string; status: Status; status_label: string; hospital_name: string; birth_date: string;
+    official_number: string | null; annee: number | null; registre: string; acte_uuid: string | null; is_archived: boolean;
+    created_by_name: string; created_at: string; validated_by_name: string; validated_at: string | null;
+  };
+  events: HistoryEvent[];
+  people: { name: string; username: string; roles: string[]; count: number; first_at: string; last_at: string; kinds: { kind: string; label: string; count: number }[] }[];
+  kinds: { kind: string; label: string; count: number }[];
+}
+
+export interface HistorySummary { events_today: number; dossiers_today: number; users_today: number; changes_today: number; deliveries_today: number; }

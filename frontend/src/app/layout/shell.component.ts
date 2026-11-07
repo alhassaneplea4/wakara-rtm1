@@ -23,6 +23,7 @@ const NAV: NavItem[] = [
   { label: 'Hôpitaux et maternités', icon: 'hospital', link: '/hospitals', perms: ['hospital.view'] },
   { label: 'Utilisateurs', icon: 'users', link: '/users', perms: ['user.view'] },
   { label: 'Rôles et permissions', icon: 'lock', link: '/roles', perms: ['role.view'] },
+  { label: 'Historiques des actes', icon: 'search', link: '/history', perms: ['audit.view'] },
   { label: "Journaux d'activité", icon: 'history', link: '/audit', perms: ['audit.view'] },
   { label: 'Paramètres', icon: 'settings', link: '/settings', perms: ['settings.manage'] },
 ];
