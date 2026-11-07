@@ -6,6 +6,7 @@ from rest_framework import mixins, serializers, viewsets
 from rest_framework.decorators import action
 
 from audit import service as audit
+from core.csv_safe import safe_row
 from core.permissions import HasWakaraPermission
 
 from .models import AuditAction, AuditLog
@@ -61,8 +62,8 @@ class AuditLogViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets
         writer = csv.writer(response, delimiter=';')
         writer.writerow(['Date', 'Utilisateur', 'Action', 'Type', 'Objet', 'Motif', 'IP'])
         for e in qs:
-            writer.writerow([e.created_at.isoformat(), e.username, e.action, e.object_type,
-                             e.object_repr, e.reason, e.ip_address or ''])
+            writer.writerow(safe_row([e.created_at.isoformat(), e.username, e.action, e.object_type,
+                                      e.object_repr, e.reason, e.ip_address or '']))
         audit.log(AuditAction.EXPORT, user=request.user, object_type='AuditLog',
                   changes={'filters': dict(request.query_params)})
         return response

@@ -74,9 +74,10 @@ export class ProfileComponent implements OnInit {
   changePassword() {
     this.wErr.set(''); this.werrs.set({});
     if (this.pw.new_password !== this.confirm) { this.wErr.set('La confirmation ne correspond pas au nouveau mot de passe.'); return; }
-    this.api.post('/auth/change-password/', this.pw).subscribe({
-      next: () => {
-        this.pw = { old_password: '', new_password: '' }; this.confirm = '';
+    this.api.post<{ access?: string; refresh?: string }>('/auth/change-password/', this.pw).subscribe({
+      next: r => {
+        if (r?.access && r?.refresh) this.auth.adoptTokens(r.access, r.refresh);
+        this.pw ={ old_password: '', new_password: '' }; this.confirm = '';
         this.auth.reloadUser().subscribe(u => { this.toast.success('Mot de passe modifié.'); if (this.forced) this.router.navigate([this.auth.can('stats.view') ? '/dashboard' : '/declarations']); this.forced = u.must_change_password; });
       },
       error: e => { this.werrs.set(fieldErrors(e)); this.wErr.set(errorMessage(e)); },

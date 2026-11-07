@@ -67,6 +67,11 @@ export class AuthService {
     );
   }
 
+  /** Replaces the stored token pair (the server revokes the old one after a password change), keeping the "remember me" choice. */
+  adoptTokens(access: string, refresh: string) {
+    this.save(access, refresh, !!this.read(localStorage, environment.refreshTokenKey));
+  }
+
   reloadUser(): Observable<Me> { return this.http.get<Me>(`${this.api}/auth/me/`).pipe(tap(u => this.user.set(u))); }
 
   /** Single in-flight refresh shared by concurrent 401s. */

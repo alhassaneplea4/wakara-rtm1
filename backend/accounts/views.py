@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from audit import service as audit
@@ -31,6 +32,16 @@ from .serializers import (
 User = get_user_model()
 
 INVALID_CREDENTIALS = {"detail": "Identifiant ou mot de passe incorrect."}
+
+
+def revoke_user_tokens(user):
+    """Blacklist every outstanding refresh token of ``user`` (password change/reset, deactivation).
+
+    Access tokens already issued stay valid until they expire (JWT_ACCESS_TOKEN_LIFETIME_MINUTES), but a stolen
+    refresh token can no longer mint new ones.
+    """
+    for token in OutstandingToken.objects.filter(user=user):
+        BlacklistedToken.objects.get_or_create(token=token)
 
 
 class LoginRateThrottle(AnonRateThrottle):
@@ -75,13 +86,17 @@ class LoginView(APIView):
             )
 
         if not user.check_password(password):
-            user.failed_login_count += 1
-            update = ['failed_login_count']
-            if user.failed_login_count >= settings.LOGIN_MAX_FAILED_ATTEMPTS:
-                user.locked_until = timezone.now() + timedelta(minutes=settings.LOGIN_LOCKOUT_MINUTES)
-                user.failed_login_count = 0
-                update.append('locked_until')
-            user.save(update_fields=update)
+            # The counter is updated on the locked row: parallel wrong guesses are serialised, so none is lost
+            # and the lockout cannot be outrun by sending the attempts at the same time.
+            with transaction.atomic():
+                row = User.objects.select_for_update().get(pk=user.pk)
+                row.failed_login_count += 1
+                update = ['failed_login_count']
+                if row.failed_login_count >= settings.LOGIN_MAX_FAILED_ATTEMPTS:
+                    row.locked_until = timezone.now() + timedelta(minutes=settings.LOGIN_LOCKOUT_MINUTES)
+                    row.failed_login_count = 0
+                    update.append('locked_until')
+                row.save(update_fields=update)
             audit.log(AuditAction.LOGIN_FAILED, user=user, obj=user, reason='Mot de passe incorrect')
             return Response(INVALID_CREDENTIALS, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -150,8 +165,12 @@ class ChangePasswordView(APIView):
         request.user.set_password(serializer.validated_data['new_password'])
         request.user.must_change_password = False
         request.user.save(update_fields=['password', 'must_change_password', 'updated_at'])
+        # Every session opened with the old password ends; this session gets a fresh token pair.
+        revoke_user_tokens(request.user)
+        refresh = RefreshToken.for_user(request.user)
         audit.log(AuditAction.PASSWORD_CHANGED, user=request.user, obj=request.user)
-        return Response({"detail": "Mot de passe modifié avec succès."})
+        return Response({"detail": "Mot de passe modifié avec succès.",
+                         "access": str(refresh.access_token), "refresh": str(refresh)})
 
 
 # ── Users ─────────────────────────────────────────
@@ -233,6 +252,7 @@ class UserViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.Upd
         self._forbid_self(request, user, "désactivation")
         user.is_active = False
         user.save(update_fields=['is_active', 'updated_at'])
+        revoke_user_tokens(user)
         audit.log(AuditAction.ACCOUNT_DEACTIVATED, user=request.user, obj=user,
                   reason=str(request.data.get('reason', '')))
         return Response(UserDetailSerializer(user).data)
@@ -309,6 +329,7 @@ class UserViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.Upd
         user.locked_until = None
         user.save(update_fields=['password', 'must_change_password', 'failed_login_count',
                                  'locked_until', 'updated_at'])
+        revoke_user_tokens(user)
         audit.log(AuditAction.PASSWORD_RESET, user=request.user, obj=user)
         return Response({'temporary_password': temp})
 

@@ -25,7 +25,12 @@ Prérequis de production (`DEBUG=False`) : `SECRET_KEY` unique, `ALLOWED_HOSTS`,
 `CSRF_TRUSTED_ORIGINS` en HTTPS, PostgreSQL, `PRIVATE_MEDIA_ROOT` hors webroot (permissions 700, propriétaire = compte du service).
 Avec plusieurs workers, remplacer le cache local par Redis/Memcached (`CACHES`) pour que la limitation de débit soit partagée.
 
-Le proxy (nginx/Caddy) doit : terminer TLS, transmettre `X-Forwarded-Proto` et `X-Forwarded-For`,
+Le proxy (nginx/Caddy) doit : terminer TLS, transmettre `X-Forwarded-Proto` et `X-Forwarded-For`
+(en **ajoutant** l'adresse du client à la fin, par exemple `proxy_add_x_forwarded_for`), et vous devez régler
+`NUM_PROXIES=1` (nombre de proxys de confiance devant Django). Avec `NUM_PROXIES=0` (valeur par défaut hors Vercel)
+l'en-tête est ignoré et c'est l'adresse de la connexion qui est journalisée ; sans ce réglage, un client pourrait
+falsifier l'adresse du journal d'audit et contourner la limitation de débit de la connexion.
+Le proxy doit aussi
 servir `/static/` (Django Admin) et **ne jamais** servir `PRIVATE_MEDIA_ROOT`.
 
 ## Frontend

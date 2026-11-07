@@ -14,6 +14,7 @@ En production, fournir les mêmes variables par l'environnement du service.
 | `JWT_ACCESS_TOKEN_LIFETIME_MINUTES` | `60` | Durée du jeton d'accès |
 | `JWT_REFRESH_TOKEN_LIFETIME_DAYS` | `7` | Durée du jeton de rafraîchissement |
 | `LOGIN_THROTTLE_RATE` | `10/min` | Limite de tentatives de connexion par IP |
+| `NUM_PROXIES` | `1` sur Vercel, `0` ailleurs | Nombre de proxys de confiance devant Django ; détermine quelle adresse de `X-Forwarded-For` est celle du client (journal d'audit et limitation de débit). `0` = en-tête ignoré |
 | `LOGIN_MAX_FAILED_ATTEMPTS` / `LOGIN_LOCKOUT_MINUTES` | `5` / `15` | Verrouillage temporaire d'un compte |
 | `PRIVATE_MEDIA_ROOT` | `backend/private_media` | Pièces justificatives — **hors** de tout dossier servi publiquement |
 | `MAX_UPLOAD_SIZE_MB` | `10` | Taille maximale d'une pièce |

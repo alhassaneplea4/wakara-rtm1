@@ -10,6 +10,7 @@ from rest_framework.response import Response
 
 from audit import service as audit
 from audit.models import AuditAction
+from core.csv_safe import safe_row
 from core.permissions import AnyOf, HasWakaraPermission
 from core.workflow import Status
 
@@ -138,11 +139,11 @@ class DeclarationViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin,
         for d in qs[:5000]:
             child = getattr(d, 'child', None)
             acte = getattr(d, 'acte', None)
-            writer.writerow([
+            writer.writerow(safe_row([
                 d.reference, d.get_status_display(), d.hospital.name if d.hospital else '',
                 str(child) if child else '', d.birth_date, d.received_at,
                 acte.numero_acte if acte and acte.numero_acte else '',
-            ])
+            ]))
         audit.log(AuditAction.EXPORT, user=request.user, object_type='Declaration',
                   changes={'rows': min(qs.count(), 5000), 'filters': dict(request.query_params)})
         return response

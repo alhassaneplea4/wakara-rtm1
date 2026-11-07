@@ -32,6 +32,10 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv(
 VERCEL_HOSTS = [h for h in (os.environ.get(k, '') for k in (
     'VERCEL_URL', 'VERCEL_BRANCH_URL', 'VERCEL_PROJECT_PRODUCTION_URL')) if h]
 ALLOWED_HOSTS += VERCEL_HOSTS
+# Number of trusted reverse proxies in front of Django. It decides which X-Forwarded-For entry is the client
+# address (audit log AND login throttling). 0 = ignore X-Forwarded-For (a client can send anything in it);
+# 1 = one proxy that sets/appends the header (Vercel, or a single nginx/Caddy). Set it to the real hop count.
+NUM_PROXIES = config('NUM_PROXIES', default=1 if ON_VERCEL else 0, cast=int)
 
 # ──────────────────────────────────────────────
 # Application definition
@@ -224,6 +228,7 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%S%z',
+    'NUM_PROXIES': NUM_PROXIES,
     'DEFAULT_THROTTLE_RATES': {
         'login': config('LOGIN_THROTTLE_RATE', default='10/min'),
     },
