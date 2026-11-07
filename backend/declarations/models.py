@@ -81,6 +81,7 @@ class Child(BaseModel):
     gender = models.CharField(
         "Sexe", max_length=1, blank=True, choices=[('M', 'Masculin'), ('F', 'Féminin')])
     nationality = models.CharField("Nationalité", max_length=100, blank=True)
+    npi = models.CharField("NPI", max_length=50, blank=True)
     birth_rank = models.PositiveSmallIntegerField(
         "Rang de naissance chez la mère", null=True, blank=True)
 
@@ -106,6 +107,7 @@ class Parent(BaseModel):
     birth_place = models.CharField("Lieu de naissance", max_length=200, blank=True)
     age = models.PositiveSmallIntegerField("Âge", null=True, blank=True)
     nationality = models.CharField("Nationalité", max_length=100, blank=True)
+    npi = models.CharField("NPI", max_length=50, blank=True)
     profession = models.CharField("Profession", max_length=100, blank=True)
     address = models.TextField("Domicile", blank=True)
     phone = models.CharField("Téléphone", max_length=20, blank=True)
@@ -133,6 +135,7 @@ class Declarant(BaseModel):
     last_name = models.CharField("Nom", max_length=100, blank=True)
     relationship = models.CharField("Lien avec l'enfant", max_length=50, blank=True)
     nationality = models.CharField("Nationalité", max_length=100, blank=True)
+    npi = models.CharField("NPI", max_length=50, blank=True)
     profession = models.CharField("Profession", max_length=100, blank=True)
     phone = models.CharField("Téléphone", max_length=20, blank=True)
     address = models.TextField("Domicile", blank=True)

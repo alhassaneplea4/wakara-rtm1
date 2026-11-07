@@ -47,6 +47,8 @@ class DashboardView(APIView):
             year = int(params.get('year') or today.year)
         except ValueError:
             year = today.year
+        if not 1900 <= year <= 2200:  # datetime.date() would raise (HTTP 500) outside 1..9999
+            year = today.year
         date_from = _parse_date(params.get('date_from')) or datetime.date(year, 1, 1)
         date_to = _parse_date(params.get('date_to')) or datetime.date(year, 12, 31)
 

@@ -31,7 +31,7 @@ class MenuBadgeTests(WakaraTestCase):
     def test_validated_dossiers_wait_for_delivery_in_the_actes_menu(self):
         d = self.create_declaration()
         self.advance_to_pending(d['uuid'])
-        self.transition(self.admin, d['uuid'], 'VALIDATED', numero_acte='8001', annee=2026, registre='R1')
+        self.transition(self.admin, d['uuid'], 'VALIDATED', numero_acte='8001', annee=2026, registre='R1', accept_incomplete=True)
         self.assertEqual(self.badges(self.secretary).get('/actes'), 1)
         self.assertNotIn('/actes', self.badges(self.agent))
 
@@ -44,7 +44,7 @@ class ChildFieldsTests(WakaraTestCase):
         d = self.create_declaration(child={'first_names': 'A', 'last_name': 'B', 'gender': 'F',
                                            'birth_weight': '3.2', 'birth_length': '50'})
         child = self.child_of(d['uuid'], self.agent)
-        self.assertEqual(set(child), {'first_names', 'last_name', 'gender', 'nationality', 'birth_rank'})
+        self.assertEqual(set(child), {'first_names', 'last_name', 'gender', 'nationality', 'npi', 'birth_rank'})
         # sending them again (old client) is harmless: unknown keys are ignored
         r = self.client_for(self.agent).patch(
             f'/api/declarations/{d["uuid"]}/', {'child': {'birth_weight': '3.4', 'last_name': 'Camara'}}, format='json')

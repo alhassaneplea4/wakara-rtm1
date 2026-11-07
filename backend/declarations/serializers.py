@@ -19,7 +19,7 @@ class PhoneMixin:
 class ChildSerializer(serializers.ModelSerializer):
     class Meta:
         model = Child
-        fields = ['first_names', 'last_name', 'gender', 'nationality', 'birth_rank']
+        fields = ['first_names', 'last_name', 'gender', 'nationality', 'npi', 'birth_rank']
         extra_kwargs = {'birth_rank': {'min_value': 1, 'max_value': 30}}
 
 
@@ -27,7 +27,7 @@ class ParentSerializer(PhoneMixin, serializers.ModelSerializer):
     class Meta:
         model = Parent
         fields = ['first_names', 'last_name', 'date_of_birth', 'birth_place', 'age',
-                  'nationality', 'profession', 'address', 'phone', 'id_type', 'id_number']
+                  'nationality', 'npi', 'profession', 'address', 'phone', 'id_type', 'id_number']
         extra_kwargs = {'age': {'min_value': 0, 'max_value': 120}}
 
     def validate_date_of_birth(self, value):
@@ -40,7 +40,7 @@ class ParentSerializer(PhoneMixin, serializers.ModelSerializer):
 class DeclarantSerializer(PhoneMixin, serializers.ModelSerializer):
     class Meta:
         model = Declarant
-        fields = ['first_names', 'last_name', 'relationship', 'nationality', 'profession', 'phone',
+        fields = ['first_names', 'last_name', 'relationship', 'nationality', 'npi', 'profession', 'phone',
                   'address', 'id_type', 'id_number']
 
 
@@ -192,3 +192,5 @@ class TransitionSerializer(serializers.Serializer):
     registre = serializers.CharField(required=False, allow_blank=True, max_length=50)
     feuillet = serializers.CharField(required=False, allow_blank=True, max_length=50)
     numero_acte = serializers.CharField(required=False, allow_blank=True, max_length=50)
+    # Final validation with expected fields still empty: the validator has been warned and confirms
+    accept_incomplete = serializers.BooleanField(required=False, default=False)

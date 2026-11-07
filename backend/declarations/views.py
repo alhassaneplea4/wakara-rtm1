@@ -109,7 +109,7 @@ class DeclarationViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin,
         data = serializer.validated_data
         services.transition_status(
             declaration.pk, data['status'], request.user, reason=data.get('reason', ''),
-            payload={k: data[k] for k in ('annee', 'registre', 'feuillet', 'numero_acte') if k in data},
+            payload={k: data[k] for k in ('annee', 'registre', 'feuillet', 'numero_acte', 'accept_incomplete') if k in data},
         )
         return Response(self._detail(declaration))
 

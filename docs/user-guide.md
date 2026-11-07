@@ -34,12 +34,12 @@ Vous ne pouvez ni valider ni rejeter.
 
 - **File de validation** → ouvrez le dossier : la zone *Décision finale* propose **Valider définitivement**
   (saisie/confirmation du numéro officiel), **Retourner à la collecte / au secrétariat** ou **Rejeter** — un motif est obligatoire
-  pour les retours et rejets. Un dossier validé ou rejeté est figé.
+  pour les retours et rejets. Si des champs attendus sont encore vides, la validation définitive **avertit** et liste ces champs : on peut revenir compléter le dossier ou **valider quand même** (les champs manquants sont alors notés dans l'historique). Un dossier validé ou rejeté est figé.
 - **Utilisateurs** : création, rôles, ajustements de permissions, désactivation, mot de passe temporaire. Vous ne pouvez pas
   modifier votre propre compte (rôles, permissions, statut).
 - **Rôles et permissions** : cochez les permissions de chaque rôle ; chaque changement est tracé.
-- **Hôpitaux et maternités** : création, modification, désactivation (un établissement utilisé n'est jamais supprimé).
-- **Statistiques** : filtres année / période / établissement / statut ; **Journal d'activité** : filtres et export CSV
+- **Hôpitaux et maternités** : création, modification, désactivation (un établissement utilisé n'est jamais supprimé). Le secrétaire peut aussi les gérer (création, modification, archivage et restauration).
+- **Tableau de bord** (statistiques comprises) : période (cette année, ce mois, cette semaine, aujourd'hui, deux années précédentes), établissement, statut, responsable et intervalle « Du / Au » ; la page « Statistiques » n'existe plus. **Journal d'activité** : filtres et export CSV
   (consultation et export sont eux-mêmes journalisés). **Paramètres** : textes de la page de connexion.
 
 ## Important

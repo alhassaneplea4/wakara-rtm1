@@ -34,13 +34,13 @@ export interface DeclarationListItem {
   assigned_to_name: string; official_number: string | null; can_edit?: boolean; updated_at: string; created_at: string;
 }
 
-export interface Child { first_names: string; last_name: string; gender: 'M' | 'F' | ''; nationality?: string; birth_rank?: number | null; }
+export interface Child { first_names: string; last_name: string; gender: 'M' | 'F' | ''; nationality?: string; npi?: string; birth_rank?: number | null; }
 export interface Person {
   first_names: string; last_name: string; date_of_birth?: string | null; birth_place?: string; age?: number | null;
-  nationality?: string; profession?: string; address?: string; phone?: string; id_type?: string; id_number?: string;
+  nationality?: string; npi?: string; profession?: string; address?: string; phone?: string; id_type?: string; id_number?: string;
 }
 export interface Declarant {
-  first_names: string; last_name: string; relationship?: string; nationality?: string; profession?: string; phone?: string;
+  first_names: string; last_name: string; relationship?: string; nationality?: string; npi?: string; profession?: string; phone?: string;
   address?: string; id_type?: string; id_number?: string;
 }
 export interface StatusHistoryEntry { from_status: string; to_status: string; changed_by_name: string; changed_at: string; reason: string; }

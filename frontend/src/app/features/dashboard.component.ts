@@ -6,7 +6,7 @@ import { ChartConfiguration } from 'chart.js';
 import { ApiService, errorMessage } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { AutoRefreshService } from '../core/auto-refresh.service';
-import { Dashboard, DeclarationListItem, Page } from '../core/models';
+import { Dashboard, DeclarationListItem, Hospital, Page, STATUS_LABELS, Status } from '../core/models';
 import { ChartComponent, IconComponent, PageHeaderComponent, StatusBadgeComponent } from '../shared/ui';
 
 const PALETTE = ['#1f5ed8', '#4f9bff', '#12a36a', '#8b7cf6', '#e58a0a', '#c3cde0'];
@@ -16,11 +16,26 @@ const PALETTE = ['#1f5ed8', '#4f9bff', '#12a36a', '#8b7cf6', '#e58a0a', '#c3cde0
   imports: [CommonModule, FormsModule, RouterLink, DatePipe, ChartComponent, IconComponent, PageHeaderComponent, StatusBadgeComponent],
   template: `
     <div class="page">
-      <wk-page-header title="Tableau de bord" subtitle="Vue d'ensemble de l'état civil de la mairie de Ratoma">
-        <select class="input period" [(ngModel)]="year" (ngModelChange)="load()" aria-label="Période">
-          @for (y of years; track y) { <option [ngValue]="y">{{ y === currentYear ? 'Cette année' : y }}</option> }
-        </select>
-      </wk-page-header>
+      <wk-page-header title="Tableau de bord" subtitle="Vue d'ensemble et statistiques de l'état civil de la mairie de Ratoma" />
+
+      <section class="card filters" aria-label="Filtres">
+        <div class="field"><label for="f-period">Période</label>
+          <select id="f-period" class="input" [(ngModel)]="period" (ngModelChange)="clearRange(); load()">
+            @for (p of periods; track p.key) { <option [value]="p.key">{{ p.label }}</option> }
+          </select></div>
+        <div class="field"><label for="f-hosp">Établissement</label>
+          <select id="f-hosp" class="input" [(ngModel)]="hospital" (ngModelChange)="load()"><option value="">Tous</option>@for (h of hospitals(); track h.uuid) { <option [value]="h.uuid">{{ h.name }}</option> }</select></div>
+        <div class="field"><label for="f-status">Statut</label>
+          <select id="f-status" class="input" [(ngModel)]="status" (ngModelChange)="load()"><option value="">Tous</option>@for (s of statuses; track s) { <option [value]="s">{{ labels[s] }}</option> }</select></div>
+        @if (agents().length) {
+          <div class="field"><label for="f-agent">Responsable</label>
+            <select id="f-agent" class="input" [(ngModel)]="agent" (ngModelChange)="load()"><option value="">Tous</option>@for (a of agents(); track a.uuid) { <option [value]="a.uuid">{{ a.name }}</option> }</select></div>
+        }
+        <div class="field"><label for="f-from">Du</label><input id="f-from" type="date" class="input" [(ngModel)]="from" (ngModelChange)="load()" /></div>
+        <div class="field"><label for="f-to">Au</label><input id="f-to" type="date" class="input" [(ngModel)]="to" (ngModelChange)="load()" /></div>
+        @if (hasFilters()) { <button type="button" class="btn btn-ghost reset" (click)="reset()">Réinitialiser</button> }
+      </section>
+      @if (data(); as d) { <p class="soft range">Période affichée : du {{ d.period.date_from | date: 'dd/MM/yyyy' }} au {{ d.period.date_to | date: 'dd/MM/yyyy' }}</p> }
 
       @if (error()) { <div class="alert alert-danger">{{ error() }}</div> }
 
@@ -111,7 +126,10 @@ const PALETTE = ['#1f5ed8', '#4f9bff', '#12a36a', '#8b7cf6', '#e58a0a', '#c3cde0
     </div>
   `,
   styles: [`
-    .period{width:auto;min-width:150px}
+    .filters{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:var(--s3)}
+    .filters .field{min-width:150px;flex:1 1 150px;max-width:240px}
+    .filters .reset{align-self:flex-end}
+    .range{margin:0 0 var(--s4)}
     .kpis{margin-bottom:var(--s4)}
     .kpi{display:flex;gap:16px;align-items:center;min-height:104px}
     .kpi strong{display:block;font-size:30px;line-height:1.1;font-weight:800}
@@ -152,8 +170,19 @@ export class DashboardComponent implements OnInit {
   auth = inject(AuthService);
 
   currentYear = new Date().getFullYear();
-  years = Array.from({ length: 5 }, (_, i) => this.currentYear - i);
-  year = this.currentYear;
+  labels = STATUS_LABELS;
+  statuses = Object.keys(STATUS_LABELS) as Status[];
+  periods = [
+    { key: 'year', label: 'Cette année' },
+    { key: 'month', label: 'Ce mois' },
+    { key: 'week', label: 'Cette semaine' },
+    { key: 'today', label: "Aujourd'hui" },
+    { key: 'y1', label: String(this.currentYear - 1) },
+    { key: 'y2', label: String(this.currentYear - 2) },
+  ];
+  period = 'year'; hospital = ''; status = ''; agent = ''; from = ''; to = '';
+  hospitals = signal<Hospital[]>([]);
+  agents = signal<{ uuid: string; name: string }[]>([]);
   data = signal<Dashboard | null>(null);
   recent = signal<DeclarationListItem[]>([]);
   error = signal('');
@@ -180,11 +209,43 @@ export class DashboardComponent implements OnInit {
   pct(n: number) { const t = this.data()?.kpis.births_declared || 0; return t ? Math.round((n / t) * 100) : 0; }
   open(uuid: string) { this.router.navigate(['/declarations', uuid]); }
 
-  ngOnInit() { this.load(); this.autoRefresh.on(this.destroyRef, () => this.load()); }
+  ngOnInit() {
+    this.load();
+    this.autoRefresh.on(this.destroyRef, () => this.load());
+    if (this.auth.can('hospital.view')) this.api.get<Page<Hospital>>('/hospitals/', { page_size: 100 }).subscribe({ next: p => this.hospitals.set(p.results), error: () => undefined });
+    if (this.auth.can('declaration.view_all')) this.api.get<{ uuid: string; name: string }[]>('/declarations/agents/').subscribe({ next: a => this.agents.set(a), error: () => undefined });
+  }
+
+  private iso(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+
+  /** Dates covered by the chosen period (local time; the week runs Monday to Sunday). */
+  range(): { year: number; date_from: string; date_to: string } {
+    const now = new Date(), y = now.getFullYear();
+    switch (this.period) {
+      case 'today': return { year: y, date_from: this.iso(now), date_to: this.iso(now) };
+      case 'week': {
+        const monday = new Date(y, now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+        const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+        return { year: y, date_from: this.iso(monday), date_to: this.iso(sunday) };
+      }
+      case 'month': return { year: y, date_from: this.iso(new Date(y, now.getMonth(), 1)), date_to: this.iso(new Date(y, now.getMonth() + 1, 0)) };
+      case 'y1': case 'y2': { const py = y - (this.period === 'y1' ? 1 : 2); return { year: py, date_from: `${py}-01-01`, date_to: `${py}-12-31` }; }
+      default: return { year: y, date_from: `${y}-01-01`, date_to: `${y}-12-31` };
+    }
+  }
+
+  clearRange() { this.from = ''; this.to = ''; }
+  hasFilters() { return !!(this.hospital || this.status || this.agent || this.from || this.to || this.period !== 'year'); }
+  reset() { this.period = 'year'; this.hospital = ''; this.status = ''; this.agent = ''; this.clearRange(); this.load(); }
 
   load() {
     this.error.set('');
-    this.api.get<Dashboard>('/stats/dashboard/', { year: this.year }).subscribe({
+    const r = this.range();
+    // a typed "Du / Au" interval takes precedence over the period
+    this.api.get<Dashboard>('/stats/dashboard/', {
+      year: this.from ? Number(this.from.slice(0, 4)) : r.year, date_from: this.from || r.date_from, date_to: this.to || r.date_to,
+      hospital: this.hospital, status: this.status, agent: this.agent,
+    }).subscribe({
       next: d => { this.data.set(d); this.buildCharts(d); },
       error: e => this.error.set(errorMessage(e)),
     });

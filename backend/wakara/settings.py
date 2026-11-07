@@ -272,6 +272,17 @@ ACTE_REQUIRED_FOR_SUBMISSION = config(
     default='acte.declaration_date,declarant.name',
     cast=Csv(),
 )
+# Fields the validator is warned about when they are still empty at the FINAL validation. The validator may
+# confirm and validate anyway; the missing fields are then written in the dossier history.
+VALIDATION_EXPECTED_FIELDS = config(
+    'VALIDATION_EXPECTED_FIELDS',
+    default=('birth_date,birth_time,birth_place,hospital,child.name,child.gender,child.nationality,'
+             'mother.name,mother.date_of_birth,mother.birth_place,mother.nationality,mother.profession,'
+             'mother.address,father.name,father.date_of_birth,father.birth_place,father.nationality,'
+             'father.profession,father.address,declarant.name,declarant.relationship,'
+             'acte.declaration_date,acte.registre,acte.feuillet'),
+    cast=Csv(),
+)
 # Official act number: manual entry by default. Automatic sequential numbering per
 # (year, registry) is only available when explicitly enabled.
 ACTE_AUTO_NUMBERING = config('ACTE_AUTO_NUMBERING', default=False, cast=bool)

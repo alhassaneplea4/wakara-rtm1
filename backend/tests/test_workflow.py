@@ -18,7 +18,7 @@ class HappyPathTests(WakaraTestCase):
         self.assertRegex(d['reference'], r'^WKR-\d{4}-\d{4}$')
         acte_uuid = self.advance_to_pending(uuid)
 
-        r = self.transition(self.admin, uuid, 'VALIDATED', annee=2026, registre='R1', numero_acte='101')
+        r = self.transition(self.admin, uuid, 'VALIDATED', annee=2026, registre='R1', numero_acte='101', accept_incomplete=True)
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual(r.data['status'], 'VALIDATED')
         self.assertEqual(r.data['official_number'], '101')
@@ -45,7 +45,7 @@ class HappyPathTests(WakaraTestCase):
     def test_audit_records_each_step(self):
         d = self.create_declaration()
         self.advance_to_pending(d['uuid'])
-        self.transition(self.admin, d['uuid'], 'VALIDATED', annee=2026, registre='R1', numero_acte='7')
+        self.transition(self.admin, d['uuid'], 'VALIDATED', annee=2026, registre='R1', numero_acte='7', accept_incomplete=True)
         actions = set(AuditLog.objects.values_list('action', flat=True))
         self.assertTrue({'create', 'transmit', 'validate', 'number_assigned', 'update'} <= actions)
 
@@ -55,7 +55,7 @@ class AuthorisationTests(WakaraTestCase):
         d = self.create_declaration()
         self.advance_to_pending(d['uuid'])
         for user in (self.agent, self.secretary):
-            r = self.transition(user, d['uuid'], 'VALIDATED', annee=2026, numero_acte='1')
+            r = self.transition(user, d['uuid'], 'VALIDATED', annee=2026, numero_acte='1', accept_incomplete=True)
             self.assertEqual(r.status_code, 403, user.username)
             r = self.transition(user, d['uuid'], 'REJECTED', reason='non')
             self.assertEqual(r.status_code, 403, user.username)
@@ -73,7 +73,7 @@ class AuthorisationTests(WakaraTestCase):
         c.patch(f'/api/declarations/{d["uuid"]}/', {'status': 'VALIDATED'}, format='json')
         self.assertEqual(Declaration.objects.get(uuid=d['uuid']).status, 'DRAFT')
         # skipping steps is refused even for the admin
-        r = self.transition(self.admin, d['uuid'], 'VALIDATED', annee=2026, numero_acte='1')
+        r = self.transition(self.admin, d['uuid'], 'VALIDATED', annee=2026, numero_acte='1', accept_incomplete=True)
         self.assertEqual(r.status_code, 400)
         self.assertEqual(r.data['code'], 'invalid_transition')
         r = self.transition(self.admin, d['uuid'], 'DELIVERED')
@@ -147,7 +147,7 @@ class StateRuleTests(WakaraTestCase):
     def test_rejected_and_validated_dossiers_are_frozen(self):
         d = self.create_declaration()
         self.advance_to_pending(d['uuid'])
-        self.transition(self.admin, d['uuid'], 'VALIDATED', annee=2026, registre='R1', numero_acte='5')
+        self.transition(self.admin, d['uuid'], 'VALIDATED', annee=2026, registre='R1', numero_acte='5', accept_incomplete=True)
         for user in (self.agent, self.secretary, self.admin):
             r = self.client_for(user).patch(f'/api/declarations/{d["uuid"]}/', {'notes': 'x'}, format='json')
             self.assertIn(r.status_code, (403, 404), user.username)
@@ -191,7 +191,7 @@ class StateRuleTests(WakaraTestCase):
         queue = self.client_for(self.admin).get('/api/declarations/?status=PENDING_VALIDATION').data['results']
         self.assertIn(d['uuid'], [x['uuid'] for x in queue])
         # once validated, nobody edits any more
-        self.transition(self.admin, d['uuid'], 'VALIDATED', numero_acte='7001', annee=2026, registre='R1')
+        self.transition(self.admin, d['uuid'], 'VALIDATED', numero_acte='7001', annee=2026, registre='R1', accept_incomplete=True)
         r = self.client_for(self.admin).patch(f'/api/declarations/{d["uuid"]}/', {'notes': 'trop tard'}, format='json')
         self.assertEqual(r.status_code, 403)
 
@@ -231,30 +231,30 @@ class OfficialNumberTests(WakaraTestCase):
 
     def test_manual_number_required_when_auto_numbering_is_off(self):
         uuid = self._pending()
-        r = self.transition(self.admin, uuid, 'VALIDATED', annee=2026, registre='R1')
+        r = self.transition(self.admin, uuid, 'VALIDATED', annee=2026, registre='R1', accept_incomplete=True)
         self.assertEqual(r.status_code, 400)
         self.assertIn('numero_acte', r.data)
         self.assertEqual(Declaration.objects.get(uuid=uuid).status, 'PENDING_VALIDATION')  # rolled back
 
     def test_duplicate_number_in_same_registry_refused(self):
         a, b = self._pending(), self._pending()
-        self.assertEqual(self.transition(self.admin, a, 'VALIDATED', annee=2026, registre='R1', numero_acte='42').status_code, 200)
-        r = self.transition(self.admin, b, 'VALIDATED', annee=2026, registre='R1', numero_acte='42')
+        self.assertEqual(self.transition(self.admin, a, 'VALIDATED', annee=2026, registre='R1', numero_acte='42', accept_incomplete=True).status_code, 200)
+        r = self.transition(self.admin, b, 'VALIDATED', annee=2026, registre='R1', numero_acte='42', accept_incomplete=True)
         self.assertEqual(r.status_code, 400)
         self.assertEqual(Declaration.objects.get(uuid=b).status, 'PENDING_VALIDATION')
         # same number in another registry is fine
-        self.assertEqual(self.transition(self.admin, b, 'VALIDATED', annee=2026, registre='R2', numero_acte='42').status_code, 200)
+        self.assertEqual(self.transition(self.admin, b, 'VALIDATED', annee=2026, registre='R2', numero_acte='42', accept_incomplete=True).status_code, 200)
 
     @override_settings(ACTE_AUTO_NUMBERING=True)
     def test_optional_auto_numbering_is_sequential_per_registry(self):
         a, b = self._pending(), self._pending()
-        ra = self.transition(self.admin, a, 'VALIDATED', annee=2026, registre='R1')
-        rb = self.transition(self.admin, b, 'VALIDATED', annee=2026, registre='R1')
+        ra = self.transition(self.admin, a, 'VALIDATED', annee=2026, registre='R1', accept_incomplete=True)
+        rb = self.transition(self.admin, b, 'VALIDATED', annee=2026, registre='R1', accept_incomplete=True)
         self.assertEqual((ra.data['official_number'], rb.data['official_number']), ('1', '2'))
 
     def test_number_never_overwritten_once_attributed(self):
         uuid = self._pending()
-        self.transition(self.admin, uuid, 'VALIDATED', annee=2026, registre='R1', numero_acte='9')
+        self.transition(self.admin, uuid, 'VALIDATED', annee=2026, registre='R1', numero_acte='9', accept_incomplete=True)
         acte = Acte.objects.get(declaration__uuid=uuid)
         from actes.services import assign_official_number
         assign_official_number(acte, self.admin, numero_acte='10')
@@ -278,13 +278,13 @@ class DocumentOutputTests(WakaraTestCase):
         self.assertFalse(doc['is_official'])
         self.assertEqual(sec.post(f'/api/actes/{acte_uuid}/print/').status_code, 400)
         self.assertEqual(sec.post(f'/api/actes/{acte_uuid}/deliver/', {'recipient_name': 'X'}, format='json').status_code, 400)
-        self.transition(self.admin, d['uuid'], 'VALIDATED', annee=2026, registre='R1', numero_acte='3')
+        self.transition(self.admin, d['uuid'], 'VALIDATED', annee=2026, registre='R1', numero_acte='3', accept_incomplete=True)
         self.assertTrue(sec.get(f'/api/actes/{acte_uuid}/document/').data['is_official'])
 
     def test_agent_cannot_print_or_deliver(self):
         d = self.create_declaration()
         acte_uuid = self.advance_to_pending(d['uuid'])
-        self.transition(self.admin, d['uuid'], 'VALIDATED', annee=2026, registre='R1', numero_acte='3')
+        self.transition(self.admin, d['uuid'], 'VALIDATED', annee=2026, registre='R1', numero_acte='3', accept_incomplete=True)
         c = self.client_for(self.agent)
         self.assertEqual(c.post(f'/api/actes/{acte_uuid}/print/').status_code, 403)
         self.assertEqual(c.post(f'/api/actes/{acte_uuid}/deliver/', {'recipient_name': 'X'}, format='json').status_code, 403)

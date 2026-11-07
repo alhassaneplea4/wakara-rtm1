@@ -15,6 +15,7 @@ from django.utils import timezone
 
 from audit import service as audit
 from audit.models import AuditAction
+from core.exceptions import IncompleteConfirmationRequired
 from core.permissions import user_has_perm
 from core.workflow import Status, available_transitions, get_transition
 
@@ -103,6 +104,16 @@ FIELD_LABELS = {
     'birth_date': 'date de naissance', 'child.gender': "sexe de l'enfant",
     'child.name': "nom de l'enfant", 'mother.name': 'nom de la mère',
     'acte.declaration_date': 'date de déclaration', 'declarant.name': 'nom du déclarant',
+    'birth_time': 'heure de naissance', 'birth_place': 'lieu de naissance', 'hospital': 'établissement',
+    'child.nationality': "nationalité de l'enfant",
+    'mother.date_of_birth': 'date de naissance de la mère', 'mother.birth_place': 'lieu de naissance de la mère',
+    'mother.nationality': 'nationalité de la mère', 'mother.profession': 'profession de la mère',
+    'mother.address': 'domicile de la mère',
+    'father.name': 'nom du père', 'father.date_of_birth': 'date de naissance du père',
+    'father.birth_place': 'lieu de naissance du père', 'father.nationality': 'nationalité du père',
+    'father.profession': 'profession du père', 'father.address': 'domicile du père',
+    'declarant.relationship': "lien du déclarant avec l'enfant",
+    'acte.registre': 'registre', 'acte.feuillet': 'feuillet',
 }
 
 
@@ -183,17 +194,17 @@ def _full_snapshot(declaration) -> dict:
     child = getattr(declaration, 'child', None) if declaration.pk else None
     if child:
         snap.update({f'child.{k}': v for k, v in audit.snapshot(
-            child, ['first_names', 'last_name', 'gender', 'nationality', 'birth_rank']).items()})
+            child, ['first_names', 'last_name', 'gender', 'nationality', 'npi', 'birth_rank']).items()})
     for parent in declaration.parents.all():
         prefix = parent.parent_type.lower()
         snap.update({f'{prefix}.{k}': v for k, v in audit.snapshot(
             parent, ['first_names', 'last_name', 'age', 'profession', 'address', 'nationality',
-                     'date_of_birth', 'birth_place', 'phone', 'id_type', 'id_number']).items()})
+                     'date_of_birth', 'birth_place', 'npi', 'phone', 'id_type', 'id_number']).items()})
     declarant = getattr(declaration, 'declarant', None)
     if declarant:
         snap.update({f'declarant.{k}': v for k, v in audit.snapshot(
             declarant, ['first_names', 'last_name', 'relationship', 'nationality', 'profession', 'phone',
-                        'address', 'id_type', 'id_number']).items()})
+                        'address', 'npi', 'id_type', 'id_number']).items()})
     return snap
 
 
@@ -256,9 +267,18 @@ def transition_status(declaration_pk, target: str, user, reason: str = '', paylo
     if target == Status.IN_COMPLETION:
         from actes.services import ensure_acte
         ensure_acte(declaration, user)
+    incomplete = []
     if target == Status.VALIDATED:
         from actes.services import finalize_numbering
         finalize_numbering(declaration, user, payload)
+        # Final validation: warn about the expected fields still empty. The validator may confirm and go on;
+        # without the confirmation nothing is written (the whole transition is rolled back).
+        incomplete = missing_fields(Declaration.objects.get(pk=declaration.pk), settings.VALIDATION_EXPECTED_FIELDS)
+        if incomplete and not payload.get('accept_incomplete'):
+            raise IncompleteConfirmationRequired(incomplete, [FIELD_LABELS.get(m, m) for m in incomplete])
+        if incomplete:
+            note = "Validé malgré des champs non renseignés : " + ', '.join(FIELD_LABELS.get(m, m) for m in incomplete)
+            reason = f"{reason} — {note}" if reason else note
 
     old_status = declaration.status
     now = timezone.now()
@@ -280,5 +300,6 @@ def transition_status(declaration_pk, target: str, user, reason: str = '', paylo
         changed_by=user, reason=reason)
     audit.log(
         AUDIT_ACTION_BY_TARGET.get(target, AuditAction.TRANSITION), user=user, obj=declaration,
-        changes={'status': {'from': old_status, 'to': target}}, reason=reason)
+        changes={'status': {'from': old_status, 'to': target},
+                 **({'incomplete_fields': incomplete} if incomplete else {})}, reason=reason)
     return declaration

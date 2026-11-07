@@ -110,3 +110,21 @@ export class NationalityListComponent {
   host: { type: 'text', list: NATIONALITY_LIST_ID, autocomplete: 'off', autocapitalize: 'characters', placeholder: 'Choisir ou saisir…' },
 })
 export class NationalityInputDirective {}
+
+/* ── Age ─────────────────────────────────────────── */
+
+/**
+ * Age in whole years on ``today`` for a birth date typed as `YYYY-MM-DD`.
+ * Returns null when the date is empty, malformed, in the future or older than 120 years, so the age field is
+ * left to the user in those cases.
+ */
+export function ageFromBirthDate(dob: string | null | undefined, today: Date = new Date()): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((dob ?? '').trim());
+  if (!m) return null;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const born = new Date(y, mo - 1, d);
+  if (born.getFullYear() !== y || born.getMonth() !== mo - 1 || born.getDate() !== d) return null;
+  let age = today.getFullYear() - y;
+  if (today.getMonth() < mo - 1 || (today.getMonth() === mo - 1 && today.getDate() < d)) age--;
+  return age >= 0 && age <= 120 ? age : null;
+}

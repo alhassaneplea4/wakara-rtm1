@@ -30,7 +30,7 @@ export const routes: Routes = [
       { path: 'hospitals', canActivate: [permissionGuard], data: { perms: ['hospital.view'] }, title: 'Établissements — Wakara', loadComponent: () => import('./features/hospitals.component').then(m => m.HospitalsComponent) },
       { path: 'users', canActivate: [permissionGuard], data: { perms: ['user.view'] }, title: 'Utilisateurs — Wakara', loadComponent: () => import('./features/users.component').then(m => m.UsersComponent) },
       { path: 'roles', canActivate: [permissionGuard], data: { perms: ['role.view'] }, title: 'Rôles et permissions — Wakara', loadComponent: () => import('./features/roles.component').then(m => m.RolesComponent) },
-      { path: 'statistics', canActivate: [permissionGuard], data: { perms: ['stats.view'] }, title: 'Statistiques — Wakara', loadComponent: () => import('./features/statistics.component').then(m => m.StatisticsComponent) },
+      { path: 'statistics', pathMatch: 'full', redirectTo: 'dashboard' },
       { path: 'audit', canActivate: [permissionGuard], data: { perms: ['audit.view'] }, title: "Journal d'activité — Wakara", loadComponent: () => import('./features/audit.component').then(m => m.AuditComponent) },
       { path: 'settings', canActivate: [permissionGuard], data: { perms: ['settings.manage'] }, title: 'Paramètres — Wakara', loadComponent: () => import('./features/settings.component').then(m => m.SettingsComponent) },
       { path: 'profile', title: 'Mon profil — Wakara', loadComponent: () => import('./features/profile.component').then(m => m.ProfileComponent) },

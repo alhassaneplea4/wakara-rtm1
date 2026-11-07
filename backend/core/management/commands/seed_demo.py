@@ -124,7 +124,8 @@ class Command(BaseCommand):
                 continue
             number += 1
             services.transition_status(d.pk, Status.VALIDATED, admin, payload={
-                'annee': today.year, 'registre': 'DEMO', 'numero_acte': str(number)})
+                'annee': today.year, 'registre': 'DEMO', 'numero_acte': str(number),
+                'accept_incomplete': True})
             if target == Status.DELIVERED:
                 from actes.services import record_delivery
                 record_delivery(Declaration.objects.get(pk=d.pk).acte, secretary, {

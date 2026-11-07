@@ -244,7 +244,7 @@ class StatisticsTests(WakaraTestCase):
         self.advance_to_pending(p['uuid'])
         v = self.create_declaration()
         self.advance_to_pending(v['uuid'])
-        self.transition(self.admin, v['uuid'], 'VALIDATED', annee=2026, registre='R1', numero_acte='1')
+        self.transition(self.admin, v['uuid'], 'VALIDATED', annee=2026, registre='R1', numero_acte='1', accept_incomplete=True)
         r = self.create_declaration()
         self.advance_to_pending(r['uuid'])
         self.transition(self.admin, r['uuid'], 'REJECTED', reason='Doublon')

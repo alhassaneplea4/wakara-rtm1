@@ -7,7 +7,23 @@ from rest_framework.views import exception_handler
 from core.mixins import HardDeleteForbidden
 
 
+class IncompleteConfirmationRequired(Exception):
+    """Final validation of a dossier whose expected fields are not all filled: the validator must confirm."""
+
+    def __init__(self, missing, labels):
+        super().__init__("Des champs ne sont pas renseignés.")
+        self.missing = list(missing)
+        self.labels = list(labels)
+
+
 def wakara_exception_handler(exc, context):
+    if isinstance(exc, IncompleteConfirmationRequired):
+        return Response({
+            'code': 'incomplete_confirmation_required',
+            'detail': ("Des champs ne sont pas renseignés : " + ', '.join(exc.labels)
+                       + ". Confirmez pour valider quand même."),
+            'missing_fields': exc.missing, 'missing_labels': exc.labels,
+        }, status=status.HTTP_409_CONFLICT)
     if isinstance(exc, DjangoValidationError):
         detail = exc.message_dict if hasattr(exc, 'error_dict') else {'detail': exc.messages}
         code = getattr(exc, 'code', None)

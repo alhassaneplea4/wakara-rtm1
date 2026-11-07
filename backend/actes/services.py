@@ -131,6 +131,7 @@ def build_document(acte: Acte) -> dict:
             'date_of_birth': getattr(p, 'date_of_birth', None),
             'birth_place': getattr(p, 'birth_place', ''),
             'age': getattr(p, 'age', None), 'nationality': getattr(p, 'nationality', ''),
+            'npi': getattr(p, 'npi', ''),
             'profession': p.profession, 'address': p.address,
         }
 
@@ -148,6 +149,7 @@ def build_document(acte: Acte) -> dict:
             'last_name': child.last_name if child else '',
             'gender': child.gender if child else '',
             'nationality': child.nationality if child else '',
+            'npi': child.npi if child else '',
             'birth_rank': child.birth_rank if child else None,
             'birth_date': d.birth_date, 'birth_time': d.birth_time, 'birth_place': d.birth_place,
         },

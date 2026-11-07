@@ -12,7 +12,7 @@ import { PageHeaderComponent, PaginationComponent, StatusBadgeComponent } from '
   imports: [CommonModule, FormsModule, RouterLink, PageHeaderComponent, PaginationComponent, StatusBadgeComponent],
   template: `
     <div class="page">
-      <wk-page-header title="Actes de naissance" subtitle="Dossiers d'actes en cours d'élaboration, validés et délivrés" />
+      <wk-page-header title="Actes de naissance" subtitle="Actes validés définitivement et actes délivrés" />
       <section class="card flush">
         <div class="filters">
           <input class="input grow" [(ngModel)]="search" (keyup.enter)="reload()" placeholder="N° d'acte, référence, nom de l'enfant…" aria-label="Recherche" />
@@ -32,7 +32,7 @@ import { PageHeaderComponent, PaginationComponent, StatusBadgeComponent } from '
                 <td class="mono"><strong>{{ a.numero_acte || '—' }}</strong></td><td class="mono">{{ a.annee ?? '—' }}</td><td>{{ a.registre || '—' }}</td><td>{{ a.feuillet || '—' }}</td>
                 <td class="uc">{{ a.child_name || '—' }}</td><td class="mono">{{ a.reference }}</td><td>{{ a.hospital_name || '—' }}</td><td><wk-status [status]="a.status" /></td>
               </tr>
-            } @empty { <tr><td colspan="8"><div class="empty"><strong>Aucun acte</strong>Les actes apparaissent lorsque le secrétariat prend un dossier en charge.</div></td></tr> }
+            } @empty { <tr><td colspan="8"><div class="empty"><strong>Aucun acte</strong>Un acte apparaît ici une fois le dossier validé définitivement.</div></td></tr> }
           </tbody></table></div>
         <wk-pagination [page]="page" [total]="total()" (pageChange)="page = $event; load()" />
       </section>
@@ -47,7 +47,7 @@ export class ActesListComponent implements OnInit {
   private autoRefresh = inject(AutoRefreshService);
   private last: Query | null = null;
   labels = STATUS_LABELS;
-  statuses: Status[] = ['IN_COMPLETION', 'PENDING_VALIDATION', 'TO_CORRECT_SECRETARIAT', 'VALIDATED', 'DELIVERED'];
+  statuses: Status[] = ['VALIDATED', 'DELIVERED'];
   search = ''; status = ''; annee: number | null = null; page = 1;
   rows = signal<Acte[]>([]); total = signal(0); error = signal('');
 
