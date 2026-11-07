@@ -66,9 +66,9 @@ export class IconComponent {
     </div>`,
   styles: [`
     .logo{display:flex;align-items:center;gap:10px}
-    .mark{width:38px;height:38px;flex:none;object-fit:contain}
-    .big .mark{width:64px;height:64px}
-    .light .mark{background:#fff;border-radius:10px;padding:3px}
+    .mark{width:46px;height:38px;flex:none;object-fit:contain}
+    .big .mark{width:77px;height:64px}
+    .light .mark{background:#fff;border-radius:10px;padding:3px;width:50px;height:42px}
     .txt{display:flex;flex-direction:column;line-height:1.1}
     strong{font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--wk-navy-800)}
     .big strong{font-size:44px}

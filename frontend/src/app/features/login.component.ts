@@ -24,7 +24,7 @@ const FALLBACK: PublicSettings = {
     <div class="login">
       <section class="left">
         <div class="box">
-          <img class="brand" src="assets/logo-full.png" alt="Wakara — État civil de la mairie de Ratoma" width="1572" height="581" />
+          <img class="brand" src="assets/logo-full.png" alt="CECI Ratoma — Centre d'état civil et de l'identification" width="560" height="463" />
           <h1>Bienvenue sur Wakara</h1>
           <p class="intro">Connectez-vous à votre espace de travail pour accéder à la gestion des déclarations et actes de naissance.</p>
 
@@ -104,7 +104,7 @@ const FALLBACK: PublicSettings = {
     .login{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);height:100vh;height:100dvh;background:#fff;overflow:hidden}
     .left{display:grid;grid-template-columns:minmax(0,1fr);place-items:center;padding:24px;background:radial-gradient(900px 500px at 0% 0%,#eaf2ff 0,#fff 60%);overflow-y:auto;min-height:0}
     .box{width:min(480px,100%);display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px}
-    .brand{width:min(380px,92%);height:auto;align-self:center}
+    .brand{width:min(230px,70%);height:auto;align-self:center}
     h1{font-size:28px;font-weight:800;margin-top:10px}
     .intro{color:var(--wk-text-soft);max-width:400px}
     form{width:100%;display:flex;flex-direction:column;gap:14px;margin-top:8px;text-align:left}
@@ -147,7 +147,7 @@ const FALLBACK: PublicSettings = {
     /* Short screens (small phones, landscape): the form is compacted so that it always fits. */
     @media (max-height:780px){
       .box{gap:10px}
-      .brand{width:min(300px,84%)}
+      .brand{width:min(200px,62%)}
       h1{font-size:24px;margin-top:2px}
       .intro{display:none}
       form{gap:10px;margin-top:2px}
@@ -156,7 +156,7 @@ const FALLBACK: PublicSettings = {
       .foot{margin-top:4px}
     }
     @media (max-height:640px){
-      .brand{width:min(230px,66%)}
+      .brand{width:min(170px,54%)}
       h1{font-size:21px}
       .control{height:44px}
       .submit{height:46px}
