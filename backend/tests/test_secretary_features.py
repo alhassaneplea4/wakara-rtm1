@@ -34,6 +34,15 @@ class NpiTests(WakaraTestCase):
         self.assertEqual(doc['mother']['npi'], 'M-1')
         self.assertIn('npi', doc['child'])
 
+    def test_the_acte_document_carries_the_phone_numbers_of_the_parents_and_declarant(self):
+        d = self.create_declaration(
+            mother={'first_names': 'Fatoumata', 'last_name': 'Bah', 'phone': '624629477'},
+            declarant={'first_names': 'Oumar', 'last_name': 'Barry', 'relationship': 'Oncle', 'phone': '+224 622 11 22 33'})
+        acte_uuid = self.advance_to_pending(d['uuid'])
+        doc = self.client_for(self.secretary).get(f'/api/actes/{acte_uuid}/document/').data
+        self.assertEqual(doc['mother']['phone'], '+224 624 62 94 77')
+        self.assertEqual(doc['declarant']['phone'], '+224 622 11 22 33')
+
 
 class IncompleteValidationTests(WakaraTestCase):
     def validate(self, uuid, **extra):

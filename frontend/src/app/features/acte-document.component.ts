@@ -1,5 +1,5 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { dateEnLettres } from '../core/date-letters';
+import { dateEnLettres, heureEnLettres } from '../core/date-letters';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -10,9 +10,13 @@ import { ToastService } from '../core/toast.service';
 import { IconComponent, PageHeaderComponent } from '../shared/ui';
 
 /**
- * Printable model of the acte. The official layout/signatures are NOT validated yet
- * (docs/business-decisions.md): until the dossier is validated the page carries a
+ * Display-only copy of the acte, laid out like the paper form of the civil registry (« Acte de naissance »,
+ * volet n° 1 — déclarant): header with the registry references, then the sections ENFANT, PARENTS (père, mère)
+ * and DÉCLARANT. Nothing here can be edited. Until the dossier is validated the page carries a
  * "projet — sans valeur juridique" watermark and printing is not recorded.
+ *
+ * Boxes the data does not tell (commune urbaine/rurale, centre principal/secondaire, situation matrimoniale)
+ * stay empty, as on a blank form: they can be ticked by hand once printed.
  */
 @Component({
   selector: 'wk-acte-document', standalone: true,
@@ -29,33 +33,79 @@ import { IconComponent, PageHeaderComponent } from '../shared/ui';
       </div>
 
       @if (prints().length) {
-        <section class="card noprint" style="max-width:820px;margin:0 auto 16px">
+        <section class="card noprint" style="max-width:640px;margin:0 auto 16px">
           <div class="card-title"><h2>Historique des impressions</h2></div>
           @for (p of prints(); track p.printed_at) { <div class="prow"><span class="mono">{{ p.printed_at | date: 'dd/MM/yyyy HH:mm' }}</span><span>Exemplaire n° {{ p.copy_number }}</span><span class="soft">{{ p.printed_by_name }}</span></div> }
         </section>
       }
+
       @if (doc(); as d) {
-        <article class="sheet" [class.draft]="!d.is_official">
-          @if (!d.is_official) { <div class="watermark">PROJET — SANS VALEUR JURIDIQUE</div> }
-          <header>
-            <p class="rep">RÉPUBLIQUE DE GUINÉE</p><p class="mot">Travail — Justice — Solidarité</p>
-            <p class="adm">Région de {{ d.region || '…' }} · Préfecture de {{ d.prefecture || '…' }} · Commune de {{ d.commune || '…' }}</p>
-            <p class="adm">{{ d.centre }}</p>
+        <article class="form" [class.draft]="!d.is_official" aria-label="Acte de naissance">
+          @if (!d.is_official) { <div class="watermark" aria-hidden="true">PROJET — SANS VALEUR JURIDIQUE</div> }
+
+          <header class="top">
+            <div class="rep"><b>RÉPUBLIQUE DE GUINÉE</b><small>Travail · Justice · Solidarité</small></div>
+            <dl class="refs">
+              <div><dt>Année</dt><dd class="box">{{ d.annee ?? '' }}</dd></div>
+              <div><dt>Registre</dt><dd class="box">{{ d.registre }}</dd></div>
+              <div><dt>Feuillet</dt><dd class="box">{{ d.feuillet }}</dd></div>
+              <div><dt>N° de l'acte</dt><dd class="box">{{ d.official_number ?? '' }}</dd></div>
+            </dl>
             <h1>ACTE DE NAISSANCE</h1>
-            <p class="refs">Année : <b>{{ d.annee ?? '…' }}</b> · Registre : <b>{{ d.registre || '…' }}</b> · Feuillet : <b>{{ d.feuillet || '…' }}</b> · N° : <b>{{ d.official_number || '…' }}</b></p>
+            <p class="volet"><b>Volet N°1</b> — Déclarant <small>(à remettre au déclarant)</small></p>
           </header>
-          <section>
-            <p>L'an <b>{{ d.child.birth_date | date: 'yyyy' }}</b>, <b>{{ letters(d.child.birth_date) }}</b> ({{ d.child.birth_date | date: 'dd/MM/yyyy' }}){{ d.child.birth_time ? ' à ' + d.child.birth_time.slice(0,5) : '' }}, est né(e) à <b class="uc">{{ d.child.birth_place || d.hospital || '…' }}</b> :</p>
-            <p class="child uc">{{ d.child.first_names }} <b>{{ d.child.last_name }}</b> — sexe {{ d.child.gender === 'M' ? 'masculin' : d.child.gender === 'F' ? 'féminin' : '…' }}@if (d.child.nationality) { — nationalité {{ d.child.nationality }} }@if (d.child.birth_rank) { — {{ d.child.birth_rank }}{{ d.child.birth_rank === 1 ? 'er' : 'e' }} enfant de la mère }</p>
-            <div class="two">
-              <div><h3>Père</h3><span class="uc">{{ who(d.father) }}</span></div>
-              <div><h3>Mère</h3><span class="uc">{{ who(d.mother) }}</span></div>
-            </div>
-            <p>Déclaration faite le <b>{{ d.declaration_date ? (d.declaration_date | date: 'dd/MM/yyyy') : '…' }}</b> par
-              <b class="uc">{{ d.declarant ? d.declarant.first_names + ' ' + d.declarant.last_name : '…' }}</b>@if (d.declarant?.relationship) { (<span class="uc">{{ d.declarant!.relationship }}</span>) }@if (d.declarant?.nationality) { , de nationalité <span class="uc">{{ d.declarant!.nationality }}</span> }.</p>
-            @if (d.mentions) { <p><b>Mentions :</b> {{ d.mentions }}</p> }
-          </section>
-          <footer><div>Le déclarant</div><div>L'officier d'état civil<br /><small>{{ d.officer_name }}</small></div></footer>
+
+          <div class="body">
+            <p class="line"><span class="k">Région Administrative de :</span><span class="v uc">{{ d.region }}</span></p>
+            <p class="line"><span class="k">Préfecture :</span><span class="v uc">{{ d.prefecture }}</span></p>
+            <p class="line"><span class="k">Commune :</span><span class="opt"><i class="cb"></i>Urbaine</span><span class="opt"><i class="cb"></i>Rurale de :</span><span class="v uc">{{ d.commune }}</span></p>
+            <p class="line"><span class="k">Centre :</span><span class="opt"><i class="cb"></i>Principal</span><span class="opt"><i class="cb"></i>Secondaire de :</span><span class="v uc">{{ d.centre }}</span></p>
+
+            <h2 class="tag">ENFANT <span class="npi">NPI :</span><span class="v uc">{{ d.child.npi }}</span></h2>
+            <p class="line"><span class="k">Prénoms :</span><span class="v uc">{{ d.child.first_names }}</span></p>
+            <p class="line"><span class="k">Nom :</span><span class="v uc">{{ d.child.last_name }}</span></p>
+            <p class="line"><span class="k">Sexe :</span><span class="v uc">{{ sexe(d.child.gender) }}</span></p>
+            <p class="line"><span class="k">Date et heure de naissance <small>(en lettres)</small> :</span><span class="v">{{ naissance(d) }}</span></p>
+            <p class="line"><span class="k">Lieu de naissance :</span><span class="v uc">{{ d.child.birth_place || d.hospital }}</span></p>
+            <p class="line"><span class="k">Rang de naissance chez la mère :</span><span class="v">{{ rang(d.child.birth_rank) }}</span></p>
+            <p class="line"><span class="k">Nationalité :</span><span class="v uc">{{ d.child.nationality }}</span></p>
+
+            <h2 class="tag wide">PARENTS</h2>
+            @for (r of parents(d); track r.title) {
+              <h3 class="tag sub">{{ r.title }} <span class="npi">NPI :</span><span class="v uc">{{ r.p.npi }}</span></h3>
+              <p class="line"><span class="k">Prénoms :</span><span class="v uc">{{ r.p.first_names }}</span></p>
+              <p class="line"><span class="k">Nom :</span><span class="v uc">{{ r.p.last_name }}</span></p>
+              <p class="line"><span class="k">Date de naissance <small>(en lettres)</small> :</span><span class="v">{{ lettres(r.p.date_of_birth) }}</span></p>
+              <p class="line"><span class="k">Lieu de naissance :</span><span class="v uc">{{ r.p.birth_place }}</span></p>
+              <p class="line"><span class="k">Nationalité :</span><span class="v uc">{{ r.p.nationality }}</span></p>
+              <p class="line"><span class="k">Profession :</span><span class="v uc">{{ r.p.profession }}</span></p>
+              <p class="line"><span class="k">Domicile :</span><span class="v uc">{{ r.p.address }}</span></p>
+              <p class="line"><span class="k">Situation matrimoniale :</span><span class="opt"><i class="cb"></i>Célibataire</span><span class="opt"><i class="cb"></i>{{ r.married }}</span><span class="opt"><i class="cb"></i>{{ r.widowed }}</span></p>
+              <p class="line"><span class="k">Téléphone :</span><span class="v">{{ r.p.phone }}</span></p>
+            }
+
+            <h2 class="tag wide">DÉCLARANT
+              <span class="who"><span class="opt">Père<i class="cb" [class.on]="who(d) === 'father'"></i></span><span class="opt">Mère<i class="cb" [class.on]="who(d) === 'mother'"></i></span><span class="opt">Autre<i class="cb" [class.on]="who(d) === 'other'"></i></span></span></h2>
+            <p class="line"><span class="k">NPI :</span><span class="v uc">{{ dec(d).npi }}</span></p>
+            <p class="line"><span class="k">Prénoms :</span><span class="v uc">{{ dec(d).first_names }}</span></p>
+            <p class="line"><span class="k">Nom :</span><span class="v uc">{{ dec(d).last_name }}</span></p>
+            <p class="line"><span class="k">Date de naissance <small>(en lettres)</small> :</span><span class="v">{{ lettres(dec(d).date_of_birth) }}</span></p>
+            <p class="line"><span class="k">Lieu de naissance :</span><span class="v uc">{{ dec(d).birth_place }}</span></p>
+            <p class="line"><span class="k">Nationalité :</span><span class="v uc">{{ dec(d).nationality }}</span></p>
+            <p class="line"><span class="k">Profession :</span><span class="v uc">{{ dec(d).profession }}</span></p>
+            <p class="line"><span class="k">Domicile :</span><span class="v uc">{{ dec(d).address }}</span></p>
+            <p class="line"><span class="k">Situation matrimoniale :</span><span class="opt"><i class="cb"></i>Célibataire</span><span class="opt"><i class="cb"></i>Marié(e)</span><span class="opt"><i class="cb"></i>Veuf(ve)</span></p>
+            <p class="line"><span class="k">Téléphone :</span><span class="v">{{ dec(d).phone }}</span></p>
+            <p class="line"><span class="k">Lien de parenté :</span><span class="v uc">{{ d.declarant?.relationship }}</span></p>
+            <p class="line"><span class="k">Date de déclaration <small>(en lettres)</small> :</span><span class="v">{{ lettres(d.declaration_date) }}</span></p>
+
+            @if (d.mentions) { <p class="line mentions"><span class="k">Mentions :</span><span class="v">{{ d.mentions }}</span></p> }
+          </div>
+
+          <footer>
+            <p class="line at"><span class="k">À</span><span class="v uc">{{ d.commune }}</span><span class="k">le</span><span class="v date">{{ d.declaration_date ? (d.declaration_date | date: 'dd/MM/yyyy') : '' }}</span></p>
+            <div class="sign"><span>Déclarant</span><span>L'Officier Délégué(e) de l'État Civil<br /><small>{{ d.officer_name }}</small></span></div>
+          </footer>
         </article>
       }
     </div>
@@ -78,20 +128,43 @@ import { IconComponent, PageHeaderComponent } from '../shared/ui';
     }
   `,
   styles: [`
-    .sheet{position:relative;background:#fff;max-width:820px;margin:0 auto;padding:48px 56px;border:1px solid var(--wk-border);box-shadow:var(--shadow-md);font-family:Georgia,'Times New Roman',serif;color:#111;line-height:1.7}
-    header{text-align:center}header p{margin:0}
-    .rep{font-weight:700;letter-spacing:.08em}.mot{font-style:italic;font-size:13px}.adm{font-size:13px}
-    h1{font-family:Georgia,serif;font-size:26px;letter-spacing:.14em;margin:18px 0 6px;color:#111}
-    .refs{font-size:14px}
-    section{margin-top:22px}.child{font-size:18px;text-align:center;margin:12px 0}
-    h3{font-family:Georgia,serif;font-size:14px;text-transform:uppercase;letter-spacing:.08em;margin:0}
-    .two{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:14px 0}
-    footer{display:flex;justify-content:space-between;margin-top:64px;text-align:center}
-    .watermark{position:absolute;inset:0;display:grid;place-items:center;font:700 44px/1.2 var(--wk-font);color:rgba(220,53,69,.16);transform:rotate(-24deg);pointer-events:none;text-align:center;padding:40px}
+    :host{--ink:#142a5c;--rule:#2b4a7a;--paper:#e8f6f8;--tag:#b6dcf3}
+    .form{position:relative;overflow:hidden;max-width:640px;margin:0 auto;padding:22px 26px 26px;color:#101828;border:1px solid #9cc7d6;box-shadow:var(--shadow-md);
+      background:
+        repeating-linear-gradient(115deg,rgba(120,190,205,.14) 0 2px,transparent 2px 9px),
+        linear-gradient(180deg,#f2fbfc,var(--paper));
+      -webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:13.5px}
+    .top{text-align:center}
+    .rep{display:flex;flex-direction:column;align-items:center;line-height:1.25;font-size:12px}.rep small{font-size:11px;font-style:italic}
+    .refs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 6px;text-align:left}
+    .refs div{display:flex;flex-direction:column;gap:2px}.refs dt{font-size:11px;font-weight:700}
+    .refs dd{margin:0}.box{min-height:26px;background:#fff;border:1.5px solid var(--rule);padding:2px 6px;font-weight:700;color:var(--ink)}
+    h1{margin:8px 0 2px;font-size:22px;letter-spacing:.06em;font-family:inherit;color:#0d1b3d}
+    .volet{margin:0 0 10px;font-size:13px}.volet small{color:#44546a}
+    .body{display:flex;flex-direction:column}
+    .line{display:flex;align-items:baseline;gap:6px;margin:0;min-height:27px;border-bottom:1.5px solid var(--rule);padding:3px 0 1px}
+    .k{white-space:nowrap;font-size:12.5px}.k small{font-size:10px}
+    .v{flex:1;min-width:0;font-weight:700;color:var(--ink);letter-spacing:.01em;overflow-wrap:anywhere}
+    .v.date{flex:0 0 120px;text-align:center}
+    .opt{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-size:12.5px;margin:0 6px}
+    .cb{display:inline-block;width:14px;height:14px;border:1.5px solid var(--rule);background:#fff;position:relative;flex:none}
+    .cb.on::after{content:'';position:absolute;left:3px;top:-1px;width:5px;height:10px;border:solid var(--ink);border-width:0 2.5px 2.5px 0;transform:rotate(40deg)}
+    .tag{display:flex;align-items:baseline;gap:10px;margin:14px 0 2px;padding:3px 10px;background:var(--tag);font-size:15px;font-weight:800;letter-spacing:.03em;font-family:inherit;color:#0d2a5c}
+    .tag.wide{margin-top:16px}
+    .tag.sub{background:transparent;padding:6px 0 0 24px;margin:6px 0 0;font-size:14px}
+    .tag .npi{font-size:12.5px;font-weight:600}
+    .tag .v{background:#fff0;border-bottom:1.5px solid var(--rule);min-height:20px;font-size:13.5px}
+    .tag.sub .v{border-bottom:1.5px solid var(--rule)}
+    .who{margin-left:auto;display:inline-flex;gap:8px;font-size:13px;font-weight:700}.who .opt{margin:0}
+    footer{margin-top:14px}
+    .at{border-bottom:0}.at .v{border-bottom:1.5px solid var(--rule)}.at .v.date{flex:0 0 120px}
+    .sign{display:flex;justify-content:space-between;gap:16px;margin-top:34px;font-size:12.5px;font-weight:700;text-align:center}
+    .sign small{font-weight:500}
+    .watermark{position:absolute;inset:0;display:grid;place-items:center;font:700 40px/1.2 var(--wk-font);color:rgba(220,53,69,.17);transform:rotate(-24deg);pointer-events:none;text-align:center;padding:40px;z-index:2}
     .prow{display:flex;gap:16px;padding:6px 0;border-top:1px solid var(--wk-border)}
-    .sheet.draft{border-style:dashed}
-    @media (max-width:640px){.sheet{padding:24px 18px}.two{grid-template-columns:1fr}}
-    @media print{.noprint{display:none!important}.page{padding:0}.sheet{border:0;box-shadow:none;max-width:none}}
+    .form.draft{border-style:dashed}
+    @media (max-width:520px){.form{padding:16px 12px}.refs{grid-template-columns:repeat(2,minmax(0,1fr))}.k{white-space:normal}.line{flex-wrap:wrap}.v{flex:1 1 55%;min-width:130px}.v.date{flex:0 0 110px;min-width:0}.tag .v{flex:1 1 40%;min-width:100px}}
+    @media print{.noprint{display:none!important}.page{padding:0}.form{border:0;box-shadow:none;max-width:none;margin:0}}
   `],
 })
 export class ActeDocumentComponent implements OnInit {
@@ -109,12 +182,34 @@ export class ActeDocumentComponent implements OnInit {
   dv = { recipient_name: '', recipient_relationship: '', recipient_id_type: '', recipient_id_number: '', notes: '' };
   private uuid = '';
 
-  letters(iso: string) { return dateEnLettres(iso); }
+  private static readonly NONE: Partial<Person> = {};
 
-  who(p: Person | null) {
-    if (!p) return '…';
-    const born = p.date_of_birth ? `né(e) ${dateEnLettres(p.date_of_birth)}${p.birth_place ? ' à ' + p.birth_place : ''}` : (p.birth_place ? `né(e) à ${p.birth_place}` : '');
-    return [`${p.first_names} ${p.last_name}`.trim(), born, p.nationality, p.profession, p.address].filter(Boolean).join(' — ') || '…';
+  lettres(iso: string | null | undefined) { return dateEnLettres(iso); }
+  sexe(g: string) { return g === 'M' ? 'Masculin' : g === 'F' ? 'Féminin' : ''; }
+  rang(n: number | null | undefined) { return n ? `${n}${n === 1 ? 'er' : 'e'} enfant` : ''; }
+
+  /** « le quinze septembre deux mille vingt-six à huit heures trente » */
+  naissance(d: ActeDocument) {
+    const date = dateEnLettres(d.child.birth_date);
+    const hour = heureEnLettres(d.child.birth_time);
+    return date ? (hour ? `${date} à ${hour}` : date) : '';
+  }
+
+  /** The father and the mother, as the form lists them; an unknown parent leaves empty lines. */
+  parents(d: ActeDocument) {
+    return [
+      { title: 'PÈRE', p: d.father ?? ActeDocumentComponent.NONE, married: 'Marié', widowed: 'Veuf' },
+      { title: 'MÈRE', p: d.mother ?? ActeDocumentComponent.NONE, married: 'Mariée', widowed: 'Veuve' },
+    ];
+  }
+
+  dec(d: ActeDocument): Partial<Person> { return d.declarant ?? ActeDocumentComponent.NONE; }
+
+  /** Which box of « Déclarant : père / mère / autre » is ticked, from the declared relationship. */
+  who(d: ActeDocument): 'father' | 'mother' | 'other' | '' {
+    const rel = (d.declarant?.relationship ?? '').trim().toLowerCase();
+    if (!rel) return d.declarant ? 'other' : '';
+    return /^p[èe]re$/.test(rel) ? 'father' : /^m[èe]re$/.test(rel) ? 'mother' : 'other';
   }
 
   ngOnInit() {

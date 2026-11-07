@@ -46,3 +46,13 @@ export function dateEnLettres(iso: string | null | undefined): string {
   if (month < 1 || month > 12 || day < 1 || day > 31) return '';
   return `le ${day === 1 ? 'premier' : nombreEnLettres(day)} ${MONTHS[month - 1]} ${nombreEnLettres(year)}`;
 }
+
+/** « huit heures trente » from `HH:MM` (or `HH:MM:SS`); empty when the value is not a time. */
+export function heureEnLettres(hhmm: string | null | undefined): string {
+  const m = /^(\d{1,2}):(\d{2})/.exec((hhmm ?? '').trim());
+  if (!m) return '';
+  const h = Number(m[1]), min = Number(m[2]);
+  if (h > 23 || min > 59) return '';
+  const hours = h === 0 ? 'minuit' : h === 12 ? 'midi' : `${nombreEnLettres(h).replace(/\bun$/, 'une')} heure${h > 1 ? 's' : ''}`;
+  return min ? `${hours} ${nombreEnLettres(min)}` : hours;
+}

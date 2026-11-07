@@ -1,4 +1,4 @@
-import { dateEnLettres, nombreEnLettres } from './date-letters';
+import { dateEnLettres, heureEnLettres, nombreEnLettres } from './date-letters';
 
 describe('Dates in words', () => {
   it('writes a date in full letters', () => {
@@ -17,5 +17,20 @@ describe('Dates in words', () => {
     expect(dateEnLettres('')).toBe('');
     expect(dateEnLettres('2026-13-01')).toBe('');
     expect(dateEnLettres(null)).toBe('');
+  });
+});
+
+describe('Time in words', () => {
+  it('writes an hour and its minutes', () => {
+    expect(heureEnLettres('08:30')).toBe('huit heures trente');
+    expect(heureEnLettres('01:05:00')).toBe('une heure cinq');
+    expect(heureEnLettres('21:00')).toBe('vingt et une heures');
+    expect(heureEnLettres('00:00')).toBe('minuit');
+    expect(heureEnLettres('12:15')).toBe('midi quinze');
+  });
+  it('returns nothing for a value that is not a time', () => {
+    expect(heureEnLettres('')).toBe('');
+    expect(heureEnLettres(null)).toBe('');
+    expect(heureEnLettres('25:00')).toBe('');
   });
 });

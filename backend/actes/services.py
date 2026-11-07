@@ -131,7 +131,7 @@ def build_document(acte: Acte) -> dict:
             'date_of_birth': getattr(p, 'date_of_birth', None),
             'birth_place': getattr(p, 'birth_place', ''),
             'age': getattr(p, 'age', None), 'nationality': getattr(p, 'nationality', ''),
-            'npi': getattr(p, 'npi', ''),
+            'npi': getattr(p, 'npi', ''), 'phone': getattr(p, 'phone', ''),
             'profession': p.profession, 'address': p.address,
         }
 

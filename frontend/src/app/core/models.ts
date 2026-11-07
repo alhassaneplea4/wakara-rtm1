@@ -71,7 +71,7 @@ export interface Acte {
 export interface ActeDocument {
   is_official: boolean; status: Status; reference: string; official_number: string | null; annee: number | null;
   registre: string; feuillet: string; region: string; prefecture: string; commune: string; centre: string;
-  declaration_date: string | null; child: { first_names: string; last_name: string; gender: string; nationality?: string; birth_rank?: number | null; birth_date: string; birth_time: string | null; birth_place: string };
+  declaration_date: string | null; child: { first_names: string; last_name: string; gender: string; nationality?: string; npi?: string; birth_rank?: number | null; birth_date: string; birth_time: string | null; birth_place: string };
   father: Person | null; mother: Person | null; declarant: (Person & { relationship: string }) | null;
   hospital: string; mentions: string; officer_name: string; validated_at: string | null;
 }
