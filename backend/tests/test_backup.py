@@ -18,7 +18,7 @@ from .base import make_user
 class BackupRestoreTests(TransactionTestCase):
     def test_backup_contains_a_consistent_database_and_documents(self):
         from django.core.management import call_command as cmd
-        cmd('setup_initial_data', skip_admin=True, verbosity=0)
+        cmd('setup_initial_data', skip_admin=True, no_hospitals=True, verbosity=0)
         with tempfile.TemporaryDirectory() as out, tempfile.TemporaryDirectory() as media:
             (Path(media) / 'declarations').mkdir()
             (Path(media) / 'declarations' / 'a.pdf').write_bytes(b'%PDF-test')

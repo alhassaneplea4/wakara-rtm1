@@ -23,7 +23,7 @@ def make_user(username, role=None, **extra):
 class WakaraTestCase(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        call_command('setup_initial_data', skip_admin=True, verbosity=0)
+        call_command('setup_initial_data', skip_admin=True, no_hospitals=True, verbosity=0)
         cls.admin = make_user('admin', 'admin')
         cls.secretary = make_user('secretary', 'secretary')
         cls.agent = make_user('agent', 'collection_agent')

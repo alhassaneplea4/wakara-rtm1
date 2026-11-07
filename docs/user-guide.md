@@ -38,8 +38,9 @@ Vous ne pouvez ni valider ni rejeter.
 - **Utilisateurs** : création, rôles, ajustements de permissions, désactivation, mot de passe temporaire. Vous ne pouvez pas
   modifier votre propre compte (rôles, permissions, statut).
 - **Rôles et permissions** : cochez les permissions de chaque rôle ; chaque changement est tracé.
-- **Hôpitaux et maternités** : création, modification, désactivation (un établissement utilisé n'est jamais supprimé). Le secrétaire peut aussi les gérer (création, modification, archivage et restauration).
-- **Tableau de bord** (statistiques comprises) : période (cette année, ce mois, cette semaine, aujourd'hui, deux années précédentes), établissement, statut, responsable et intervalle « Du / Au » ; la page « Statistiques » n'existe plus. **Journal d'activité** : filtres et export CSV
+- **Hôpitaux et maternités** : création, modification, désactivation (un établissement utilisé n'est jamais supprimé). Le secrétaire peut aussi les gérer (création, modification, archivage et restauration). Les établissements de la commune de Ratoma documentés par des sources publiques sont **préremplis une seule fois** au premier déploiement ; la liste est à valider par la mairie (voir `backend/hospitals/ratoma.py`).
+- **Tableau de bord** (statistiques comprises) : période (cette année, ce mois, cette semaine, aujourd'hui, deux années précédentes), établissement, statut, responsable et intervalle « Du / Au » ; la page « Statistiques » n'existe plus. **Chaque carte de chiffres est cliquable** : elle ouvre la liste (déclarations ou actes) avec la même période, les mêmes filtres et les mêmes statuts, donc le même nombre ; le bandeau « Sélection du tableau de bord » permet de la retirer.
+- **Délivrances** : cliquez une ligne pour ouvrir le détail (remise, acte, qui a fait quoi, parcours du dossier, autres remises du même acte) ; filtres par type, établissement et dates, compteurs en tête. L'administrateur voit en plus la colonne « Validé par », le nombre de copies imprimées et le journal d'audit du dossier (adresse IP, motifs). **Journal d'activité** : filtres et export CSV
   (consultation et export sont eux-mêmes journalisés). **Paramètres** : textes de la page de connexion.
 
 ## Important

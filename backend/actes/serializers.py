@@ -44,27 +44,77 @@ class ActeUpdateSerializer(serializers.ModelSerializer):
                   'declaration_date', 'officer_name', 'mentions']
 
 
+def _person_name(user):
+    return (user.get_full_name() or user.username) if user else ''
+
+
 class DeliverySerializer(serializers.ModelSerializer):
     delivered_by_name = serializers.SerializerMethodField()
     reference = serializers.CharField(source='acte.declaration.reference', read_only=True)
     official_number = serializers.CharField(source='acte.numero_acte', read_only=True)
     child_name = serializers.SerializerMethodField()
     acte_uuid = serializers.UUIDField(source='acte.uuid', read_only=True)
+    declaration_uuid = serializers.UUIDField(source='acte.declaration.uuid', read_only=True)
+    hospital_name = serializers.CharField(source='acte.declaration.hospital.name', read_only=True, default=None)
+    validated_by_name = serializers.SerializerMethodField()
+    print_count = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model = Delivery
-        fields = ['uuid', 'acte_uuid', 'reference', 'official_number', 'child_name', 'delivered_at',
-                  'recipient_name', 'recipient_relationship', 'recipient_id_type',
-                  'recipient_id_number', 'is_duplicate', 'notes', 'delivered_by_name']
+        fields = ['uuid', 'acte_uuid', 'declaration_uuid', 'reference', 'official_number', 'child_name',
+                  'hospital_name', 'delivered_at', 'recipient_name', 'recipient_relationship',
+                  'recipient_id_type', 'recipient_id_number', 'is_duplicate', 'notes', 'delivered_by_name',
+                  'validated_by_name', 'print_count']
         read_only_fields = ['uuid', 'is_duplicate']
 
+    def get_validated_by_name(self, obj):
+        return _person_name(obj.acte.declaration.validated_by)
+
     def get_delivered_by_name(self, obj):
-        u = obj.delivered_by
-        return (u.get_full_name() or u.username) if u else ''
+        return _person_name(obj.delivered_by)
 
     def get_child_name(self, obj):
         child = getattr(obj.acte.declaration, 'child', None)
         return str(child) if child else ''
+
+
+class DeliveryDetailSerializer(DeliverySerializer):
+    """One delivery with everything needed to understand what was done: the act, the path of the dossier,
+    the printed copies and the other deliveries of the same act."""
+    acte = serializers.SerializerMethodField()
+    history = serializers.SerializerMethodField()
+    prints = serializers.SerializerMethodField()
+    other_deliveries = serializers.SerializerMethodField()
+
+    class Meta(DeliverySerializer.Meta):
+        fields = DeliverySerializer.Meta.fields + ['acte', 'history', 'prints', 'other_deliveries']
+
+    def get_acte(self, obj):
+        a = obj.acte
+        d = a.declaration
+        child = getattr(d, 'child', None)
+        return {
+            'status': d.status, 'status_label': d.get_status_display(),
+            'numero_acte': a.numero_acte, 'annee': a.annee, 'registre': a.registre, 'feuillet': a.feuillet,
+            'declaration_date': a.declaration_date, 'officer_name': a.officer_name,
+            'numero_assigned_by_name': _person_name(a.numero_assigned_by), 'numero_assigned_at': a.numero_assigned_at,
+            'validated_at': d.validated_at, 'created_by_name': _person_name(d.created_by),
+            'birth_date': d.birth_date, 'birth_place': d.birth_place,
+            'child_gender': child.gender if child else '', 'child_npi': child.npi if child else '',
+        }
+
+    def get_history(self, obj):
+        from declarations.serializers import StatusHistorySerializer
+        rows = obj.acte.declaration.status_history.select_related('changed_by')
+        return StatusHistorySerializer(rows, many=True).data
+
+    def get_prints(self, obj):
+        return PrintLogSerializer(obj.acte.print_logs.select_related('printed_by'), many=True).data
+
+    def get_other_deliveries(self, obj):
+        others = Delivery.objects.filter(acte=obj.acte).exclude(pk=obj.pk).select_related('delivered_by')
+        return [{'uuid': str(o.uuid), 'delivered_at': o.delivered_at, 'recipient_name': o.recipient_name,
+                 'is_duplicate': o.is_duplicate, 'delivered_by_name': _person_name(o.delivered_by)} for o in others]
 
 
 class DeliveryCreateSerializer(serializers.ModelSerializer):

@@ -1,3 +1,5 @@
+from django.db.models import Count
+from django.utils import timezone
 from django_filters import rest_framework as filters
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
@@ -14,13 +16,17 @@ from . import services
 from .models import Acte, Delivery
 from .serializers import (
     ActeListSerializer, ActeSerializer, ActeUpdateSerializer, DeliveryCreateSerializer,
-    DeliverySerializer, PrintLogSerializer,
+    DeliveryDetailSerializer, DeliverySerializer, PrintLogSerializer,
 )
 
 
 class ActeFilter(filters.FilterSet):
     status = filters.MultipleChoiceFilter(field_name='declaration__status', choices=Status.CHOICES)
     hospital = filters.UUIDFilter(field_name='declaration__hospital__uuid')
+    # same period / responsible filters as the declarations list, so a dashboard figure and its list agree
+    received_from = filters.DateFilter(field_name='declaration__received_at', lookup_expr='gte')
+    received_to = filters.DateFilter(field_name='declaration__received_at', lookup_expr='lte')
+    assigned_to = filters.UUIDFilter(field_name='declaration__assigned_to__uuid')
 
     class Meta:
         model = Acte
@@ -97,16 +103,48 @@ class ActeViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Updat
         return Response(DeliverySerializer(delivery).data, status=status.HTTP_201_CREATED)
 
 
-class DeliveryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
-    """Delivery follow-up list (read-only)."""
+class DeliveryFilter(filters.FilterSet):
+    delivered_from = filters.DateFilter(field_name='delivered_at', lookup_expr='date__gte')
+    delivered_to = filters.DateFilter(field_name='delivered_at', lookup_expr='date__lte')
+    hospital = filters.UUIDFilter(field_name='acte__declaration__hospital__uuid')
+    delivered_by = filters.UUIDFilter(field_name='delivered_by__uuid')
+
+    class Meta:
+        model = Delivery
+        fields = ['is_duplicate']
+
+
+class DeliveryViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    """Delivery follow-up (read-only): the list, a detailed view of one delivery and a few counters."""
     queryset = Delivery.objects.select_related(
-        'acte__declaration__child', 'delivered_by').order_by('-delivered_at')
+        'acte__declaration__child', 'acte__declaration__hospital', 'acte__declaration__validated_by',
+        'acte__numero_assigned_by', 'delivered_by',
+    ).annotate(print_count=Count('acte__print_logs', distinct=True)).order_by('-delivered_at')
     serializer_class = DeliverySerializer
     permission_classes = [HasWakaraPermission]
-    search_fields = ['recipient_name', 'acte__numero_acte', 'acte__declaration__reference']
-    ordering_fields = ['delivered_at']
-    permission_map = {'list': 'acte.view'}
+    lookup_field = 'uuid'
+    filterset_class = DeliveryFilter
+    search_fields = ['recipient_name', 'recipient_id_number', 'acte__numero_acte', 'acte__declaration__reference',
+                     'acte__declaration__child__last_name', 'acte__declaration__child__first_names']
+    ordering_fields = ['delivered_at', 'recipient_name']
+    permission_map = {'list': 'acte.view', 'retrieve': 'acte.view', 'summary': 'acte.view'}
 
     def get_queryset(self):
         qs = super().get_queryset()
         return qs.filter(acte__declaration__in=visible_declarations(self.request.user))
+
+    def get_serializer_class(self):
+        return DeliveryDetailSerializer if self.action == 'retrieve' else DeliverySerializer
+
+    @action(detail=False, methods=['get'], url_path='summary')
+    def summary(self, request):
+        """Counters for the filters currently applied (first deliveries, duplicates, today, this month)."""
+        qs = self.filter_queryset(self.get_queryset()).order_by()
+        today = timezone.localdate()
+        return Response({
+            'total': qs.count(),
+            'first': qs.filter(is_duplicate=False).count(),
+            'duplicates': qs.filter(is_duplicate=True).count(),
+            'today': qs.filter(delivered_at__date=today).count(),
+            'this_month': qs.filter(delivered_at__date__gte=today.replace(day=1)).count(),
+        })

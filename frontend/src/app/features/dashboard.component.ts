@@ -41,12 +41,21 @@ const PALETTE = ['#1f5ed8', '#4f9bff', '#12a36a', '#8b7cf6', '#e58a0a', '#c3cde0
 
       <div class="grid grid-4 kpis">
         @for (k of kpiCards(); track k.label) {
-          <article class="card kpi" [class.skeleton]="!data()">
-            <span class="ico" [ngClass]="k.tone"><wk-icon [name]="k.icon" [size]="22" /></span>
-            <div><strong class="mono">{{ k.value }}</strong><span>{{ k.label }}</span></div>
-          </article>
+          @if (k.link) {
+            <a class="card kpi link" [class.skeleton]="!data()" [routerLink]="k.link" [queryParams]="k.query"
+               [attr.aria-label]="k.label + ' : ' + k.value + '. Afficher la liste.'">
+              <ng-container *ngTemplateOutlet="kpiBody; context: { $implicit: k }" />
+            </a>
+          } @else {
+            <article class="card kpi" [class.skeleton]="!data()"><ng-container *ngTemplateOutlet="kpiBody; context: { $implicit: k }" /></article>
+          }
         }
       </div>
+      <ng-template #kpiBody let-k>
+        <span class="ico" [ngClass]="k.tone"><wk-icon [name]="k.icon" [size]="22" /></span>
+        <div><strong class="mono">{{ k.value }}</strong><span>{{ k.label }}</span></div>
+        @if (k.link) { <wk-icon class="go" name="arrow" [size]="16" /> }
+      </ng-template>
 
       <div class="grid charts">
         <section class="card">
@@ -131,7 +140,12 @@ const PALETTE = ['#1f5ed8', '#4f9bff', '#12a36a', '#8b7cf6', '#e58a0a', '#c3cde0
     .filters .reset{align-self:flex-end}
     .range{margin:0 0 var(--s4)}
     .kpis{margin-bottom:var(--s4)}
-    .kpi{display:flex;gap:16px;align-items:center;min-height:104px}
+    .kpi{display:flex;gap:16px;align-items:center;min-height:104px;position:relative}
+    .kpi.link{color:inherit;text-decoration:none;cursor:pointer;transition:box-shadow .15s,transform .15s,border-color .15s}
+    .kpi.link:hover{box-shadow:var(--shadow-md);transform:translateY(-2px);border-color:var(--wk-royal)}
+    .kpi.link:focus-visible{outline:3px solid var(--wk-info-bg);outline-offset:2px;border-color:var(--wk-royal)}
+    .kpi .go{position:absolute;right:14px;top:14px;color:var(--wk-royal);opacity:0;transition:opacity .15s}
+    .kpi.link:hover .go,.kpi.link:focus-visible .go{opacity:1}
     .kpi strong{display:block;font-size:30px;line-height:1.1;font-weight:800}
     .kpi span{color:var(--wk-text-soft);font-size:13px}
     .ico{width:50px;height:50px;border-radius:50%;display:grid;place-items:center;flex:none}
@@ -190,19 +204,49 @@ export class DashboardComponent implements OnInit {
   hospitalDonut?: ChartConfiguration<'doughnut'>;
   genderDonut?: ChartConfiguration<'doughnut'>;
 
+  /** The period and the filters of the dashboard, written the way the lists read them from the URL. */
+  private scopeQuery(): Record<string, string> {
+    const r = this.range();
+    const q: Record<string, string> = { from: this.from || r.date_from, to: this.to || r.date_to };
+    if (this.hospital) q['hospital'] = this.hospital;
+    if (this.agent) q['agent'] = this.agent;
+    return q;
+  }
+
+  /** Link to the declarations list showing exactly what a figure counts (same period, filters and statuses). */
+  private declarations(statuses: Status[] | null, label: string) {
+    if (!this.auth.can('declaration.view')) return { link: null, query: {} };
+    const q = this.scopeQuery();
+    if (statuses) {
+      // the status filter of the dashboard narrows the figure, so it narrows the list the same way
+      const picked = this.status ? statuses.filter(s => s === this.status) : statuses;
+      q['statuses'] = (picked.length ? picked : statuses).join(',');
+      q['label'] = label;
+    }
+    return { link: '/declarations', query: q };
+  }
+
+  /** Link to the list of birth certificates (validated and delivered ones). */
+  private actes(status?: Status) {
+    if (!this.auth.can('acte.view')) return { link: null, query: {} };
+    return { link: '/actes', query: status ? { ...this.scopeQuery(), status } : this.scopeQuery() };
+  }
+
   kpiCards = () => {
     const k = this.data()?.kpis;
     const v = (n?: number) => (k ? n : '—');
+    const notDraft = this.statuses.filter(s => s !== 'DRAFT');
     return [
-      { label: 'Naissances déclarées', value: v(k?.births_declared), icon: 'baby', tone: 'info' },
-      { label: 'Déclarations reçues', value: v(k?.declarations_received), icon: 'file', tone: 'info' },
-      { label: 'Actes validés', value: v(k?.validated), icon: 'check', tone: 'success' },
-      { label: 'Dossiers rejetés', value: v(k?.rejected), icon: 'x', tone: 'danger' },
-      { label: 'Dossiers en cours', value: v(k?.in_progress), icon: 'clock', tone: 'warning' },
-      { label: 'En attente de validation', value: v(k?.pending_validation), icon: 'shield', tone: 'warning' },
-      { label: 'À corriger', value: v(k?.to_correct), icon: 'history', tone: 'danger' },
-      { label: 'Actes délivrés', value: v(k?.delivered), icon: 'certificate', tone: 'success' },
-    ];
+      { label: 'Naissances déclarées', value: v(k?.births_declared), icon: 'baby', tone: 'info', ...this.declarations(null, '') },
+      { label: 'Déclarations reçues', value: v(k?.declarations_received), icon: 'file', tone: 'info', ...this.declarations(notDraft, 'Déclarations reçues') },
+      { label: 'Actes validés', value: v(k?.validated), icon: 'check', tone: 'success', ...this.actes() },
+      { label: 'Dossiers rejetés', value: v(k?.rejected), icon: 'x', tone: 'danger', ...this.declarations(['REJECTED'], 'Dossiers rejetés') },
+      { label: 'Dossiers en cours', value: v(k?.in_progress), icon: 'clock', tone: 'warning',
+        ...this.declarations(['TRANSMITTED', 'IN_COMPLETION', 'TO_CORRECT_COLLECTION', 'TO_CORRECT_SECRETARIAT'], 'Dossiers en cours') },
+      { label: 'En attente de validation', value: v(k?.pending_validation), icon: 'shield', tone: 'warning', ...this.declarations(['PENDING_VALIDATION'], 'En attente de validation') },
+      { label: 'À corriger', value: v(k?.to_correct), icon: 'history', tone: 'danger', ...this.declarations(['TO_CORRECT_COLLECTION', 'TO_CORRECT_SECRETARIAT'], 'À corriger') },
+      { label: 'Actes délivrés', value: v(k?.delivered), icon: 'certificate', tone: 'success', ...this.actes('DELIVERED') },
+    ] as { label: string; value: number | string | undefined; icon: string; tone: string; link: string | null; query: Record<string, string> }[];
   };
 
   color(i: number) { return PALETTE[i % PALETTE.length]; }

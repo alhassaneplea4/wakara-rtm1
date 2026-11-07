@@ -77,10 +77,24 @@ export interface ActeDocument {
 }
 
 export interface Delivery {
-  uuid: string; acte_uuid: string; reference: string; official_number: string | null; child_name: string;
-  delivered_at: string; recipient_name: string; recipient_relationship: string; is_duplicate: boolean;
-  notes: string; delivered_by_name: string;
+  uuid: string; acte_uuid: string; declaration_uuid: string; reference: string; official_number: string | null; child_name: string;
+  hospital_name: string | null; delivered_at: string; recipient_name: string; recipient_relationship: string;
+  recipient_id_type: string; recipient_id_number: string; is_duplicate: boolean;
+  notes: string; delivered_by_name: string; validated_by_name: string; print_count: number;
 }
+
+export interface DeliveryDetail extends Delivery {
+  acte: {
+    status: Status; status_label: string; numero_acte: string | null; annee: number | null; registre: string; feuillet: string;
+    declaration_date: string | null; officer_name: string; numero_assigned_by_name: string; numero_assigned_at: string | null;
+    validated_at: string | null; created_by_name: string; birth_date: string; birth_place: string; child_gender: string; child_npi: string;
+  };
+  history: StatusHistoryEntry[];
+  prints: { printed_at: string; copy_number: number; printed_by_name: string }[];
+  other_deliveries: { uuid: string; delivered_at: string; recipient_name: string; is_duplicate: boolean; delivered_by_name: string }[];
+}
+
+export interface DeliverySummary { total: number; first: number; duplicates: number; today: number; this_month: number; }
 
 export interface UserRow {
   uuid: string; username: string; email: string; first_name: string; last_name: string; phone: string;

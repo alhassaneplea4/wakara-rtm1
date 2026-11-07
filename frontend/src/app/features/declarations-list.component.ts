@@ -58,6 +58,10 @@ const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Statu
           }
           <button class="btn" (click)="apply()"><wk-icon name="search" [size]="16" /> Filtrer</button>
           @if (hasFilters()) { <button class="btn btn-ghost" (click)="reset()">Réinitialiser</button> }
+          @if (statuses.length) {
+            <p class="scope" role="status">Sélection du tableau de bord : <strong>{{ scopeLabel || statuses.length + ' statuts' }}</strong>
+              <button type="button" class="btn btn-sm btn-ghost" (click)="clearScope()" aria-label="Retirer cette sélection">Retirer ×</button></p>
+          }
         </div>
 
         @if (error()) { <div class="alert alert-danger m">{{ error() }}</div> }
@@ -97,6 +101,7 @@ const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Statu
     </div>
   `,
   styles: [`
+    .scope{flex:1 1 100%;margin:4px 0 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--wk-text-soft)}
     .filters{display:flex;gap:10px;flex-wrap:wrap;padding:16px;border-bottom:1px solid var(--wk-border);align-items:center}
     .grow{flex:1;min-width:220px}
     .filters .input{min-height:40px}
@@ -130,6 +135,8 @@ export class DeclarationsListComponent implements OnInit {
   statusOptions: Status[] = [];
 
   search = ''; status = ''; hospital = ''; agent = ''; from = ''; to = ''; ordering = '-updated_at'; page = 1;
+  /** Several statuses at once, set by a dashboard figure (`?statuses=A,B&label=…`); a single status chosen here replaces them. */
+  statuses: string[] = []; scopeLabel = '';
   rows = signal<DeclarationListItem[]>([]);
   total = signal(0);
   loading = signal(true);
@@ -146,6 +153,12 @@ export class DeclarationsListComponent implements OnInit {
     this.route.queryParamMap.subscribe(q => {
       this.search = q.get('search') ?? '';
       this.status = q.get('status') ?? '';
+      this.statuses = (q.get('statuses') ?? '').split(',').filter(Boolean);
+      this.scopeLabel = q.get('label') ?? '';
+      if (this.mode === 'all') {
+        this.hospital = q.get('hospital') ?? ''; this.agent = q.get('agent') ?? '';
+        this.from = q.get('from') ?? ''; this.to = q.get('to') ?? '';
+      }
       this.page = Number(q.get('page') ?? 1);
       this.load();
     });
@@ -157,17 +170,28 @@ export class DeclarationsListComponent implements OnInit {
     }
   }
 
-  hasFilters = () => !!(this.search || this.status || this.hospital || this.agent || this.from || this.to);
+  hasFilters = () => !!(this.search || this.status || this.statuses.length || this.hospital || this.agent || this.from || this.to);
   arrow(f: string) { return this.ordering === f ? '↑' : this.ordering === '-' + f ? '↓' : ''; }
   sort(f: string) { this.ordering = this.ordering === f ? '-' + f : f; this.load(); }
   open(uuid: string) { this.router.navigate(['/declarations', uuid]); }
   goto(p: number) { this.router.navigate([], { queryParams: { page: p }, queryParamsHandling: 'merge' }); }
-  apply() { this.router.navigate([], { queryParams: { search: this.search || null, status: this.status || null, page: null }, queryParamsHandling: 'merge' }); this.page = 1; this.load(); }
-  reset() { this.search = this.status = this.hospital = this.agent = this.from = this.to = ''; this.apply(); }
+  apply() {
+    if (this.status) { this.statuses = []; this.scopeLabel = ''; }   // one status picked here replaces the dashboard's selection
+    this.router.navigate([], {
+      queryParams: {
+        search: this.search || null, status: this.status || null, statuses: this.statuses.join(',') || null, label: this.statuses.length ? this.scopeLabel || null : null,
+        hospital: this.hospital || null, agent: this.agent || null, from: this.from || null, to: this.to || null, page: null,
+      },
+      queryParamsHandling: 'merge',
+    });
+    this.page = 1; this.load();
+  }
+  reset() { this.search = this.status = this.hospital = this.agent = this.from = this.to = this.scopeLabel = ''; this.statuses = []; this.apply(); }
+  clearScope() { this.statuses = []; this.scopeLabel = ''; this.apply(); }
 
   private query() {
     return {
-      search: this.search, status: this.status ? [this.status] : this.text.statuses, hospital: this.hospital, assigned_to: this.agent,
+      search: this.search, status: this.status ? [this.status] : this.statuses.length ? this.statuses : this.text.statuses, hospital: this.hospital, assigned_to: this.agent,
       received_from: this.from, received_to: this.to, ordering: this.ordering, page: this.page,
     };
   }

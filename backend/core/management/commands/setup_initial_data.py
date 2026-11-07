@@ -22,6 +22,8 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--skip-admin', action='store_true',
                             help="Ne pas créer le compte administrateur initial.")
+        parser.add_argument('--no-hospitals', action='store_true',
+                            help="Ne pas pré-remplir les établissements de Ratoma.")
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -48,6 +50,18 @@ class Command(BaseCommand):
         for key, value, description, is_public in DEFAULT_SETTINGS:
             SiteSetting.objects.get_or_create(
                 key=key, defaults={'value': value, 'description': description, 'is_public': is_public})
+
+        # One-time pre-fill of the facilities of Ratoma: the marker keeps it from running again on every deployment,
+        # so a facility the administrator renames, deactivates or archives afterwards is never re-created.
+        if not options['no_hospitals']:
+            from hospitals.ratoma import prefill_ratoma_facilities
+            marker, first_run = SiteSetting.objects.get_or_create(
+                key='bootstrap.ratoma_hospitals', defaults={
+                    'value': 'done', 'is_public': False,
+                    'description': "Établissements de Ratoma pré-remplis (une seule fois)"})
+            if first_run:
+                created, _ = prefill_ratoma_facilities()
+                self.stdout.write(f"Établissements de Ratoma pré-remplis : {len(created)}")
 
         if options['skip_admin']:
             return
