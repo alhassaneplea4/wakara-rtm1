@@ -60,7 +60,7 @@ import { IconComponent, PageHeaderComponent } from '../shared/ui';
             <p class="line"><span class="k">Préfecture :</span><span class="v uc">{{ d.prefecture }}</span></p>
             <p class="line"><span class="k">Commune :</span><span class="opt"><i class="cb"></i>Urbaine</span><span class="opt"><i class="cb"></i>Rurale de :</span><span class="v uc">{{ d.commune }}</span></p>
             <p class="line"><span class="k">Centre :</span><span class="opt"><i class="cb"></i>Principal</span><span class="opt"><i class="cb"></i>Secondaire de :</span><span class="v uc">{{ d.centre }}</span></p>
-            <p class="soussigne">Je soussigné : <b>AMADOU KONIA CAMARA</b><br />Officier délégué de l'état civil</p>
+            <p class="line"><span class="k">Je soussigné :</span><span class="v uc">AMADOU KONIA CAMARA</span><span class="k">(L'officier délégué de l'état civil)</span></p>
 
             <h2 class="tag">ENFANT <span class="npi">NPI :</span><span class="v uc">{{ d.child.npi }}</span></h2>
             <p class="line"><span class="k">Prénoms :</span><span class="v uc">{{ d.child.first_names }}</span></p>
@@ -161,7 +161,6 @@ import { IconComponent, PageHeaderComponent } from '../shared/ui';
     .at{border-bottom:0}.at .v{border-bottom:1.5px solid var(--rule)}.at .v.date{flex:0 0 120px}
     .sign{display:flex;justify-content:space-between;gap:16px;margin-top:34px;font-size:12.5px;font-weight:700;text-align:center}
     .sign small{font-weight:500}
-    .soussigne{margin:10px 0 4px;line-height:1.5}
     .watermark{position:absolute;inset:0;display:grid;place-items:center;font:700 40px/1.2 var(--wk-font);color:rgba(220,53,69,.17);transform:rotate(-24deg);pointer-events:none;text-align:center;padding:40px;z-index:2}
     .prow{display:flex;gap:16px;padding:6px 0;border-top:1px solid var(--wk-border)}
     .form.draft{border-style:dashed}
