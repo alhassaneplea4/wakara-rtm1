@@ -13,7 +13,7 @@ import { IconComponent, PageHeaderComponent } from '../shared/ui';
  * Display-only copy of the acte, laid out like the paper form of the civil registry (« Acte de naissance »,
  * volet n° 1 — déclarant): header with the registry references, then the sections ENFANT, PARENTS (père, mère)
  * and DÉCLARANT. Nothing here can be edited. Until the dossier is validated the page carries a
- * "projet — sans valeur juridique" watermark and printing is not recorded.
+ * "ACTE NON VALIDE" watermark and printing is not recorded.
  *
  * Boxes the data does not tell (commune urbaine/rurale, centre principal/secondaire, situation matrimoniale)
  * stay empty, as on a blank form: they can be ticked by hand once printed.
@@ -41,7 +41,7 @@ import { IconComponent, PageHeaderComponent } from '../shared/ui';
 
       @if (doc(); as d) {
         <article class="form" [class.draft]="!d.is_official" aria-label="Acte de naissance">
-          @if (!d.is_official) { <div class="watermark" aria-hidden="true">PROJET — SANS VALEUR JURIDIQUE</div> }
+          @if (!d.is_official) { <div class="watermark" aria-hidden="true">ACTE NON VALIDE</div> }
 
           <header class="top">
             <div class="rep"><b>RÉPUBLIQUE DE GUINÉE</b><small>Travail · Justice · Solidarité</small></div>
@@ -60,6 +60,7 @@ import { IconComponent, PageHeaderComponent } from '../shared/ui';
             <p class="line"><span class="k">Préfecture :</span><span class="v uc">{{ d.prefecture }}</span></p>
             <p class="line"><span class="k">Commune :</span><span class="opt"><i class="cb"></i>Urbaine</span><span class="opt"><i class="cb"></i>Rurale de :</span><span class="v uc">{{ d.commune }}</span></p>
             <p class="line"><span class="k">Centre :</span><span class="opt"><i class="cb"></i>Principal</span><span class="opt"><i class="cb"></i>Secondaire de :</span><span class="v uc">{{ d.centre }}</span></p>
+            <p class="soussigne">Je soussigné : <b>AMADOU KONIA CAMARA</b><br />Officier délégué de l'état civil</p>
 
             <h2 class="tag">ENFANT <span class="npi">NPI :</span><span class="v uc">{{ d.child.npi }}</span></h2>
             <p class="line"><span class="k">Prénoms :</span><span class="v uc">{{ d.child.first_names }}</span></p>
@@ -160,6 +161,7 @@ import { IconComponent, PageHeaderComponent } from '../shared/ui';
     .at{border-bottom:0}.at .v{border-bottom:1.5px solid var(--rule)}.at .v.date{flex:0 0 120px}
     .sign{display:flex;justify-content:space-between;gap:16px;margin-top:34px;font-size:12.5px;font-weight:700;text-align:center}
     .sign small{font-weight:500}
+    .soussigne{margin:10px 0 4px;line-height:1.5}
     .watermark{position:absolute;inset:0;display:grid;place-items:center;font:700 40px/1.2 var(--wk-font);color:rgba(220,53,69,.17);transform:rotate(-24deg);pointer-events:none;text-align:center;padding:40px;z-index:2}
     .prow{display:flex;gap:16px;padding:6px 0;border-top:1px solid var(--wk-border)}
     .form.draft{border-style:dashed}
