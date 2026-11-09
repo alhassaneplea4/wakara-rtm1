@@ -1,6 +1,8 @@
 # Compte rendu des tests
 
-Dernière mise à jour : 29/10/2026 — Windows 11, Python 3.14, Django 5.2, Node 24, Angular 17.
+Dernière mise à jour : 9 novembre 2026 — Windows 11, Python 3.14, Django 5.2, Node 24, Angular 17.
+
+> Le rapport de tests complet, à jour (**161 tests**), est dans le [dossier de livraison](./livraison/05-Rapport-de-tests.pdf). Le détail ci-dessous date de la première version (95 tests) ; les tests ajoutés depuis couvrent le durcissement de sécurité, les champs du formulaire, les fonctions du secrétariat, les délivrances, les établissements de Ratoma et les historiques des actes.
 
 ## 1. Backend — `python manage.py test tests` : **95 tests, tous réussis**
 

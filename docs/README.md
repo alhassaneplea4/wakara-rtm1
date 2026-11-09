@@ -8,6 +8,7 @@
 6. [Guide utilisateur par rôle](./user-guide.md)
 7. [Décisions métier à valider](./business-decisions.md)
 8. [Compte rendu des tests](./test-report.md)
+9. **[Dossier de livraison (7 documents Word et PDF)](./livraison/README.md)** — cahier des charges, dossier technique, manuel utilisateur, guide d'exploitation, rapport de tests, PV de recette, PV de livraison
 
 L'API est documentée automatiquement (OpenAPI) : en développement (`DEBUG=True`),
 `http://localhost:8000/api/docs/` (Swagger) et `/api/schema/`. Ces routes sont désactivées en production.

@@ -1,0 +1,2173 @@
+[
+ {
+  "app": "accounts",
+  "model": "CustomUser",
+  "table": "accounts_customuser",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "password",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 128,
+    "unique": false
+   },
+   {
+    "name": "last_login",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "is_superuser",
+    "type": "BooleanField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "username",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 150,
+    "unique": true
+   },
+   {
+    "name": "first_name",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 150,
+    "unique": false
+   },
+   {
+    "name": "last_name",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 150,
+    "unique": false
+   },
+   {
+    "name": "email",
+    "type": "EmailField",
+    "rel": "",
+    "null": false,
+    "max": 254,
+    "unique": false
+   },
+   {
+    "name": "is_staff",
+    "type": "BooleanField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "is_active",
+    "type": "BooleanField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "date_joined",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "uuid",
+    "type": "UUIDField",
+    "rel": "",
+    "null": false,
+    "max": 32,
+    "unique": true
+   },
+   {
+    "name": "phone",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 20,
+    "unique": false
+   },
+   {
+    "name": "address",
+    "type": "TextField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "hospital",
+    "type": "ForeignKey",
+    "rel": "Hospital",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "must_change_password",
+    "type": "BooleanField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "failed_login_count",
+    "type": "PositiveIntegerField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "locked_until",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "created_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "created_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "updated_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "groups",
+    "type": "ManyToManyField",
+    "rel": "Group",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "user_permissions",
+    "type": "ManyToManyField",
+    "rel": "Permission",
+    "null": false,
+    "max": null,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "accounts",
+  "model": "Role",
+  "table": "accounts_role",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "created_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "updated_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "codename",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 50,
+    "unique": true
+   },
+   {
+    "name": "name",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 100,
+    "unique": false
+   },
+   {
+    "name": "description",
+    "type": "TextField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "is_active",
+    "type": "BooleanField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "is_system",
+    "type": "BooleanField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "accounts",
+  "model": "Permission",
+  "table": "accounts_permission",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "created_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "updated_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "codename",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 100,
+    "unique": true
+   },
+   {
+    "name": "name",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 200,
+    "unique": false
+   },
+   {
+    "name": "category",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 50,
+    "unique": false
+   },
+   {
+    "name": "description",
+    "type": "TextField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "accounts",
+  "model": "RolePermission",
+  "table": "accounts_rolepermission",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "created_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "updated_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "role",
+    "type": "ForeignKey",
+    "rel": "Role",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "permission",
+    "type": "ForeignKey",
+    "rel": "Permission",
+    "null": false,
+    "max": null,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "accounts",
+  "model": "UserRole",
+  "table": "accounts_userrole",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "created_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "updated_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "user",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "role",
+    "type": "ForeignKey",
+    "rel": "Role",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "is_active",
+    "type": "BooleanField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "assigned_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "assigned_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "accounts",
+  "model": "UserPermission",
+  "table": "accounts_userpermission",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "created_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "updated_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "user",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "permission",
+    "type": "ForeignKey",
+    "rel": "Permission",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "granted",
+    "type": "BooleanField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "set_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "hospitals",
+  "model": "Hospital",
+  "table": "hospitals_hospital",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "created_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "updated_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "is_archived",
+    "type": "BooleanField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "archived_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "archived_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "uuid",
+    "type": "UUIDField",
+    "rel": "",
+    "null": false,
+    "max": 32,
+    "unique": true
+   },
+   {
+    "name": "created_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "updated_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "code",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 20,
+    "unique": true
+   },
+   {
+    "name": "name",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 200,
+    "unique": false
+   },
+   {
+    "name": "facility_type",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 20,
+    "unique": false
+   },
+   {
+    "name": "region",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 100,
+    "unique": false
+   },
+   {
+    "name": "commune",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 100,
+    "unique": false
+   },
+   {
+    "name": "address",
+    "type": "TextField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "contact_name",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 150,
+    "unique": false
+   },
+   {
+    "name": "phone",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 20,
+    "unique": false
+   },
+   {
+    "name": "email",
+    "type": "EmailField",
+    "rel": "",
+    "null": false,
+    "max": 254,
+    "unique": false
+   },
+   {
+    "name": "is_active",
+    "type": "BooleanField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "declarations",
+  "model": "ReferenceCounter",
+  "table": "declarations_referencecounter",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "key",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 60,
+    "unique": true
+   },
+   {
+    "name": "value",
+    "type": "PositiveIntegerField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "declarations",
+  "model": "Declaration",
+  "table": "declarations_declaration",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "created_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "updated_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "is_archived",
+    "type": "BooleanField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "archived_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "archived_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "uuid",
+    "type": "UUIDField",
+    "rel": "",
+    "null": false,
+    "max": 32,
+    "unique": true
+   },
+   {
+    "name": "created_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "updated_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "reference",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 50,
+    "unique": true
+   },
+   {
+    "name": "status",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 30,
+    "unique": false
+   },
+   {
+    "name": "hospital",
+    "type": "ForeignKey",
+    "rel": "Hospital",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "hospital_document_ref",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 100,
+    "unique": false
+   },
+   {
+    "name": "doctor_name",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 150,
+    "unique": false
+   },
+   {
+    "name": "midwife_name",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 150,
+    "unique": false
+   },
+   {
+    "name": "birth_date",
+    "type": "DateField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "birth_time",
+    "type": "TimeField",
+    "rel": "",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "birth_place",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 200,
+    "unique": false
+   },
+   {
+    "name": "notes",
+    "type": "TextField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "received_at",
+    "type": "DateField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "assigned_to",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "last_decision_reason",
+    "type": "TextField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "transmitted_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "validated_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "validated_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "declarations",
+  "model": "Child",
+  "table": "declarations_child",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "created_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "updated_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "is_archived",
+    "type": "BooleanField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "archived_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "archived_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "uuid",
+    "type": "UUIDField",
+    "rel": "",
+    "null": false,
+    "max": 32,
+    "unique": true
+   },
+   {
+    "name": "declaration",
+    "type": "OneToOneField",
+    "rel": "Declaration",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "first_names",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 150,
+    "unique": false
+   },
+   {
+    "name": "last_name",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 100,
+    "unique": false
+   },
+   {
+    "name": "gender",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 1,
+    "unique": false
+   },
+   {
+    "name": "nationality",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 100,
+    "unique": false
+   },
+   {
+    "name": "npi",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 50,
+    "unique": false
+   },
+   {
+    "name": "birth_rank",
+    "type": "PositiveSmallIntegerField",
+    "rel": "",
+    "null": true,
+    "max": null,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "declarations",
+  "model": "Parent",
+  "table": "declarations_parent",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "created_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "updated_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "is_archived",
+    "type": "BooleanField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "archived_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "archived_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "uuid",
+    "type": "UUIDField",
+    "rel": "",
+    "null": false,
+    "max": 32,
+    "unique": true
+   },
+   {
+    "name": "declaration",
+    "type": "ForeignKey",
+    "rel": "Declaration",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "parent_type",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 10,
+    "unique": false
+   },
+   {
+    "name": "first_names",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 150,
+    "unique": false
+   },
+   {
+    "name": "last_name",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 100,
+    "unique": false
+   },
+   {
+    "name": "date_of_birth",
+    "type": "DateField",
+    "rel": "",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "birth_place",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 200,
+    "unique": false
+   },
+   {
+    "name": "age",
+    "type": "PositiveSmallIntegerField",
+    "rel": "",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "nationality",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 100,
+    "unique": false
+   },
+   {
+    "name": "npi",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 50,
+    "unique": false
+   },
+   {
+    "name": "profession",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 100,
+    "unique": false
+   },
+   {
+    "name": "address",
+    "type": "TextField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "phone",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 20,
+    "unique": false
+   },
+   {
+    "name": "id_type",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 50,
+    "unique": false
+   },
+   {
+    "name": "id_number",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 50,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "declarations",
+  "model": "Declarant",
+  "table": "declarations_declarant",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "created_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "updated_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "is_archived",
+    "type": "BooleanField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "archived_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "archived_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "uuid",
+    "type": "UUIDField",
+    "rel": "",
+    "null": false,
+    "max": 32,
+    "unique": true
+   },
+   {
+    "name": "declaration",
+    "type": "OneToOneField",
+    "rel": "Declaration",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "first_names",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 150,
+    "unique": false
+   },
+   {
+    "name": "last_name",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 100,
+    "unique": false
+   },
+   {
+    "name": "relationship",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 50,
+    "unique": false
+   },
+   {
+    "name": "nationality",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 100,
+    "unique": false
+   },
+   {
+    "name": "npi",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 50,
+    "unique": false
+   },
+   {
+    "name": "profession",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 100,
+    "unique": false
+   },
+   {
+    "name": "phone",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 20,
+    "unique": false
+   },
+   {
+    "name": "address",
+    "type": "TextField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "id_type",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 50,
+    "unique": false
+   },
+   {
+    "name": "id_number",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 50,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "declarations",
+  "model": "StatusHistory",
+  "table": "declarations_statushistory",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "declaration",
+    "type": "ForeignKey",
+    "rel": "Declaration",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "from_status",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 30,
+    "unique": false
+   },
+   {
+    "name": "to_status",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 30,
+    "unique": false
+   },
+   {
+    "name": "changed_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "changed_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "reason",
+    "type": "TextField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "actes",
+  "model": "Acte",
+  "table": "actes_acte",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "created_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "updated_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "is_archived",
+    "type": "BooleanField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "archived_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "archived_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "uuid",
+    "type": "UUIDField",
+    "rel": "",
+    "null": false,
+    "max": 32,
+    "unique": true
+   },
+   {
+    "name": "created_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "updated_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "declaration",
+    "type": "OneToOneField",
+    "rel": "Declaration",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "annee",
+    "type": "PositiveSmallIntegerField",
+    "rel": "",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "registre",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 50,
+    "unique": false
+   },
+   {
+    "name": "feuillet",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 50,
+    "unique": false
+   },
+   {
+    "name": "numero_acte",
+    "type": "CharField",
+    "rel": "",
+    "null": true,
+    "max": 50,
+    "unique": false
+   },
+   {
+    "name": "numero_assigned_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "numero_assigned_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "region",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 100,
+    "unique": false
+   },
+   {
+    "name": "prefecture",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 100,
+    "unique": false
+   },
+   {
+    "name": "commune",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 100,
+    "unique": false
+   },
+   {
+    "name": "centre",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 150,
+    "unique": false
+   },
+   {
+    "name": "declaration_date",
+    "type": "DateField",
+    "rel": "",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "officer_name",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 150,
+    "unique": false
+   },
+   {
+    "name": "mentions",
+    "type": "TextField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "actes",
+  "model": "NumberSequence",
+  "table": "actes_numbersequence",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "annee",
+    "type": "PositiveSmallIntegerField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "registre",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 50,
+    "unique": false
+   },
+   {
+    "name": "last_value",
+    "type": "PositiveIntegerField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "actes",
+  "model": "PrintLog",
+  "table": "actes_printlog",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "acte",
+    "type": "ForeignKey",
+    "rel": "Acte",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "printed_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "printed_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "copy_number",
+    "type": "PositiveSmallIntegerField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "actes",
+  "model": "Delivery",
+  "table": "actes_delivery",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "created_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "updated_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "is_archived",
+    "type": "BooleanField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "archived_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "archived_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "uuid",
+    "type": "UUIDField",
+    "rel": "",
+    "null": false,
+    "max": 32,
+    "unique": true
+   },
+   {
+    "name": "acte",
+    "type": "ForeignKey",
+    "rel": "Acte",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "delivered_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "recipient_name",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 200,
+    "unique": false
+   },
+   {
+    "name": "recipient_relationship",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 100,
+    "unique": false
+   },
+   {
+    "name": "recipient_id_type",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 50,
+    "unique": false
+   },
+   {
+    "name": "recipient_id_number",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 50,
+    "unique": false
+   },
+   {
+    "name": "is_duplicate",
+    "type": "BooleanField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "notes",
+    "type": "TextField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "delivered_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "documents",
+  "model": "StoredFile",
+  "table": "documents_storedfile",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "name",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 255,
+    "unique": true
+   },
+   {
+    "name": "content",
+    "type": "BinaryField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "size",
+    "type": "PositiveIntegerField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "documents",
+  "model": "SupportingDocument",
+  "table": "documents_supportingdocument",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "created_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "updated_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "is_archived",
+    "type": "BooleanField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "archived_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "archived_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "uuid",
+    "type": "UUIDField",
+    "rel": "",
+    "null": false,
+    "max": 32,
+    "unique": true
+   },
+   {
+    "name": "declaration",
+    "type": "ForeignKey",
+    "rel": "Declaration",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "kind",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 20,
+    "unique": false
+   },
+   {
+    "name": "file",
+    "type": "FileField",
+    "rel": "",
+    "null": false,
+    "max": 255,
+    "unique": false
+   },
+   {
+    "name": "original_name",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 255,
+    "unique": false
+   },
+   {
+    "name": "content_type",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 100,
+    "unique": false
+   },
+   {
+    "name": "size",
+    "type": "PositiveIntegerField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "sha256",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 64,
+    "unique": false
+   },
+   {
+    "name": "description",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 255,
+    "unique": false
+   },
+   {
+    "name": "uploaded_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "audit",
+  "model": "AuditLog",
+  "table": "audit_auditlog",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "created_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "user",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "username",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 150,
+    "unique": false
+   },
+   {
+    "name": "action",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 40,
+    "unique": false
+   },
+   {
+    "name": "object_type",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 60,
+    "unique": false
+   },
+   {
+    "name": "object_id",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 64,
+    "unique": false
+   },
+   {
+    "name": "object_repr",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 255,
+    "unique": false
+   },
+   {
+    "name": "changes",
+    "type": "JSONField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "reason",
+    "type": "TextField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "ip_address",
+    "type": "GenericIPAddressField",
+    "rel": "",
+    "null": true,
+    "max": 39,
+    "unique": false
+   },
+   {
+    "name": "user_agent",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 255,
+    "unique": false
+   }
+  ]
+ },
+ {
+  "app": "core",
+  "model": "SiteSetting",
+  "table": "core_sitesetting",
+  "fields": [
+   {
+    "name": "id",
+    "type": "BigAutoField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": true
+   },
+   {
+    "name": "created_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "updated_at",
+    "type": "DateTimeField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "key",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 100,
+    "unique": true
+   },
+   {
+    "name": "value",
+    "type": "TextField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "description",
+    "type": "CharField",
+    "rel": "",
+    "null": false,
+    "max": 255,
+    "unique": false
+   },
+   {
+    "name": "is_public",
+    "type": "BooleanField",
+    "rel": "",
+    "null": false,
+    "max": null,
+    "unique": false
+   },
+   {
+    "name": "updated_by",
+    "type": "ForeignKey",
+    "rel": "CustomUser",
+    "null": true,
+    "max": null,
+    "unique": false
+   }
+  ]
+ }
+]

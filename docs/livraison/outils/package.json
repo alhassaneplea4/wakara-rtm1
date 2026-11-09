@@ -1,0 +1,13 @@
+{
+  "name": "wakara-dossier-livraison",
+  "private": true,
+  "type": "module",
+  "description": "Génère le dossier de livraison Wakara (Word + PDF) à partir des contenus du dossier contenus/",
+  "scripts": {
+    "schemas": "node diagrammes.mjs",
+    "build": "node generer.mjs"
+  },
+  "dependencies": {
+    "docx": "^9.5.0"
+  }
+}
