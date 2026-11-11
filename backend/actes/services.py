@@ -33,19 +33,49 @@ def ensure_acte(declaration: Declaration, user) -> Acte:
         prefecture=get_setting('acte.default_prefecture'),
         commune=get_setting('acte.default_commune'),
         centre=get_setting('acte.default_centre'),
+        officer_name=get_setting('acte.default_officer'),
         created_by=user, updated_by=user,
     )
     audit.log(AuditAction.CREATE, user=user, obj=acte, changes={'declaration': declaration.reference})
     return acte
 
 
-def can_edit_acte(user, acte) -> bool:
+def can_edit_acte_in_status(user, status) -> bool:
     from core.permissions import user_has_perm
-    status = acte.declaration.status
     if not user_has_perm(user, 'acte.update'):
         return False
     return status in Status.ACTE_EDITABLE or (
         status in Status.VALIDATOR_EDITABLE and user_has_perm(user, 'dossier.validate'))
+
+
+def can_edit_acte(user, acte) -> bool:
+    return can_edit_acte_in_status(user, acte.declaration.status)
+
+
+ACTE_EDITABLE_FIELDS = ['annee', 'registre', 'feuillet', 'region', 'prefecture', 'commune', 'centre',
+                        'declaration_date', 'officer_name', 'mentions']
+
+
+@transaction.atomic
+def update_acte_data(user, declaration: Declaration, data: dict) -> Acte:
+    """
+    Registry references / declaration date / officer / mentions, sent together with the dossier by the
+    secretariat. The acte is created if the dossier does not have one yet. The OFFICIAL number is never
+    written here: it is attributed at validation.
+    """
+    if not can_edit_acte_in_status(user, declaration.status):
+        raise PermissionDenied("Les références de l'acte ne peuvent pas être modifiées par vous ou dans l'état actuel du dossier.")
+    acte = ensure_acte(declaration, user)
+    before = audit.snapshot(acte, ACTE_EDITABLE_FIELDS)
+    for field, value in data.items():
+        if field in ACTE_EDITABLE_FIELDS:
+            setattr(acte, field, value)
+    acte.updated_by = user
+    acte.save()
+    changes = audit.diff(before, audit.snapshot(acte, ACTE_EDITABLE_FIELDS))
+    if changes:
+        audit.log(AuditAction.UPDATE, user=user, obj=acte, changes=changes)
+    return acte
 
 
 @transaction.atomic

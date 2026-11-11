@@ -16,7 +16,6 @@ interface NavItem { label: string; icon: string; link: string; perms: string[]; 
 const NAV: NavItem[] = [
   { label: 'Tableau de bord', icon: 'dashboard', link: '/dashboard', perms: ['stats.view'] },
   { label: 'Déclarations', icon: 'file', link: '/declarations', perms: ['declaration.view'] },
-  { label: 'File du secrétariat', icon: 'paper', link: '/secretariat', perms: ['acte.complete', 'acte.update'] },
   { label: 'File de validation', icon: 'shield', link: '/validation', perms: ['dossier.validate'] },
   { label: 'Actes de naissance', icon: 'certificate', link: '/actes', perms: ['acte.view'] },
   { label: 'Délivrances', icon: 'download', link: '/deliveries', perms: ['acte.view'] },
@@ -198,7 +197,7 @@ export class ShellComponent implements OnInit {
   logout() { this.open.set(''); this.navOpen.set(false); this.auth.logout(); }
 
   inboxLink(status: string): string {
-    return status === 'PENDING_VALIDATION' ? '/validation' : ['TRANSMITTED', 'IN_COMPLETION', 'TO_CORRECT_SECRETARIAT'].includes(status) && this.auth.can('acte.update') ? '/secretariat' : '/declarations';
+    return status === 'PENDING_VALIDATION' ? '/validation' : '/declarations';
   }
   search(e: Event) {
     e.preventDefault();

@@ -50,6 +50,8 @@ def user_transitions(user, declaration):
     for t in available_transitions(declaration.status):
         if t.via_delivery or not user_has_perm(user, t.permission):
             continue
+        if t.target == Status.IN_COMPLETION:
+            continue  # « Prendre en charge » is no longer offered: the secretariat edits the transmitted dossier directly
         if t.source in (Status.DRAFT, Status.TO_CORRECT_COLLECTION):
             if not (user_has_perm(user, 'declaration.view_all') or declaration.created_by_id == user.id):
                 continue
@@ -113,7 +115,16 @@ FIELD_LABELS = {
     'father.birth_place': 'lieu de naissance du père', 'father.nationality': 'nationalité du père',
     'father.profession': 'profession du père', 'father.address': 'domicile du père',
     'declarant.relationship': "lien du déclarant avec l'enfant",
-    'acte.registre': 'registre', 'acte.feuillet': 'feuillet',
+    'acte.registre': 'registre', 'acte.feuillet': 'feuillet', 'acte.annee': 'année du registre',
+    'acte.officer_name': "officier d'état civil",
+    'child.first_names': "prénoms de l'enfant", 'child.last_name': "nom de l'enfant", 'child.birth_rank': "rang de naissance de l'enfant",
+    'mother.first_names': 'prénoms de la mère', 'mother.last_name': 'nom de la mère', 'mother.age': 'âge de la mère',
+    'mother.phone': 'téléphone de la mère',
+    'father.first_names': 'prénoms du père', 'father.last_name': 'nom du père', 'father.age': 'âge du père',
+    'father.phone': 'téléphone du père',
+    'declarant.first_names': 'prénoms du déclarant', 'declarant.last_name': 'nom du déclarant',
+    'declarant.nationality': 'nationalité du déclarant', 'declarant.profession': 'profession du déclarant',
+    'declarant.address': 'domicile du déclarant', 'declarant.phone': 'téléphone du déclarant',
 }
 
 
@@ -155,6 +166,7 @@ def update_declaration(user, declaration: Declaration, data: dict) -> Declaratio
     mother = data.pop('mother', None)
     father = data.pop('father', None)
     declarant = data.pop('declarant', None)
+    acte_data = data.pop('acte', None)
 
     for field, value in data.items():
         setattr(declaration, field, value)
@@ -171,6 +183,9 @@ def update_declaration(user, declaration: Declaration, data: dict) -> Declaratio
     if declarant is not None:
         obj, _ = Declarant.objects.get_or_create(declaration=declaration)
         _apply(obj, declarant)
+    if acte_data is not None:
+        from actes.services import update_acte_data
+        update_acte_data(user, declaration, acte_data)
 
     declaration = Declaration.objects.get(pk=declaration.pk)
     changes = audit.diff(before, _full_snapshot(declaration))
@@ -264,7 +279,8 @@ def transition_status(declaration_pk, target: str, user, reason: str = '', paylo
             raise ValidationError({'missing_fields': missing, 'detail': (
                 "Informations obligatoires manquantes : "
                 + ', '.join(FIELD_LABELS.get(m, m) for m in missing))})
-    if target == Status.IN_COMPLETION:
+    if target in (Status.IN_COMPLETION, Status.TRANSMITTED):
+        # the acte dossier exists as soon as the declaration reaches the secretariat (registry header to fill in)
         from actes.services import ensure_acte
         ensure_acte(declaration, user)
     incomplete = []

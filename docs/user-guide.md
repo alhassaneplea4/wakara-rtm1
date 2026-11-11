@@ -21,10 +21,14 @@ Vous ne voyez que vos propres déclarations. Vous ne pouvez plus modifier un dos
 
 ## Secrétaire d'état civil
 
-1. **File du secrétariat** : ouvrez un dossier *Transmis* puis **Prendre en charge**.
-2. Renseignez le déclarant et corrigez l'identité si besoin (**Modifier**), puis **Compléter l'acte** : année, registre,
-   feuillet, commune, centre, date de déclaration, mentions.
-3. **Soumettre à validation** (les informations minimales sont vérifiées).
+1. **Déclarations** (une seule page, pastille = dossiers à traiter) : ouvrez un dossier *Transmis*. La fiche n'offre que
+   **Modifier** et **Aperçu de l'acte**.
+2. **Modifier** : le formulaire commence par l'en-tête du registre (année, registre, feuillet, N° officiel attribué à la
+   validation), la circonscription, la date de déclaration, l'officier d'état civil (pré-rempli) et les mentions ; vient
+   ensuite la déclaration (enfant, **père obligatoire**, mère, déclarant).
+3. **Enregistrer et envoyer à la validation de l'administrateur** : possible seulement si **tous les champs sont
+   renseignés, sauf le NPI** ; les champs manquants sont marqués en rouge. **Enregistrer les modifications** garde la
+   saisie en cours sans envoyer le dossier.
 4. Après validation : **Aperçu de l'acte → Imprimer** (l'impression est enregistrée), puis **Enregistrer la délivrance**
    (nom du bénéficiaire, qualité, pièce). Une nouvelle délivrance est marquée *Duplicata*.
 

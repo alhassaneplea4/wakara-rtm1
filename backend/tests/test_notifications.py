@@ -12,14 +12,14 @@ class MenuBadgeTests(WakaraTestCase):
         self.assertEqual(self.badges(self.agent), {'/declarations': 1})
         # transmitted: the secretariat has work, the agent has nothing left to fill
         self.transition(self.agent, draft['uuid'], 'TRANSMITTED')
-        self.assertEqual(self.badges(self.secretary).get('/secretariat'), 1)
+        self.assertEqual(self.badges(self.secretary).get('/declarations'), 1)
         self.assertNotIn('/declarations', self.badges(self.agent))
         self.assertNotIn('/validation', self.badges(self.secretary))
         # pending validation: only the validator sees it in his queue; the secretary's badge goes away
         self.advance_to_pending(self.create_declaration()['uuid'])
         self.assertEqual(self.badges(self.admin).get('/validation'), 1)
         self.assertNotIn('/validation', self.badges(self.agent))
-        self.assertEqual(self.badges(self.secretary).get('/secretariat'), 1)  # the first, still transmitted dossier
+        self.assertEqual(self.badges(self.secretary).get('/declarations'), 1)  # the first, still transmitted dossier
 
     def test_returned_to_the_agent_shows_up_in_his_badge(self):
         d = self.create_declaration()
@@ -88,7 +88,7 @@ class SecretariatTreatmentTests(WakaraTestCase):
         queue = self.client_for(self.admin).get('/api/declarations/?status=PENDING_VALIDATION').data['results']
         self.assertIn(d['uuid'], [x['uuid'] for x in queue])
         # the secretariat's badge is gone, the validator's appears
-        self.assertNotIn('/secretariat', self.client_for(self.secretary).get('/api/inbox/').data['badges'])
+        self.assertNotIn('/declarations', self.client_for(self.secretary).get('/api/inbox/').data['badges'])
         self.assertEqual(self.client_for(self.admin).get('/api/inbox/').data['badges'].get('/validation'), 1)
 
     def test_the_agent_cannot_skip_the_secretariat(self):

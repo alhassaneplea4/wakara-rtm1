@@ -266,10 +266,22 @@ DECLARATION_REQUIRED_FOR_TRANSMISSION = config(
     default='birth_date,birth_time,birth_place,child.gender',
     cast=Csv(),
 )
-# Minimum data required to SUBMIT an acte to validation.
+# Data required to SUBMIT a dossier to validation (secretariat): every field of the form EXCEPT the NPI
+# (child, father, mother, declarant) and the optional free-text ones (observations, mentions, hospital paperwork:
+# reference, doctor, midwife). The official number is attributed at validation, so it is not part of the list.
+DEFAULT_ACTE_REQUIRED_FOR_SUBMISSION = (
+    'birth_date,birth_time,birth_place,hospital,'
+    'child.first_names,child.last_name,child.gender,child.nationality,child.birth_rank,'
+    'father.first_names,father.last_name,father.date_of_birth,father.birth_place,father.age,father.nationality,'
+    'father.profession,father.address,father.phone,'
+    'mother.first_names,mother.last_name,mother.date_of_birth,mother.birth_place,mother.age,mother.nationality,'
+    'mother.profession,mother.address,mother.phone,'
+    'declarant.first_names,declarant.last_name,declarant.relationship,declarant.nationality,declarant.profession,'
+    'declarant.address,declarant.phone,'
+    'acte.annee,acte.registre,acte.feuillet,acte.declaration_date,acte.officer_name')
 ACTE_REQUIRED_FOR_SUBMISSION = config(
     'ACTE_REQUIRED_FOR_SUBMISSION',
-    default='acte.declaration_date,declarant.name',
+    default=DEFAULT_ACTE_REQUIRED_FOR_SUBMISSION,
     cast=Csv(),
 )
 # Fields the validator is warned about when they are still empty at the FINAL validation. The validator may

@@ -43,7 +43,7 @@ comptes de démonstration sont créés avec les valeurs de `backend/.env` (`WAKA
 | Rôle | Peut faire | Ne peut pas |
 |---|---|---|
 | **Agent de collecte** | Créer, modifier (brouillon / à corriger) et transmettre ses déclarations, joindre des pièces | Voir les dossiers des autres, valider, imprimer |
-| **Secrétaire d'état civil** | Prendre en charge un dossier, compléter l'acte, soumettre à validation, imprimer et délivrer un acte validé | Valider ou rejeter |
+| **Secrétaire d'état civil** | Compléter le dossier et l'acte (un seul formulaire), l'envoyer à la validation, imprimer et délivrer un acte validé | Valider ou rejeter |
 | **Administrateur technique Wakara** | Valider / retourner / rejeter, gérer utilisateurs, rôles, permissions, établissements, paramètres, journaux | — (n'est **pas** superuser Django) |
 
 Les permissions sont **granulaires** (32 codes, voir `backend/core/permissions.py`) et ajustables

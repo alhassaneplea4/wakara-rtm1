@@ -43,8 +43,9 @@ class Status:
 
     # Statuses in which the hospital declaration data may still be edited.
     DECLARATION_EDITABLE = (DRAFT, TO_CORRECT_COLLECTION)
-    # Statuses in which the secretariat (acte.update) may correct the declaration data and complete the acte.
-    ACTE_EDITABLE = (IN_COMPLETION, TO_CORRECT_SECRETARIAT)
+    # Statuses in which the secretariat (acte.update) may correct the declaration data and complete the acte
+    # (registry references, declaration date, officer): from the moment the agent has transmitted the dossier.
+    ACTE_EDITABLE = (TRANSMITTED, IN_COMPLETION, TO_CORRECT_SECRETARIAT)
     # ... and the declaration data alone, as soon as the agent has transmitted it.
     SECRETARIAT_DATA_EDITABLE = (TRANSMITTED, IN_COMPLETION, TO_CORRECT_SECRETARIAT)
     # While the dossier waits for the final decision, only a validator may still work on it;

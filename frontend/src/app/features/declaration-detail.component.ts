@@ -35,7 +35,7 @@ const MAIN_FLOW = [
 
 const STEP_TEXT: Record<string, { title: string; help: string; icon: string; tone: string }> = {
   DRAFT: { title: 'Déclaration créée', help: "L'agent de collecte a enregistré la déclaration. Elle reste modifiable par lui tant qu'elle n'est pas transmise.", icon: 'file', tone: 'info' },
-  TRANSMITTED: { title: 'Transmise au secrétariat', help: "La déclaration est envoyée au secrétariat d'état civil, qui peut la prendre en charge ou la traiter directement.", icon: 'arrow', tone: 'info' },
+  TRANSMITTED: { title: 'Transmise au secrétariat', help: "La déclaration est envoyée au secrétariat d'état civil, qui la complète (références du registre, père, déclarant) puis l'envoie à la validation.", icon: 'arrow', tone: 'info' },
   IN_COMPLETION: { title: 'Prise en charge par le secrétariat', help: 'Le secrétariat complète le dossier : informations manquantes, déclarant, registre et feuillet.', icon: 'paper', tone: 'info' },
   PENDING_VALIDATION: { title: 'Envoyée à la validation', help: "Le dossier est prêt côté secrétariat. L'administrateur technique doit décider : valider, renvoyer pour correction ou rejeter.", icon: 'shield', tone: 'warning' },
   TO_CORRECT_COLLECTION: { title: 'Renvoyée à la collecte pour correction', help: "L'administrateur demande à l'agent de collecte de corriger la déclaration, puis de la retransmettre.", icon: 'history', tone: 'warning' },
@@ -55,7 +55,6 @@ const STEP_TEXT: Record<string, { title: string; help: string; icon: string; ton
           <wk-status [status]="d.status" />
           @if (d.can_edit) { <a class="btn" [routerLink]="['/declarations', d.uuid, 'edit']"><wk-icon name="edit" [size]="16" /> Modifier</a> }
           @if (d.acte_uuid && auth.can('acte.view')) {
-            @if (acte()?.can_edit) { <a class="btn" [routerLink]="['/declarations', d.uuid, 'acte']"><wk-icon name="certificate" [size]="16" /> Compléter l'acte</a> }
             <a class="btn" [routerLink]="['/actes', d.acte_uuid, 'document']"><wk-icon name="eye" [size]="16" /> Aperçu de l'acte</a>
           }
         </wk-page-header>
@@ -65,14 +64,14 @@ const STEP_TEXT: Record<string, { title: string; help: string; icon: string; ton
           <div class="alert alert-warning" style="margin-bottom:16px"><strong>Motif du retour / rejet :</strong> {{ d.last_decision_reason }}</div>
         }
 
-        @if (d.available_transitions.length) {
+        @if (actions(d).length) {
           <section class="card actions" [class.decision]="isDecision(d)">
             <div>
               <h2>{{ isDecision(d) ? 'Décision finale' : 'Actions sur le dossier' }}</h2>
               <p class="soft">{{ isDecision(d) ? 'Vérifiez le dossier complet ci-dessous puis validez, retournez ou rejetez.' : 'Les actions affichées dépendent de votre rôle et de l\\'état du dossier.' }}</p>
             </div>
             <div class="row">
-              @for (t of d.available_transitions; track t.target) {
+              @for (t of actions(d); track t.target) {
                 <button class="btn" [ngClass]="meta(t).cls" (click)="start(t)"><wk-icon [name]="meta(t).icon" [size]="16" /> {{ meta(t).label }}</button>
               }
             </div>
@@ -291,6 +290,12 @@ export class DeclarationDetailComponent implements OnInit {
   label(s: string) { return STATUS_LABELS[s as Status] ?? s; }
   meta(t: AvailableTransition) { return ACTION[t.target] ?? { label: t.target, icon: 'arrow', cls: '' }; }
   isDecision(d: DeclarationDetail) { return d.status === 'PENDING_VALIDATION'; }
+  /**
+   * Buttons of the « Actions sur le dossier » card. « Prendre en charge » no longer exists and « Soumettre à
+   * validation » is done from the edit form (it needs every field filled in), so the secretariat only keeps
+   * « Modifier » and « Aperçu ».
+   */
+  actions(d: DeclarationDetail) { return d.available_transitions.filter(t => t.target !== 'IN_COMPLETION' && t.target !== 'PENDING_VALIDATION'); }
   frozen(d: DeclarationDetail) { return ['VALIDATED', 'REJECTED', 'DELIVERED'].includes(d.status); }
   /** Plain-language reading of every workflow step, newest first. */
   history(d: DeclarationDetail) {

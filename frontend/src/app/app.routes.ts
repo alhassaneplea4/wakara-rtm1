@@ -20,9 +20,11 @@ export const routes: Routes = [
       { path: 'declarations', canActivate: [permissionGuard], data: { perms: ['declaration.view'], mode: 'all' }, title: 'Déclarations — Wakara', loadComponent: () => import('./features/declarations-list.component').then(m => m.DeclarationsListComponent) },
       { path: 'declarations/new', canActivate: [permissionGuard], data: { perms: ['declaration.create'] }, title: 'Nouvelle déclaration — Wakara', loadComponent: () => import('./features/declaration-form.component').then(m => m.DeclarationFormComponent) },
       { path: 'declarations/:uuid/edit', canActivate: [permissionGuard], data: { perms: ['declaration.update', 'acte.update'] }, title: 'Modifier la déclaration — Wakara', loadComponent: () => import('./features/declaration-form.component').then(m => m.DeclarationFormComponent) },
-      { path: 'declarations/:uuid/acte', canActivate: [permissionGuard], data: { perms: ['acte.view'] }, title: "Complément de l'acte — Wakara", loadComponent: () => import('./features/acte-form.component').then(m => m.ActeFormComponent) },
+      // the acte header now sits at the top of the edit form
+      { path: 'declarations/:uuid/acte', redirectTo: 'declarations/:uuid/edit' },
       { path: 'declarations/:uuid', canActivate: [permissionGuard], data: { perms: ['declaration.view'] }, title: 'Dossier — Wakara', loadComponent: () => import('./features/declaration-detail.component').then(m => m.DeclarationDetailComponent) },
-      { path: 'secretariat', canActivate: [permissionGuard], data: { perms: ['acte.complete', 'acte.update'], mode: 'secretariat' }, title: 'File du secrétariat — Wakara', loadComponent: () => import('./features/declarations-list.component').then(m => m.DeclarationsListComponent) },
+      // the secretariat queue is merged into « Déclarations »
+      { path: 'secretariat', pathMatch: 'full', redirectTo: 'declarations' },
       { path: 'validation', canActivate: [permissionGuard], data: { perms: ['dossier.validate'], mode: 'validation' }, title: 'File de validation — Wakara', loadComponent: () => import('./features/declarations-list.component').then(m => m.DeclarationsListComponent) },
       { path: 'actes', canActivate: [permissionGuard], data: { perms: ['acte.view'] }, title: 'Actes de naissance — Wakara', loadComponent: () => import('./features/actes-list.component').then(m => m.ActesListComponent) },
       { path: 'actes/:uuid/document', canActivate: [permissionGuard], data: { perms: ['acte.view'] }, title: "Acte de naissance — Wakara", loadComponent: () => import('./features/acte-document.component').then(m => m.ActeDocumentComponent) },

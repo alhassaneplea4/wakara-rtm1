@@ -35,6 +35,23 @@ FIRST = ['Fatoumata', 'Mohamed', 'Mariama', 'Ibrahima', 'Aissatou', 'Mamadou', '
 LAST = ['Bah', 'Diallo', 'Camara', 'Fofana', 'Sylla', 'Barry', 'Soumah', 'Keïta', 'Condé', 'Touré']
 
 
+def complete_dossier(d, secretary, today, registre='DEMO'):
+    """What the secretariat fills in before sending a dossier to validation (every field but the NPI)."""
+    person = {'date_of_birth': datetime.date(1992, 3, 14), 'birth_place': 'Conakry', 'age': 34,
+              'nationality': 'Guinéenne', 'profession': 'Commerçant(e)', 'address': 'Ratoma, Conakry',
+              'phone': '+224 622 00 00 00'}
+    services.update_declaration(secretary, Declaration.objects.get(pk=d.pk), {
+        'child': {'nationality': 'Guinéenne', 'birth_rank': 1},
+        'mother': person,
+        'father': {**person, 'first_names': 'Oumar', 'last_name': 'Démo'},
+        'declarant': {'first_names': 'Oumar', 'last_name': 'Démo', 'relationship': 'Père',
+                      'nationality': 'Guinéenne', 'profession': 'Commerçant(e)', 'address': 'Ratoma, Conakry',
+                      'phone': '+224 622 00 00 00'},
+        'acte': {'annee': today.year, 'registre': registre, 'feuillet': '1', 'declaration_date': today,
+                 'officer_name': 'AMADOU KONIA CAMARA'},
+    })
+
+
 class Command(BaseCommand):
     help = "Données de démonstration FICTIVES (développement uniquement)."
 
@@ -84,7 +101,7 @@ class Command(BaseCommand):
                 'hospital': random.choice(hospitals), 'birth_date': birth,
                 'hospital_document_ref': f'DEMO-{i + 1:04d}',
                 'doctor_name': 'Dr Démo', 'midwife_name': 'Sage-femme Démo',
-                'birth_place': 'Ratoma',
+                'birth_place': 'Ratoma', 'birth_time': datetime.time(9, 0),
                 'child': {'first_names': random.choice(FIRST), 'last_name': random.choice(LAST),
                           'gender': random.choice('MF')},
                 'mother': {'first_names': random.choice(FIRST), 'last_name': random.choice(LAST),
@@ -99,23 +116,14 @@ class Command(BaseCommand):
                 continue
             if target == Status.TO_CORRECT_COLLECTION:
                 services.transition_status(d.pk, Status.IN_COMPLETION, secretary)
-                services.update_declaration(secretary, Declaration.objects.get(pk=d.pk), {
-                    'declarant': {'first_names': 'Démo', 'last_name': 'Déclarant'}})
-                acte = Declaration.objects.get(pk=d.pk).acte
-                acte.declaration_date = today
-                acte.save()
+                complete_dossier(d, secretary, today)
                 services.transition_status(d.pk, Status.PENDING_VALIDATION, secretary)
                 services.transition_status(d.pk, Status.TO_CORRECT_COLLECTION, admin, 'Information illisible (démo)')
                 continue
             services.transition_status(d.pk, Status.IN_COMPLETION, secretary)
             if target == Status.IN_COMPLETION:
                 continue
-            services.update_declaration(secretary, Declaration.objects.get(pk=d.pk), {
-                'declarant': {'first_names': 'Démo', 'last_name': 'Déclarant', 'relationship': 'Père'}})
-            acte = Declaration.objects.get(pk=d.pk).acte
-            acte.declaration_date = today
-            acte.registre = 'DEMO'
-            acte.save()
+            complete_dossier(d, secretary, today)
             services.transition_status(d.pk, Status.PENDING_VALIDATION, secretary)
             if target == Status.PENDING_VALIDATION:
                 continue

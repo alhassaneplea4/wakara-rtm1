@@ -3,6 +3,7 @@ import datetime
 
 from django.core.cache import cache
 from django.core.management import call_command
+from django.test import override_settings
 from rest_framework.test import APIClient, APITestCase
 
 from accounts.models import CustomUser, Role, UserRole
@@ -20,6 +21,12 @@ def make_user(username, role=None, **extra):
     return user
 
 
+# Workflow tests move many small dossiers through the circuit: they use the minimal submission rule. The real
+# rule (every field but the NPI) is exercised in tests/test_secretariat_form.py.
+MINIMAL_SUBMISSION = ['acte.declaration_date', 'declarant.name']
+
+
+@override_settings(ACTE_REQUIRED_FOR_SUBMISSION=MINIMAL_SUBMISSION)
 class WakaraTestCase(APITestCase):
     @classmethod
     def setUpTestData(cls):

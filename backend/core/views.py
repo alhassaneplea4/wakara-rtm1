@@ -91,11 +91,15 @@ class InboxView(APIView):
                 badges[route] = count
 
         has = lambda perm: user_has_perm(request.user, perm)  # noqa: E731
-        badge('/secretariat', qs.filter(status__in=Status.SECRETARIAT_DATA_EDITABLE).count(),
-              has('acte.complete') or has('acte.update'))
         badge('/validation', qs.filter(status=Status.PENDING_VALIDATION).count(), has('dossier.validate'))
-        # agent: corrections requested + own drafts still to finish
-        to_fill = qs.filter(status=Status.TO_CORRECT_COLLECTION).count()             + qs.filter(status=Status.DRAFT, created_by=request.user).count()
-        badge('/declarations', to_fill, has('declaration.update'))
+        # « Déclarations »: for the agent, corrections requested + own drafts still to finish; for the
+        # secretariat, the dossiers it has to treat (the former « File du secrétariat », now the same page)
+        to_fill = 0
+        if has('declaration.update'):
+            to_fill += qs.filter(status=Status.TO_CORRECT_COLLECTION).count() \
+                + qs.filter(status=Status.DRAFT, created_by=request.user).count()
+        if has('acte.complete') or has('acte.update'):
+            to_fill += qs.filter(status__in=Status.SECRETARIAT_DATA_EDITABLE).count()
+        badge('/declarations', to_fill, True)
         badge('/actes', qs.filter(status=Status.VALIDATED).count(), has('acte.deliver'))
         return Response({'total': sum(i['count'] for i in items), 'items': items, 'badges': badges})

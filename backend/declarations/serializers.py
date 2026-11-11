@@ -1,6 +1,7 @@
 """Serializers for the declarations app."""
 from rest_framework import serializers
 
+from actes.serializers import ActeUpdateSerializer
 from core.validators import normalize_phone
 from core.workflow import Status
 from hospitals.models import Hospital
@@ -156,6 +157,8 @@ class DeclarationWriteSerializer(serializers.ModelSerializer):
     mother = ParentSerializer(required=False, allow_null=True)
     father = ParentSerializer(required=False, allow_null=True)
     declarant = DeclarantSerializer(required=False, allow_null=True)
+    # registry references etc.: only the secretariat / validator may send it (checked in the service)
+    acte = ActeUpdateSerializer(required=False)
     hospital = serializers.SlugRelatedField(
         slug_field='uuid', queryset=Hospital.objects.all(), required=False, allow_null=True)
 
@@ -164,7 +167,7 @@ class DeclarationWriteSerializer(serializers.ModelSerializer):
         fields = [
             'hospital', 'hospital_document_ref', 'doctor_name', 'midwife_name',
             'birth_date', 'birth_time', 'birth_place', 'notes',
-            'child', 'mother', 'father', 'declarant',
+            'child', 'mother', 'father', 'declarant', 'acte',
         ]
 
     def validate_hospital(self, hospital):

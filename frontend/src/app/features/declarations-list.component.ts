@@ -9,11 +9,10 @@ import { DeclarationListItem, Hospital, Page, STATUS_LABELS, Status } from '../c
 import { ToastService } from '../core/toast.service';
 import { IconComponent, PageHeaderComponent, PaginationComponent, StatusBadgeComponent } from '../shared/ui';
 
-type Mode = 'all' | 'secretariat' | 'validation';
+type Mode = 'all' | 'validation';
 
 const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Status[] }> = {
   all: { title: 'Déclarations de naissance', subtitle: 'Déclarations reçues des hôpitaux et maternités', statuses: [] },
-  secretariat: { title: 'File du secrétariat', subtitle: 'Dossiers transmis à compléter et à soumettre à validation', statuses: ['TRANSMITTED', 'IN_COMPLETION', 'TO_CORRECT_SECRETARIAT'] },
   validation: { title: 'File de validation', subtitle: 'Dossiers en attente de la décision définitive', statuses: ['PENDING_VALIDATION'] },
 };
 
