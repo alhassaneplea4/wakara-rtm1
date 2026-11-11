@@ -54,14 +54,15 @@ class Command(BaseCommand):
         # One-time pre-fill of the facilities of Ratoma: the marker keeps it from running again on every deployment,
         # so a facility the administrator renames, deactivates or archives afterwards is never re-created.
         if not options['no_hospitals']:
-            from hospitals.ratoma import prefill_ratoma_facilities
-            marker, first_run = SiteSetting.objects.get_or_create(
-                key='bootstrap.ratoma_hospitals', defaults={
-                    'value': 'done', 'is_public': False,
-                    'description': "Établissements de Ratoma pré-remplis (une seule fois)"})
-            if first_run:
-                created, _ = prefill_ratoma_facilities()
-                self.stdout.write(f"Établissements de Ratoma pré-remplis : {len(created)}")
+            from hospitals.ratoma import RATOMA_BATCHES, prefill_ratoma_facilities
+            for key, batch in RATOMA_BATCHES:  # one marker per batch: a new list is added once, on the next deployment
+                marker, first_run = SiteSetting.objects.get_or_create(
+                    key=key, defaults={
+                        'value': 'done', 'is_public': False,
+                        'description': "Établissements de Ratoma pré-remplis (une seule fois)"})
+                if first_run:
+                    created, _ = prefill_ratoma_facilities(batch)
+                    self.stdout.write(f"Établissements de Ratoma pré-remplis : {len(created)}")
 
         if options['skip_admin']:
             return

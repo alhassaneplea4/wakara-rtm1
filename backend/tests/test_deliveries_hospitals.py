@@ -150,3 +150,37 @@ class RatomaHospitalsTests(WakaraTestCase):
         self.assertIn("Hôpital de l'Amitié Sino-Guinéenne", names)
         uuid = next(h['uuid'] for h in c.get('/api/hospitals/', {'search': 'Sino', 'page_size': 100}).data['results'])
         self.assertEqual(c.patch(f'/api/hospitals/{uuid}/', {'phone': '+224 622 11 22 33'}, format='json').status_code, 200)
+
+
+class MairieFacilityListTests(WakaraTestCase):
+    """The list of structures given by the mairie (photographed sheet): names only, no duplicates."""
+    NEW_NAMES = [
+        'Centre de santé de Koloma Soloprimo', 'Centre de santé Fondis (Kaporo Centre)',
+        'Centre de santé Hadja Djene Kaba (Kaporo Centre)', 'Clinique Jean Oury de Hamdallaye II',
+        'Clinique de Bomboly', 'Clinique AGVF de Koloma Soloprimo', 'Clinique Mères et Enfants Kipé',
+        'Clinique AK Arabic Bambeto', 'Clinique Aide Mère et Enfant Hamdallaye Mosquée',
+    ]
+
+    def test_a_database_that_already_ran_the_first_list_receives_only_the_new_names(self):
+        # production state: the first pre-fill already happened (marker set), the 7 first facilities exist
+        from hospitals.ratoma import FIRST_BATCH
+        prefill_ratoma_facilities(FIRST_BATCH)
+        SiteSetting.objects.create(key='bootstrap.ratoma_hospitals', value='done', is_public=False)
+        before = Hospital.objects.count()
+        self.assertFalse(Hospital.objects.filter(name__in=self.NEW_NAMES).exists())
+        call_command('setup_initial_data', skip_admin=True, verbosity=0)
+        self.assertEqual(Hospital.objects.count(), before + len(self.NEW_NAMES))
+        self.assertEqual(Hospital.objects.filter(name__in=self.NEW_NAMES).count(), len(self.NEW_NAMES))
+        # the three structures of the sheet that already existed are not duplicated
+        for existing in ('Centre Médical Communal (CMC) de Ratoma', 'Hôpital Jean-Paul II', "Hôpital de l'Amitié Sino-Guinéenne"):
+            self.assertEqual(Hospital.all_objects.filter(name=existing).count(), 1)
+        self.assertEqual(len(FIRST_BATCH), 7)
+        call_command('setup_initial_data', skip_admin=True, verbosity=0)   # next deployment: nothing more
+        self.assertEqual(Hospital.objects.count(), before + len(self.NEW_NAMES))
+
+    def test_only_names_are_recorded_without_public_or_private_mention(self):
+        prefill_ratoma_facilities()
+        for h in Hospital.objects.filter(name__in=self.NEW_NAMES):
+            self.assertEqual((h.address, h.phone, h.email, h.contact_name), ('', '', '', ''))
+            self.assertNotRegex(h.name.lower(), r'public|privé|prive')
+            self.assertEqual(h.commune, 'Ratoma')
