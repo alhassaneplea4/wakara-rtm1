@@ -263,7 +263,7 @@ LOGIN_LOCKOUT_MINUTES = config('LOGIN_LOCKOUT_MINUTES', default=15, cast=int)
 # Minimum data required to TRANSMIT a declaration to the secretariat.
 DECLARATION_REQUIRED_FOR_TRANSMISSION = config(
     'DECLARATION_REQUIRED_FOR_TRANSMISSION',
-    default='birth_date,child.gender,child.name,mother.name',
+    default='birth_date,birth_time,birth_place,child.gender',
     cast=Csv(),
 )
 # Minimum data required to SUBMIT an acte to validation.

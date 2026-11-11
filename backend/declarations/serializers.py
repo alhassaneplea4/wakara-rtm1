@@ -27,7 +27,7 @@ class ParentSerializer(PhoneMixin, serializers.ModelSerializer):
     class Meta:
         model = Parent
         fields = ['first_names', 'last_name', 'date_of_birth', 'birth_place', 'age',
-                  'nationality', 'npi', 'profession', 'address', 'phone', 'id_type', 'id_number']
+                  'nationality', 'npi', 'profession', 'address', 'phone']
         extra_kwargs = {'age': {'min_value': 0, 'max_value': 120}}
 
     def validate_date_of_birth(self, value):
@@ -41,7 +41,7 @@ class DeclarantSerializer(PhoneMixin, serializers.ModelSerializer):
     class Meta:
         model = Declarant
         fields = ['first_names', 'last_name', 'relationship', 'nationality', 'npi', 'profession', 'phone',
-                  'address', 'id_type', 'id_number']
+                  'address']
 
 
 class StatusHistorySerializer(serializers.ModelSerializer):
@@ -178,9 +178,28 @@ class DeclarationWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("La date de naissance ne peut pas être dans le futur.")
         return value
 
+    # The only mandatory data when the collection agent starts a record; everything else is optional.
+    REQUIRED_MESSAGES = {
+        'birth_date': "La date de naissance est requise.",
+        'birth_time': "L'heure de naissance est requise.",
+        'birth_place': "Le lieu de naissance est requis.",
+    }
+    GENDER_REQUIRED = "Le sexe de l'enfant est requis."
+
     def validate(self, attrs):
-        if self.instance is None and 'birth_date' not in attrs:
-            raise serializers.ValidationError({'birth_date': "La date de naissance est requise."})
+        creating = self.instance is None
+        errors = {}
+        for field, message in self.REQUIRED_MESSAGES.items():
+            value = attrs.get(field)
+            blank = value is None or (isinstance(value, str) and not value.strip())
+            # on update, only a field that is sent (and emptied) is refused: partial edits stay possible
+            if blank and (creating or field in attrs):
+                errors[field] = message
+        child = attrs.get('child') or {}
+        if (creating or 'gender' in child) and not child.get('gender'):
+            errors['child'] = {'gender': self.GENDER_REQUIRED}
+        if errors:
+            raise serializers.ValidationError(errors)
         return attrs
 
 

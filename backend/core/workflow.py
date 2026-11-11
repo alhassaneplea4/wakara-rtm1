@@ -31,7 +31,7 @@ class Status:
     CHOICES = [
         (DRAFT, 'Brouillon'),
         (TRANSMITTED, 'Transmis au secrétariat'),
-        (IN_COMPLETION, 'En complément'),
+        (IN_COMPLETION, 'Acte incomplet'),
         (PENDING_VALIDATION, 'En attente de validation'),
         (TO_CORRECT_COLLECTION, 'À corriger — collecte'),
         (TO_CORRECT_SECRETARIAT, 'À corriger — secrétariat'),

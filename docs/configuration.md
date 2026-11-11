@@ -26,7 +26,7 @@ En production, fournir les mêmes variables par l'environnement du service.
 
 | Variable | Défaut | Effet |
 |---|---|---|
-| `DECLARATION_REQUIRED_FOR_TRANSMISSION` | `birth_date,child.gender,child.name,mother.name` | Données minimales pour transmettre une déclaration |
+| `DECLARATION_REQUIRED_FOR_TRANSMISSION` | `birth_date,birth_time,birth_place,child.gender` | Données minimales pour transmettre une déclaration |
 | `ACTE_REQUIRED_FOR_SUBMISSION` | `acte.declaration_date,declarant.name` | Données minimales pour soumettre un acte à validation |
 | `ACTE_AUTO_NUMBERING` | `False` | `False` : numéro officiel saisi par l'administrateur à la validation. `True` : séquence automatique par (année, registre) |
 | `STATS_SHOW_GENDER` | `True` | Affiche la répartition par sexe |

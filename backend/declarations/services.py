@@ -199,12 +199,12 @@ def _full_snapshot(declaration) -> dict:
         prefix = parent.parent_type.lower()
         snap.update({f'{prefix}.{k}': v for k, v in audit.snapshot(
             parent, ['first_names', 'last_name', 'age', 'profession', 'address', 'nationality',
-                     'date_of_birth', 'birth_place', 'npi', 'phone', 'id_type', 'id_number']).items()})
+                     'date_of_birth', 'birth_place', 'npi', 'phone']).items()})
     declarant = getattr(declaration, 'declarant', None)
     if declarant:
         snap.update({f'declarant.{k}': v for k, v in audit.snapshot(
             declarant, ['first_names', 'last_name', 'relationship', 'nationality', 'profession', 'phone',
-                        'address', 'npi', 'id_type', 'id_number']).items()})
+                        'address', 'npi']).items()})
     return snap
 
 

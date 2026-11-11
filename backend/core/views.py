@@ -75,7 +75,7 @@ class InboxView(APIView):
                     items.append({'code': code, 'label': label, 'count': n, 'status': status_value})
 
         add('to_complete', 'Dossiers transmis à traiter', Status.TRANSMITTED, 'acte.complete')
-        add('in_completion', 'Dossiers en complément', Status.IN_COMPLETION, 'acte.update')
+        add('in_completion', 'Actes incomplets', Status.IN_COMPLETION, 'acte.update')
         add('to_validate', 'Dossiers en attente de validation', Status.PENDING_VALIDATION, 'dossier.validate')
         add('to_correct_secretariat', 'À corriger (secrétariat)', Status.TO_CORRECT_SECRETARIAT, 'acte.update')
         mine = qs.filter(status=Status.TO_CORRECT_COLLECTION)

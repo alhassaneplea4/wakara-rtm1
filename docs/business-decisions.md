@@ -7,8 +7,8 @@ avant la mise en production. Légende : ⏳ à confirmer.
 | # | Sujet | Hypothèse actuellement implémentée | Où l'ajuster |
 |---|---|---|---|
 | 1 | **Numérotation officielle des actes** | Aucune règle codée en dur. Par défaut le numéro est **saisi** par l'administrateur à la validation (unicité garantie par année + registre, transactionnelle). Numérotation automatique séquentielle par (année, registre) disponible mais **désactivée** | `ACTE_AUTO_NUMBERING`, `actes/services.py` |
-| 2 | **Champs obligatoires** | Brouillon : date de naissance seule. Transmission : date de naissance, sexe, nom de l'enfant, nom de la mère. Soumission de l'acte : date de déclaration, nom du déclarant | `DECLARATION_REQUIRED_FOR_TRANSMISSION`, `ACTE_REQUIRED_FOR_SUBMISSION` |
-| 3 | **Liste des statuts** | Brouillon, Transmis, En complément, En attente de validation, À corriger (collecte / secrétariat), Validé, Rejeté (clos), Délivré | `core/workflow.py` |
+| 2 | **Champs obligatoires** | Dès l'enregistrement par l'agent de collecte (brouillon) et pour la transmission : date de naissance, heure de naissance, lieu de naissance et sexe de l'enfant ; tous les autres champs sont facultatifs. Soumission de l'acte : date de déclaration, nom du déclarant | `DECLARATION_REQUIRED_FOR_TRANSMISSION`, `ACTE_REQUIRED_FOR_SUBMISSION` |
+| 3 | **Liste des statuts** | Brouillon, Transmis, Acte incomplet, En attente de validation, À corriger (collecte / secrétariat), Validé, Rejeté (clos), Délivré | `core/workflow.py` |
 | 4 | **Circuit de retour** | Retour collecte → l'agent corrige et retransmet. Retour secrétariat → le secrétariat corrige et resoumet | `core/workflow.py` |
 | 5 | **Signatures et mentions** | Mention textuelle de l'officier d'état civil ; pas de signature électronique | `actes.Acte` |
 | 6 | **Modèle officiel du document** | Modèle de travail HTML imprimable, en lecture seule, calqué sur la fiche papier (volet n° 1 : en-tête de registre, ENFANT, PARENTS, DÉCLARANT, dates et heure en lettres, NPI, téléphones), avec filigrane « ACTE NON VALIDE » avant validation. Les formulaires fournis sont des références, pas des modèles validés | `frontend/.../acte-document.component.ts` |
@@ -40,7 +40,7 @@ avant la mise en production. Légende : ⏳ à confirmer.
 - Le **secrétariat** (permission « Compléter un acte ») peut corriger les données d'une déclaration dès qu'elle est **transmise**, et pendant le complément. La modification ne change pas le statut du dossier.
 - Quand le secrétariat a fini, il **soumet à validation** : le dossier passe dans la **file de validation** de l'administrateur et le secrétariat ne peut plus le modifier.
 - L'**administrateur** peut travailler sur un dossier en attente de validation (déclaration et acte) : il **reste dans sa file de validation** jusqu'à la décision (valider, retourner ou rejeter). Après validation, plus personne ne modifie.
-- Pastilles du menu : *File du secrétariat* (dossiers transmis, en complément ou à corriger côté secrétariat), *File de validation* (en attente de décision), *Déclarations* (pour l'agent : brouillons et dossiers retournés), *Actes de naissance* (actes validés à délivrer). Les écrans et les pastilles se rafraîchissent toutes les 30 secondes tant que la session est ouverte et l'onglet visible.
+- Pastilles du menu : *File du secrétariat* (dossiers transmis, actes incomplets ou à corriger côté secrétariat), *File de validation* (en attente de décision), *Déclarations* (pour l'agent : brouillons et dossiers retournés), *Actes de naissance* (actes validés à délivrer). Les écrans et les pastilles se rafraîchissent toutes les 30 secondes tant que la session est ouverte et l'onglet visible.
 
 ## Traitement par le secrétariat, date en lettres, déclarant
 

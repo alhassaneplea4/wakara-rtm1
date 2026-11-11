@@ -112,7 +112,7 @@ const STEP_TEXT: Record<string, { title: string; help: string; icon: string; ton
           <section class="card"><div class="card-title"><h2>Déclarant</h2></div>
             @if (d.declarant) { <dl class="kv uc"><dt>Nom</dt><dd>{{ d.declarant.first_names }} {{ d.declarant.last_name }}</dd>
               <dt>Lien</dt><dd>{{ d.declarant.relationship || '—' }}</dd><dt>Profession</dt><dd>{{ d.declarant.profession || '—' }}</dd><dt>Nationalité</dt><dd>{{ d.declarant.nationality || '—' }}</dd><dt>NPI</dt><dd>{{ d.declarant.npi || '—' }}</dd>
-              <dt>Téléphone</dt><dd>{{ d.declarant.phone || '—' }}</dd><dt>Pièce</dt><dd>{{ d.declarant.id_type }} {{ d.declarant.id_number }}</dd><dt>Domicile</dt><dd>{{ d.declarant.address || '—' }}</dd></dl> } @else { <p class="muted">À renseigner par le secrétariat.</p> }</section>
+              <dt>Téléphone</dt><dd>{{ d.declarant.phone || '—' }}</dd><dt>Domicile</dt><dd>{{ d.declarant.address || '—' }}</dd></dl> } @else { <p class="muted">À renseigner par le secrétariat.</p> }</section>
 
           @if (acte(); as a) {
             <section class="card"><div class="card-title"><h2>Acte</h2></div>

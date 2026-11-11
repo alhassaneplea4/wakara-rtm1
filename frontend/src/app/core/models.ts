@@ -16,7 +16,7 @@ export type Status =
   | 'TO_CORRECT_SECRETARIAT' | 'VALIDATED' | 'REJECTED' | 'DELIVERED';
 
 export const STATUS_LABELS: Record<Status, string> = {
-  DRAFT: 'Brouillon', TRANSMITTED: 'Transmis au secrétariat', IN_COMPLETION: 'En complément',
+  DRAFT: 'Brouillon', TRANSMITTED: 'Transmis au secrétariat', IN_COMPLETION: 'Acte incomplet',
   PENDING_VALIDATION: 'En attente de validation', TO_CORRECT_COLLECTION: 'À corriger — collecte',
   TO_CORRECT_SECRETARIAT: 'À corriger — secrétariat', VALIDATED: 'Validé définitivement',
   REJECTED: 'Rejeté', DELIVERED: 'Acte délivré',
@@ -37,11 +37,11 @@ export interface DeclarationListItem {
 export interface Child { first_names: string; last_name: string; gender: 'M' | 'F' | ''; nationality?: string; npi?: string; birth_rank?: number | null; }
 export interface Person {
   first_names: string; last_name: string; date_of_birth?: string | null; birth_place?: string; age?: number | null;
-  nationality?: string; npi?: string; profession?: string; address?: string; phone?: string; id_type?: string; id_number?: string;
+  nationality?: string; npi?: string; profession?: string; address?: string; phone?: string;
 }
 export interface Declarant {
   first_names: string; last_name: string; relationship?: string; nationality?: string; npi?: string; profession?: string; phone?: string;
-  address?: string; id_type?: string; id_number?: string;
+  address?: string;
 }
 export interface StatusHistoryEntry { from_status: string; to_status: string; changed_by_name: string; changed_at: string; reason: string; }
 export interface AvailableTransition { target: Status; reason_required: boolean; permission: string; }

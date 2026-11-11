@@ -10,8 +10,8 @@ import { IntegerInputDirective, NationalityInputDirective, NationalityListCompon
 import { PaperFormComponent } from '../shared/paper-form.component';
 import { IconComponent, PageHeaderComponent } from '../shared/ui';
 
-type PersonForm = { first_names: string; last_name: string; age: number | null; nationality: string; npi: string; profession: string; address: string; phone: string; date_of_birth: string; birth_place: string; id_type: string; id_number: string };
-const blankPerson = (): PersonForm => ({ first_names: '', last_name: '', age: null, nationality: '', npi: '', profession: '', address: '', phone: '', date_of_birth: '', birth_place: '', id_type: '', id_number: '' });
+type PersonForm = { first_names: string; last_name: string; age: number | null; nationality: string; npi: string; profession: string; address: string; phone: string; date_of_birth: string; birth_place: string };
+const blankPerson = (): PersonForm => ({ first_names: '', last_name: '', age: null, nationality: '', npi: '', profession: '', address: '', phone: '', date_of_birth: '', birth_place: '' });
 const nullIfEmpty = (v: unknown) => (v === '' || v === undefined ? null : v);
 
 @Component({
@@ -52,15 +52,16 @@ const nullIfEmpty = (v: unknown) => (v === '' || v === undefined ? null : v);
             <div class="form-grid">
               <div class="field"><label>Prénoms</label><input class="input" name="c_fn" [(ngModel)]="m.child.first_names" /></div>
               <div class="field"><label>Nom</label><input class="input" name="c_ln" [(ngModel)]="m.child.last_name" /></div>
-              <div class="field"><label>Sexe</label>
-                <select class="input" name="c_g" [(ngModel)]="m.child.gender"><option value="">—</option><option value="M">Masculin</option><option value="F">Féminin</option></select></div>
+              <div class="field"><label class="req">Sexe</label>
+                <select class="input" name="c_g" [(ngModel)]="m.child.gender" required [class.invalid]="err('child.gender')"><option value="">—</option><option value="M">Masculin</option><option value="F">Féminin</option></select>
+                <span class="field-error">{{ err('child.gender') }}</span></div>
               <div class="field"><label>Nationalité</label><input class="input" wkNationality name="c_na" [(ngModel)]="m.child.nationality" /></div>
               <div class="field"><label>NPI</label><input class="input" name="c_npi" autocomplete="off" spellcheck="false" [(ngModel)]="m.child.npi" /></div>
               <div class="field"><label class="req">Date de naissance</label><input class="input" type="date" name="bd" [(ngModel)]="m.birth_date" min="1900-01-01" [max]="today" required [class.invalid]="err('birth_date')" />
                 @if (m.birth_date) { <small class="letters">{{ m.birth_date | dateLetters }}</small> }
                 <span class="field-error">{{ err('birth_date') }}</span></div>
-              <div class="field"><label>Heure de naissance</label><input class="input" type="time" name="bt" [(ngModel)]="m.birth_time" /></div>
-              <div class="field"><label>Lieu de naissance</label><input class="input" name="bp" [(ngModel)]="m.birth_place" /></div>
+              <div class="field"><label class="req">Heure de naissance</label><input class="input" type="time" name="bt" [(ngModel)]="m.birth_time" required [class.invalid]="err('birth_time')" /><span class="field-error">{{ err('birth_time') }}</span></div>
+              <div class="field"><label class="req">Lieu de naissance</label><input class="input" name="bp" [(ngModel)]="m.birth_place" required [class.invalid]="err('birth_place')" /><span class="field-error">{{ err('birth_place') }}</span></div>
               <div class="field"><label>Rang de naissance chez la mère</label><input class="input" wkInteger min="1" max="30" name="c_rank" [(ngModel)]="m.child.birth_rank" placeholder="1 = premier enfant" [class.invalid]="err('child.birth_rank')" /><span class="field-error">{{ err('child.birth_rank') }}</span></div>
             </div>
             <wk-nationality-list />
@@ -123,10 +124,6 @@ const nullIfEmpty = (v: unknown) => (v === '' || v === undefined ? null : v);
                   <span class="warn">Renseignez d'abord le nom {{ declarantMode === 'father' ? 'du père' : 'de la mère' }} ci-dessus : ses informations seront reprises comme déclarant.</span>
                 }
               </div>
-              <div class="form-grid">
-                <div class="field"><label>Pièce d'identité</label><input class="input" name="d_idt" list="id-types" autocomplete="off" [(ngModel)]="m.declarant.id_type" placeholder="Type (CNI, passeport…)" /></div>
-                <div class="field"><label>N° de la pièce</label><input class="input" name="d_idn" autocomplete="off" spellcheck="false" [(ngModel)]="m.declarant.id_number" /></div>
-              </div>
             } @else if (declarantMode === 'other') {
               <div class="form-grid">
                 <div class="field"><label>Prénoms</label><input class="input" name="d_fn" [(ngModel)]="m.declarant.first_names" /></div>
@@ -137,14 +134,10 @@ const nullIfEmpty = (v: unknown) => (v === '' || v === undefined ? null : v);
                 <div class="field"><label>NPI</label><input class="input" name="d_npi" autocomplete="off" spellcheck="false" [(ngModel)]="m.declarant.npi" /></div>
                 <div class="field"><label>Téléphone</label><input class="input" wkPhone name="d_ph" #dph="ngModel" [(ngModel)]="m.declarant.phone" [class.invalid]="err('declarant.phone') || (dph.touched && phoneError(m.declarant.phone))" />
                   <span class="field-error">{{ err('declarant.phone') || (dph.touched ? phoneError(m.declarant.phone) : '') }}</span></div>
-                <div class="field"><label>Pièce d'identité</label><input class="input" name="d_idt" list="id-types" autocomplete="off" [(ngModel)]="m.declarant.id_type" placeholder="Type" /></div>
-                <div class="field"><label>N° de la pièce</label><input class="input" name="d_idn" autocomplete="off" spellcheck="false" [(ngModel)]="m.declarant.id_number" /></div>
                 <div class="field wide"><label>Domicile</label><input class="input" name="d_ad" [(ngModel)]="m.declarant.address" /></div>
               </div>
             } @else { <p class="muted">Cochez qui fait la déclaration. Sans choix, le secrétariat le renseignera en présence des parents.</p> }
           </section>
-
-          <datalist id="id-types"><option value="CNI"></option><option value="Passeport"></option><option value="Carte consulaire"></option><option value="Permis de conduire"></option><option value="Carte d'électeur"></option></datalist>
 
           <section class="card">
             <div class="field"><label>Observations</label><textarea class="input" name="notes" [(ngModel)]="m.notes"></textarea></div>
@@ -202,7 +195,7 @@ export class DeclarationFormComponent implements OnInit {
     hospital: null, hospital_document_ref: '', doctor_name: '', midwife_name: '', birth_date: '', birth_time: '', birth_place: '', notes: '',
     child: { first_names: '', last_name: '', gender: '', nationality: '', npi: '', birth_rank: null },
     mother: blankPerson(), father: blankPerson(),
-    declarant: { first_names: '', last_name: '', relationship: '', nationality: '', npi: '', profession: '', phone: '', address: '', id_type: '', id_number: '' },
+    declarant: { first_names: '', last_name: '', relationship: '', nationality: '', npi: '', profession: '', phone: '', address: '' },
   };
 
   err(k: string) { return this.errors()[k] ?? ''; }
@@ -255,13 +248,12 @@ export class DeclarationFormComponent implements OnInit {
   }
 
   private declarantPayload() {
-    const idDocs = { id_type: this.m.declarant.id_type, id_number: this.m.declarant.id_number };
     if (this.declarantMode === 'other') return { ...this.m.declarant };
     const p = this.declarantFromParent();
     if (!p) return this.uuid ? undefined : null;
     return {
       first_names: p.first_names, last_name: p.last_name, nationality: p.nationality, npi: p.npi, profession: p.profession, phone: p.phone, address: p.address,
-      relationship: this.declarantMode === 'father' ? 'Père' : 'Mère', ...idDocs,
+      relationship: this.declarantMode === 'father' ? 'Père' : 'Mère',
     };
   }
 
@@ -285,6 +277,9 @@ export class DeclarationFormComponent implements OnInit {
     const m = this.m;
     if (!m.birth_date) e['birth_date'] = 'La date de naissance est requise.';
     else if (m.birth_date > this.today) e['birth_date'] = 'La date de naissance ne peut pas être dans le futur.';
+    if (!m.birth_time) e['birth_time'] = "L'heure de naissance est requise.";
+    if (!(m.birth_place ?? '').trim()) e['birth_place'] = 'Le lieu de naissance est requis.';
+    if (!m.child.gender) e['child.gender'] = "Le sexe de l'enfant est requis.";
     const people: [string, PersonForm, boolean][] = [['mother', m.mother, true], ['father', m.father, this.hasFather]];
     for (const [key, p, active] of people) {
       if (!active) continue;

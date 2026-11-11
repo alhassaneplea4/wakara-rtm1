@@ -5,7 +5,7 @@ from django.test import override_settings
 
 from actes.models import Acte
 from audit.models import AuditLog
-from declarations.models import Declaration, StatusHistory
+from declarations.models import Child, Declaration, StatusHistory
 
 from .base import WakaraTestCase
 
@@ -103,11 +103,16 @@ class AuthorisationTests(WakaraTestCase):
 
 class StateRuleTests(WakaraTestCase):
     def test_incomplete_declaration_cannot_be_transmitted(self):
-        d = self.create_declaration(child={'first_names': '', 'last_name': ''}, mother=None)
+        d = self.create_declaration()
+        # data lost after the draft was saved (e.g. an older record): the transmission is still refused
+        Declaration.objects.filter(uuid=d['uuid']).update(birth_place='', birth_time=None)
+        Child.objects.filter(declaration__uuid=d['uuid']).update(gender='')
         r = self.transition(self.agent, d['uuid'], 'TRANSMITTED')
         self.assertEqual(r.status_code, 400)
-        self.assertIn('child.name', r.data['missing_fields'])
-        self.assertIn('mother.name', r.data['missing_fields'])
+        for missing in ('birth_place', 'birth_time', 'child.gender'):
+            self.assertIn(missing, r.data['missing_fields'])
+        self.assertNotIn('child.name', r.data['missing_fields'])  # names are optional
+        self.assertNotIn('mother.name', r.data['missing_fields'])
         self.assertEqual(Declaration.objects.get(uuid=d['uuid']).status, 'DRAFT')
 
     def test_secretary_cannot_submit_acte_without_required_data(self):

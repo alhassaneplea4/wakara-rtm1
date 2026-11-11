@@ -53,7 +53,7 @@ permission métier : il sert uniquement à la maintenance (`/admin/`).
 ## Circuit d'un dossier
 
 ```
-Brouillon → Transmis → En complément → En attente de validation → Validé définitivement → Acte délivré
+Brouillon → Transmis → Acte incomplet → En attente de validation → Validé définitivement → Acte délivré
                 ▲             ▲                    │
                 │             └─ À corriger — secrétariat ◄┤
                 └──────────── À corriger — collecte ◄──────┤
