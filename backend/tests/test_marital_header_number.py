@@ -124,3 +124,24 @@ class FreeOfficialNumberTests(WakaraTestCase):
         r = self.client_for(self.agent).patch(
             f'/api/declarations/{d["uuid"]}/', {'acte': {'numero_acte': '1'}}, format='json')
         self.assertEqual(r.status_code, 403)
+
+
+class ExistingActesGetTheFormDefaultsTests(WakaraTestCase):
+    def test_in_progress_actes_without_types_receive_the_defaults_the_form_proposes(self):
+        import importlib
+        from django.apps import apps
+        migration = importlib.import_module('actes.migrations.0004_types_par_defaut_actes_en_cours')
+        d = self.create_declaration()
+        self.transition(self.agent, d['uuid'], 'TRANSMITTED')
+        Acte.objects.filter(declaration__uuid=d['uuid']).update(commune_type='', centre_type='')
+        done = self.create_declaration()
+        self.advance_to_pending(done['uuid'])
+        self.transition(self.admin, done['uuid'], 'VALIDATED', annee=2026, registre='R1', numero_acte='9', accept_incomplete=True)
+        Acte.objects.filter(declaration__uuid=done['uuid']).update(commune_type='', centre_type='')
+
+        migration.fill_defaults(apps, None)
+
+        a = Acte.objects.get(declaration__uuid=d['uuid'])
+        self.assertEqual((a.commune_type, a.centre_type), ('URBAINE', 'PRINCIPAL'))
+        frozen = Acte.objects.get(declaration__uuid=done['uuid'])
+        self.assertEqual((frozen.commune_type, frozen.centre_type), ('', ''))       # validated acts are not touched
