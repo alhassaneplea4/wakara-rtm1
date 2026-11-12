@@ -76,7 +76,7 @@ class DeclarationListSerializer(serializers.ModelSerializer):
         fields = [
             'uuid', 'reference', 'status', 'status_label', 'hospital', 'hospital_name', 'hospital_code',
             'birth_date', 'received_at', 'child_name', 'assigned_to_name', 'official_number',
-            'can_edit', 'updated_at', 'created_at',
+            'can_edit', 'updated_at', 'created_at', 'sync_version',
         ]
 
     def get_can_edit(self, obj):

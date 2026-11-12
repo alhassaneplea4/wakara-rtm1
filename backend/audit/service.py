@@ -65,4 +65,13 @@ def log(action, *, user=None, obj=None, object_type='', object_id='', object_rep
         reason=reason or '',
         ip_address=ctx.get('ip_address'),
         user_agent=ctx.get('user_agent', ''),
+        **_sync_fields(ctx.get('sync')),
     )
+
+
+def _sync_fields(sync) -> dict:
+    """Columns filled when the event is applied by the offline synchronisation (audit.middleware.sync_context)."""
+    if not sync:
+        return {}
+    return {'origin': 'offline', 'device_id': sync.get('device_id'), 'sync_op_id': sync.get('op_id'),
+            'device_time': sync.get('device_time')}

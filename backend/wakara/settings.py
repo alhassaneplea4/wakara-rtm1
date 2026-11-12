@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'documents.apps.DocumentsConfig',
     'audit.apps.AuditConfig',
     'stats.apps.StatsConfig',
+    'sync.apps.SyncConfig',
 ]
 
 MIDDLEWARE = [
@@ -300,6 +301,19 @@ VALIDATION_EXPECTED_FIELDS = config(
 # (year, registry) is only available when explicitly enabled.
 ACTE_AUTO_NUMBERING = config('ACTE_AUTO_NUMBERING', default=False, cast=bool)
 STATS_SHOW_GENDER = config('STATS_SHOW_GENDER', default=True, cast=bool)
+
+# ──────────────────────────────────────────────
+# Offline mode — synchronisation of the collection agents' devices (docs/hors-ligne)
+# ──────────────────────────────────────────────
+# Operations accepted in one push (small batches: serverless duration and body limits).
+SYNC_MAX_BATCH = config('SYNC_MAX_BATCH', default=20, cast=int)
+# Difference tolerated between the device clock and the server before the device times are corrected.
+SYNC_CLOCK_TOLERANCE_SECONDS = config('SYNC_CLOCK_TOLERANCE_SECONDS', default=300, cast=int)
+# A device date older than this is not trusted: the server date is used and the anomaly is recorded.
+SYNC_MAX_DEVICE_AGE_DAYS = config('SYNC_MAX_DEVICE_AGE_DAYS', default=30, cast=int)
+# Dossiers sent to the device per pull, and how far back the first pull goes.
+SYNC_PULL_PAGE_SIZE = config('SYNC_PULL_PAGE_SIZE', default=50, cast=int)
+SYNC_PULL_INITIAL_DAYS = config('SYNC_PULL_INITIAL_DAYS', default=90, cast=int)
 
 # ──────────────────────────────────────────────
 # CORS

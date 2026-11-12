@@ -38,6 +38,9 @@ DEFAULT_SETTINGS = [
     ('acte.default_centre', "Centre d'état civil de Ratoma", "Centre par défaut des actes", False),
     ('acte.default_commune_type', 'URBAINE', "Type de commune par défaut des actes (URBAINE ou RURALE)", False),
     ('acte.default_centre_type', 'PRINCIPAL', "Type de centre par défaut des actes (PRINCIPAL ou SECONDAIRE)", False),
+    # Remote switch of the offline mode: 'false' makes every device stop working locally and remove its
+    # service worker at the next contact; pending operations can still be synchronised.
+    ('offline.enabled', 'true', "Mode hors connexion pour les agents de collecte (true ou false)", True),
     ('acte.default_officer', 'AMADOU KONIA CAMARA', "Officier d'état civil pré-rempli sur les actes", False),
 ]
 

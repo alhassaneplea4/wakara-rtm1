@@ -19,6 +19,7 @@ urlpatterns = [
     path('api/audit/', include('audit.urls')),
     path('api/history/', include('audit.urls_history')),
     path('api/stats/', include('stats.urls')),
+    path('api/sync/', include('sync.urls')),
     path('api/public/settings/', PublicSettingsView.as_view(), name='public-settings'),
     path('api/settings/', SettingsView.as_view(), name='settings'),
     path('api/inbox/', InboxView.as_view(), name='inbox'),

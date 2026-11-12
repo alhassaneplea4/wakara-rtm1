@@ -11,6 +11,24 @@ def get_request_context() -> dict:
     return _request_ctx.get()
 
 
+class sync_context:
+    """
+    ``with sync_context(op_id=…, device_id=…, device_time=…):`` — every audit event written inside is marked
+    as coming from the offline synchronisation (see audit.service.log).
+    """
+
+    def __init__(self, **sync):
+        self.sync = sync
+
+    def __enter__(self):
+        self.token = _request_ctx.set({**_request_ctx.get(), 'sync': self.sync})
+        return self
+
+    def __exit__(self, *exc):
+        _request_ctx.reset(self.token)
+        return False
+
+
 def _valid_ip(value):
     """Normalised IP address, or None when ``value`` is not a syntactically valid IP."""
     try:

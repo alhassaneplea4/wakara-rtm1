@@ -30,6 +30,7 @@ class DeclarationFilter(filters.FilterSet):
     received_from = filters.DateFilter(field_name='received_at', lookup_expr='gte')
     received_to = filters.DateFilter(field_name='received_at', lookup_expr='lte')
     assigned_to = filters.UUIDFilter(field_name='assigned_to__uuid')
+    updated_since = filters.IsoDateTimeFilter(field_name='updated_at', lookup_expr='gt')
 
     class Meta:
         model = Declaration
