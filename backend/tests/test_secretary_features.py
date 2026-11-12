@@ -92,18 +92,33 @@ class IncompleteValidationTests(WakaraTestCase):
 
 
 class ActesListTests(WakaraTestCase):
-    def test_the_list_only_shows_definitively_validated_and_delivered_acts(self):
-        a, b = self.create_declaration()['uuid'], self.create_declaration()['uuid']
-        acte_a = self.advance_to_pending(a)
-        self.advance_to_pending(b)
-        c = self.client_for(self.secretary)
-        self.assertEqual(c.get('/api/actes/').data['count'], 0)       # pending dossiers are not listed
-        self.assertEqual(self.transition(self.admin, a, 'VALIDATED', annee=2026, registre='R1', numero_acte='1',
+    def listed(self, user=None, **params):
+        return [x['uuid'] for x in self.client_for(user or self.secretary).get('/api/actes/', params).data['results']]
+
+    def test_the_list_holds_the_pending_and_validated_dossiers_only(self):
+        transmitted = self.create_declaration()['uuid']
+        self.transition(self.agent, transmitted, 'TRANSMITTED')
+        pending = self.create_declaration()['uuid']
+        acte_pending = self.advance_to_pending(pending)
+        validated = self.create_declaration()['uuid']
+        acte_validated = self.advance_to_pending(validated)
+        self.assertEqual(self.transition(self.admin, validated, 'VALIDATED', annee=2026, registre='R1', numero_acte='1',
                                          accept_incomplete=True).status_code, 200)
-        listed = c.get('/api/actes/').data
-        self.assertEqual([x['uuid'] for x in listed['results']], [acte_a])
-        # an acte still being completed stays reachable by the secretariat that works on it
-        self.assertEqual(c.get(f'/api/actes/{acte_a}/').status_code, 200)
+        delivered = self.create_declaration()['uuid']
+        acte_delivered = self.advance_to_pending(delivered)
+        self.transition(self.admin, delivered, 'VALIDATED', annee=2026, registre='R1', numero_acte='2', accept_incomplete=True)
+        r = self.client_for(self.secretary).post(f'/api/actes/{acte_delivered}/deliver/', {'recipient_name': 'Mariam'}, format='json')
+        self.assertEqual(r.status_code, 201, r.content)
+
+        listed = self.listed()
+        self.assertCountEqual(listed, [acte_pending, acte_validated])
+        # a dossier still being worked on stays in « Déclarations »; a delivered act moves to « Délivrances »
+        self.assertNotIn(acte_delivered, listed)
+        self.assertEqual(self.client_for(self.secretary).get('/api/actes/deliveries/').data['count'], 1)
+        self.assertEqual(self.listed(status='PENDING_VALIDATION'), [acte_pending])
+        self.assertEqual(self.listed(status='DELIVERED'), [])
+        # an acte stays reachable by the secretariat that works on it
+        self.assertEqual(self.client_for(self.secretary).get(f'/api/actes/{acte_delivered}/').status_code, 200)
 
 
 class SecretaryHospitalTests(WakaraTestCase):

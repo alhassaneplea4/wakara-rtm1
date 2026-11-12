@@ -239,13 +239,13 @@ export class DashboardComponent implements OnInit {
     return [
       { label: 'Naissances déclarées', value: v(k?.births_declared), icon: 'baby', tone: 'info', ...this.declarations(null, '') },
       { label: 'Déclarations reçues', value: v(k?.declarations_received), icon: 'file', tone: 'info', ...this.declarations(notDraft, 'Déclarations reçues') },
-      { label: 'Actes validés', value: v(k?.validated), icon: 'check', tone: 'success', ...this.actes() },
+      { label: 'Actes validés', value: v(k?.validated), icon: 'check', tone: 'success', ...this.declarations(['VALIDATED', 'DELIVERED'], 'Actes validés') },
       { label: 'Dossiers rejetés', value: v(k?.rejected), icon: 'x', tone: 'danger', ...this.declarations(['REJECTED'], 'Dossiers rejetés') },
       { label: 'Dossiers en cours', value: v(k?.in_progress), icon: 'clock', tone: 'warning',
         ...this.declarations(['TRANSMITTED', 'IN_COMPLETION', 'TO_CORRECT_COLLECTION', 'TO_CORRECT_SECRETARIAT'], 'Dossiers en cours') },
       { label: 'En attente de validation', value: v(k?.pending_validation), icon: 'shield', tone: 'warning', ...this.declarations(['PENDING_VALIDATION'], 'En attente de validation') },
       { label: 'À corriger', value: v(k?.to_correct), icon: 'history', tone: 'danger', ...this.declarations(['TO_CORRECT_COLLECTION', 'TO_CORRECT_SECRETARIAT'], 'À corriger') },
-      { label: 'Actes délivrés', value: v(k?.delivered), icon: 'certificate', tone: 'success', ...this.actes('DELIVERED') },
+      { label: 'Actes délivrés', value: v(k?.delivered), icon: 'certificate', tone: 'success', link: this.auth.can('acte.view') ? '/deliveries' : null, query: {} },
     ] as { label: string; value: number | string | undefined; icon: string; tone: string; link: string | null; query: Record<string, string> }[];
   };
 

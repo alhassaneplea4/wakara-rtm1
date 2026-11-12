@@ -94,8 +94,8 @@ class Child(BaseModel):
 
 
 MARITAL_STATUS_CHOICES = [
-    ('CELIBATAIRE', 'Célibataire'), ('MARIE', 'Marié(e)'), ('VEUF', 'Veuf(ve)'),
-]  # the three boxes of the paper form (« Situation matrimoniale »)
+    ('CELIBATAIRE', 'Célibataire'), ('MARIE', 'Marié(e)'), ('DIVORCE', 'Divorcé(e)'), ('VEUF', 'Veuf(ve)'),
+]  # « Situation matrimoniale »
 
 
 class Parent(BaseModel):

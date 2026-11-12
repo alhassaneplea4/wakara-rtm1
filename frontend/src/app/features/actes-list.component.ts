@@ -12,7 +12,7 @@ import { PageHeaderComponent, PaginationComponent, StatusBadgeComponent } from '
   imports: [CommonModule, FormsModule, RouterLink, PageHeaderComponent, PaginationComponent, StatusBadgeComponent],
   template: `
     <div class="page">
-      <wk-page-header title="Actes de naissance" subtitle="Actes validés définitivement et actes délivrés" />
+      <wk-page-header title="Actes de naissance" subtitle="Dossiers terminés par le secrétariat : en attente de validation ou validés. Les actes remis sont dans « Délivrances »." />
       <section class="card flush">
         <div class="filters">
           <input class="input grow" [(ngModel)]="search" (keyup.enter)="reload()" placeholder="N° d'acte, référence, nom de l'enfant…" aria-label="Recherche" />
@@ -35,7 +35,7 @@ import { PageHeaderComponent, PaginationComponent, StatusBadgeComponent } from '
                 <td class="mono"><strong>{{ a.numero_acte || '—' }}</strong></td><td class="mono">{{ a.annee ?? '—' }}</td><td>{{ a.registre || '—' }}</td><td>{{ a.feuillet || '—' }}</td>
                 <td class="uc">{{ a.child_name || '—' }}</td><td class="mono">{{ a.reference }}</td><td>{{ a.hospital_name || '—' }}</td><td><wk-status [status]="a.status" /></td>
               </tr>
-            } @empty { <tr><td colspan="8"><div class="empty"><strong>Aucun acte</strong>Un acte apparaît ici une fois le dossier validé définitivement.</div></td></tr> }
+            } @empty { <tr><td colspan="8"><div class="empty"><strong>Aucun acte</strong>Un dossier apparaît ici dès que le secrétariat l'a envoyé à la validation.</div></td></tr> }
           </tbody></table></div>
         <wk-pagination [page]="page" [total]="total()" (pageChange)="page = $event; load()" />
       </section>
@@ -51,7 +51,7 @@ export class ActesListComponent implements OnInit {
   private autoRefresh = inject(AutoRefreshService);
   private last: Query | null = null;
   labels = STATUS_LABELS;
-  statuses: Status[] = ['VALIDATED', 'DELIVERED'];
+  statuses: Status[] = ['PENDING_VALIDATION', 'VALIDATED'];
   search = ''; status = ''; annee: number | null = null; page = 1;
   /** Filters coming from the dashboard figures (`?from=&to=&hospital=&agent=`), in the URL so the link can be shared. */
   from = ''; to = ''; hospital = ''; agent = '';

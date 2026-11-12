@@ -11,6 +11,9 @@ import { IconComponent, PageHeaderComponent, PaginationComponent, StatusBadgeCom
 
 type Mode = 'all' | 'validation';
 
+/** Finished by the secretariat: these dossiers are followed in « Actes de naissance » (and « Délivrances »). */
+const MOVED_TO_ACTES: Status[] = ['PENDING_VALIDATION', 'VALIDATED', 'DELIVERED'];
+
 const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Status[] }> = {
   all: { title: 'Déclarations de naissance', subtitle: 'Déclarations reçues des hôpitaux et maternités', statuses: [] },
   validation: { title: 'File de validation', subtitle: 'Dossiers en attente de la décision définitive', statuses: ['PENDING_VALIDATION'] },
@@ -21,7 +24,7 @@ const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Statu
   imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, PaginationComponent, StatusBadgeComponent],
   template: `
     <div class="page">
-      <wk-page-header [title]="text.title" [subtitle]="text.subtitle">
+      <wk-page-header [title]="text.title" [subtitle]="subtitle()">
         @if (mode === 'all' && auth.can('data.export')) {
           <button class="btn" (click)="export()"><wk-icon name="download" [size]="16" /> Exporter (CSV)</button>
         }
@@ -36,7 +39,7 @@ const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Statu
             <input id="q" class="input" [(ngModel)]="search" (keyup.enter)="apply()" placeholder="Référence, nom de l'enfant, n° de l'acte…" /></div>
           <div class="field"><label class="sr-only" for="st">Statut</label>
             <select id="st" class="input" [(ngModel)]="status" (ngModelChange)="apply()">
-              <option value="">{{ mode === 'all' ? 'Tous les statuts' : 'Tous (file)' }}</option>
+              <option value="">{{ mode !== 'all' ? 'Tous (file)' : hidesActes() ? 'Dossiers en cours' : 'Tous les statuts' }}</option>
               @for (s of statusOptions; track s) { <option [value]="s">{{ labels[s] }}</option> }
             </select></div>
           @if (mode === 'all') {
@@ -169,6 +172,19 @@ export class DeclarationsListComponent implements OnInit {
     }
   }
 
+  /**
+   * Users who follow the acts (secretariat, administrator) get a simple list: without a search or a chosen status,
+   * the dossiers waiting for validation, validated or delivered are not shown here but in « Actes de naissance » /
+   * « Délivrances ». A search, a chosen status or a dashboard figure still reaches every dossier.
+   */
+  hidesActes = () => this.mode === 'all' && this.auth.can('acte.view');
+  subtitle() {
+    return this.hidesActes() ? "Dossiers en cours. Ceux en attente de validation ou validés sont dans « Actes de naissance », les actes remis dans « Délivrances »." : this.text.subtitle;
+  }
+  private defaultStatuses(): Status[] {
+    return this.hidesActes() && !this.search ? (Object.keys(STATUS_LABELS) as Status[]).filter(s => !MOVED_TO_ACTES.includes(s)) : this.text.statuses;
+  }
+
   hasFilters = () => !!(this.search || this.status || this.statuses.length || this.hospital || this.agent || this.from || this.to);
   arrow(f: string) { return this.ordering === f ? '↑' : this.ordering === '-' + f ? '↓' : ''; }
   sort(f: string) { this.ordering = this.ordering === f ? '-' + f : f; this.load(); }
@@ -190,7 +206,7 @@ export class DeclarationsListComponent implements OnInit {
 
   private query() {
     return {
-      search: this.search, status: this.status ? [this.status] : this.statuses.length ? this.statuses : this.text.statuses, hospital: this.hospital, assigned_to: this.agent,
+      search: this.search, status: this.status ? [this.status] : this.statuses.length ? this.statuses : this.defaultStatuses(), hospital: this.hospital, assigned_to: this.agent,
       received_from: this.from, received_to: this.to, ordering: this.ordering, page: this.page,
     };
   }

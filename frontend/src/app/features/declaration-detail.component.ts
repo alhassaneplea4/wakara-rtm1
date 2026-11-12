@@ -9,6 +9,7 @@ import { AutoRefreshService } from '../core/auto-refresh.service';
 import { Acte, AuditEntry, AvailableTransition, DeclarationDetail, Page, STATUS_LABELS, Status, SupportingDocument } from '../core/models';
 import { ToastService } from '../core/toast.service';
 import { DateLettersPipe } from '../shared/date-letters.pipe';
+import { maritalLabel } from '../shared/marital';
 import { PaperFormComponent } from '../shared/paper-form.component';
 import { ConfirmComponent, IconComponent, PageHeaderComponent, StatusBadgeComponent } from '../shared/ui';
 
@@ -101,16 +102,16 @@ const STEP_TEXT: Record<string, { title: string; help: string; icon: string; ton
           <section class="card"><div class="card-title"><h2>Père</h2></div>
             @if (d.father) { <dl class="kv uc"><dt>Prénoms</dt><dd>{{ d.father.first_names || '—' }}</dd><dt>Nom</dt><dd>{{ d.father.last_name || '—' }}</dd>
               <dt>Né(e) le</dt><dd>{{ d.father.date_of_birth ? (d.father.date_of_birth | date: 'dd/MM/yyyy') : '—' }}@if (d.father.date_of_birth) { <span class="letters">{{ d.father.date_of_birth | dateLetters }}</span> }</dd><dt>Lieu de naissance</dt><dd>{{ d.father.birth_place || '—' }}</dd><dt>Âge</dt><dd>{{ d.father.age ?? '—' }}</dd><dt>Profession</dt><dd>{{ d.father.profession || '—' }}</dd>
-              <dt>Nationalité</dt><dd>{{ d.father.nationality || '—' }}</dd><dt>Situation matrimoniale</dt><dd>{{ marital(d.father.marital_status) }}</dd><dt>NPI</dt><dd>{{ d.father.npi || '—' }}</dd><dt>Téléphone</dt><dd>{{ d.father.phone || '—' }}</dd><dt>Domicile</dt><dd>{{ d.father.address || '—' }}</dd></dl> } @else { <p class="muted">Non renseigné.</p> }</section>
+              <dt>Nationalité</dt><dd>{{ d.father.nationality || '—' }}</dd><dt>Situation matrimoniale</dt><dd>{{ marital(d.father.marital_status, 'father') }}</dd><dt>NPI</dt><dd>{{ d.father.npi || '—' }}</dd><dt>Téléphone</dt><dd>{{ d.father.phone || '—' }}</dd><dt>Domicile</dt><dd>{{ d.father.address || '—' }}</dd></dl> } @else { <p class="muted">Non renseigné.</p> }</section>
 
           <section class="card"><div class="card-title"><h2>Mère</h2></div>
             @if (d.mother) { <dl class="kv uc"><dt>Prénoms</dt><dd>{{ d.mother.first_names || '—' }}</dd><dt>Nom</dt><dd>{{ d.mother.last_name || '—' }}</dd>
               <dt>Né(e) le</dt><dd>{{ d.mother.date_of_birth ? (d.mother.date_of_birth | date: 'dd/MM/yyyy') : '—' }}@if (d.mother.date_of_birth) { <span class="letters">{{ d.mother.date_of_birth | dateLetters }}</span> }</dd><dt>Lieu de naissance</dt><dd>{{ d.mother.birth_place || '—' }}</dd><dt>Âge</dt><dd>{{ d.mother.age ?? '—' }}</dd><dt>Profession</dt><dd>{{ d.mother.profession || '—' }}</dd>
-              <dt>Nationalité</dt><dd>{{ d.mother.nationality || '—' }}</dd><dt>Situation matrimoniale</dt><dd>{{ marital(d.mother.marital_status) }}</dd><dt>NPI</dt><dd>{{ d.mother.npi || '—' }}</dd><dt>Téléphone</dt><dd>{{ d.mother.phone || '—' }}</dd><dt>Domicile</dt><dd>{{ d.mother.address || '—' }}</dd></dl> } @else { <p class="muted">Non renseignée.</p> }</section>
+              <dt>Nationalité</dt><dd>{{ d.mother.nationality || '—' }}</dd><dt>Situation matrimoniale</dt><dd>{{ marital(d.mother.marital_status, 'mother') }}</dd><dt>NPI</dt><dd>{{ d.mother.npi || '—' }}</dd><dt>Téléphone</dt><dd>{{ d.mother.phone || '—' }}</dd><dt>Domicile</dt><dd>{{ d.mother.address || '—' }}</dd></dl> } @else { <p class="muted">Non renseignée.</p> }</section>
 
           <section class="card"><div class="card-title"><h2>Déclarant</h2></div>
             @if (d.declarant) { <dl class="kv uc"><dt>Nom</dt><dd>{{ d.declarant.first_names }} {{ d.declarant.last_name }}</dd>
-              <dt>Lien</dt><dd>{{ d.declarant.relationship || '—' }}</dd><dt>Profession</dt><dd>{{ d.declarant.profession || '—' }}</dd><dt>Nationalité</dt><dd>{{ d.declarant.nationality || '—' }}</dd><dt>Situation matrimoniale</dt><dd>{{ marital(d.declarant.marital_status) }}</dd><dt>NPI</dt><dd>{{ d.declarant.npi || '—' }}</dd>
+              <dt>Lien</dt><dd>{{ d.declarant.relationship || '—' }}</dd><dt>Profession</dt><dd>{{ d.declarant.profession || '—' }}</dd><dt>Nationalité</dt><dd>{{ d.declarant.nationality || '—' }}</dd><dt>Situation matrimoniale</dt><dd>{{ marital(d.declarant.marital_status, 'other') }}</dd><dt>NPI</dt><dd>{{ d.declarant.npi || '—' }}</dd>
               <dt>Téléphone</dt><dd>{{ d.declarant.phone || '—' }}</dd><dt>Domicile</dt><dd>{{ d.declarant.address || '—' }}</dd></dl> } @else { <p class="muted">À renseigner par le secrétariat.</p> }</section>
 
           @if (acte(); as a) {
@@ -290,7 +291,7 @@ export class DeclarationDetailComponent implements OnInit {
   kindLabel(k: string) { return ({ PAPER_FORM: 'Fiche de déclaration physique', HOSPITAL_FORM: 'Déclaration hospitalière', PARENT_ID: "Pièce d'un parent", DECLARANT_ID: 'Pièce du déclarant', OTHER: 'Autre pièce' } as Record<string, string>)[k] ?? k; }
   sizeLabel(bytes: number) { return bytes < 1024 ? '< 1 Ko' : bytes < 1048576 ? `${Math.round(bytes / 1024)} Ko` : `${(bytes / 1048576).toFixed(1)} Mo`; }
   label(s: string) { return STATUS_LABELS[s as Status] ?? s; }
-  marital(v?: string) { return ({ CELIBATAIRE: 'Célibataire', MARIE: 'Marié(e)', VEUF: 'Veuf(ve)' } as Record<string, string>)[v ?? ''] ?? '—'; }
+  marital(v: string | undefined, kind: 'father' | 'mother' | 'other') { return maritalLabel(v, kind) || '—'; }
   meta(t: AvailableTransition) { return ACTION[t.target] ?? { label: t.target, icon: 'arrow', cls: '' }; }
   isDecision(d: DeclarationDetail) { return d.status === 'PENDING_VALIDATION'; }
   /**

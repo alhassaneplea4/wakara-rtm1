@@ -8,6 +8,7 @@ import { Acte, DeclarationDetail, Hospital, Page } from '../core/models';
 import { ToastService } from '../core/toast.service';
 import { DateLettersPipe } from '../shared/date-letters.pipe';
 import { IntegerInputDirective, NationalityInputDirective, NationalityListComponent, PhoneInputDirective, ageFromBirthDate, phoneError } from '../shared/field-formats';
+import { maritalOptions } from '../shared/marital';
 import { PaperFormComponent } from '../shared/paper-form.component';
 import { IconComponent, PageHeaderComponent } from '../shared/ui';
 
@@ -24,8 +25,6 @@ const DEFAULT_ACTE = {
   region: 'Conakry', prefecture: 'Conakry', commune_type: 'URBAINE', commune: 'Ratoma', centre_type: 'PRINCIPAL',
   centre: "Centre d'état civil de Ratoma", officer_name: DEFAULT_OFFICER,
 };
-/** The three boxes of « Situation matrimoniale » on the paper form. */
-export const MARITAL = [{ v: 'CELIBATAIRE', l: 'Célibataire' }, { v: 'MARIE', l: 'Marié(e)' }, { v: 'VEUF', l: 'Veuf(ve)' }];
 
 /**
  * What the secretariat must have filled in before sending a dossier to validation: every field except the NPI
@@ -149,7 +148,7 @@ const SUBMISSION_KEYS: string[] = [
                 <div class="field need" [class.missing]="miss('father.profession')"><label>Profession</label><input class="input" name="f_pr" [(ngModel)]="m.father.profession" /></div>
                 <div class="field need" [class.missing]="miss('father.nationality')"><label>Nationalité</label><input class="input" wkNationality name="f_na" [(ngModel)]="m.father.nationality" /></div>
                 <div class="field need" [class.missing]="miss('father.marital_status')"><label>Situation matrimoniale</label>
-                  <select class="input" name="f_ms" [(ngModel)]="m.father.marital_status"><option value="">—</option>@for (o of marital; track o.v) { <option [value]="o.v">{{ o.l }}</option> }</select></div>
+                  <select class="input" name="f_ms" [(ngModel)]="m.father.marital_status"><option value="">—</option>@for (o of maritalFather; track o.v) { <option [value]="o.v">{{ o.l }}</option> }</select></div>
                 <div class="field"><label>NPI</label><input class="input" name="f_npi" autocomplete="off" spellcheck="false" [(ngModel)]="m.father.npi" /></div>
                 <div class="field need" [class.missing]="miss('father.phone')"><label>Téléphone</label><input class="input" wkPhone name="f_ph" #fph="ngModel" [(ngModel)]="m.father.phone" [class.invalid]="err('father.phone') || (fph.touched && phoneError(m.father.phone))" />
                   <span class="field-error">{{ err('father.phone') || (fph.touched ? phoneError(m.father.phone) : '') }}</span></div>
@@ -170,7 +169,7 @@ const SUBMISSION_KEYS: string[] = [
                 <div class="field need" [class.missing]="miss('mother.profession')"><label>Profession</label><input class="input" name="m_pr" [(ngModel)]="m.mother.profession" /></div>
                 <div class="field need" [class.missing]="miss('mother.nationality')"><label>Nationalité</label><input class="input" wkNationality name="m_na" [(ngModel)]="m.mother.nationality" /></div>
                 <div class="field need" [class.missing]="miss('mother.marital_status')"><label>Situation matrimoniale</label>
-                  <select class="input" name="m_ms" [(ngModel)]="m.mother.marital_status"><option value="">—</option>@for (o of marital; track o.v) { <option [value]="o.v">{{ o.l }}</option> }</select></div>
+                  <select class="input" name="m_ms" [(ngModel)]="m.mother.marital_status"><option value="">—</option>@for (o of maritalMother; track o.v) { <option [value]="o.v">{{ o.l }}</option> }</select></div>
                 <div class="field"><label>NPI</label><input class="input" name="m_npi" autocomplete="off" spellcheck="false" [(ngModel)]="m.mother.npi" /></div>
                 <div class="field need" [class.missing]="miss('mother.phone')"><label>Téléphone</label><input class="input" wkPhone name="m_ph" #mph="ngModel" [(ngModel)]="m.mother.phone" [class.invalid]="err('mother.phone') || (mph.touched && phoneError(m.mother.phone))" />
                   <span class="field-error">{{ err('mother.phone') || (mph.touched ? phoneError(m.mother.phone) : '') }}</span></div>
@@ -204,7 +203,7 @@ const SUBMISSION_KEYS: string[] = [
                 <div class="field need" [class.missing]="miss('declarant.profession')"><label>Profession</label><input class="input" name="d_pr" [(ngModel)]="m.declarant.profession" /></div>
                 <div class="field need" [class.missing]="miss('declarant.nationality')"><label>Nationalité</label><input class="input" wkNationality name="d_na" [(ngModel)]="m.declarant.nationality" /></div>
                 <div class="field need" [class.missing]="miss('declarant.marital_status')"><label>Situation matrimoniale</label>
-                  <select class="input" name="d_ms" [(ngModel)]="m.declarant.marital_status"><option value="">—</option>@for (o of marital; track o.v) { <option [value]="o.v">{{ o.l }}</option> }</select></div>
+                  <select class="input" name="d_ms" [(ngModel)]="m.declarant.marital_status"><option value="">—</option>@for (o of maritalOther; track o.v) { <option [value]="o.v">{{ o.l }}</option> }</select></div>
                 <div class="field"><label>NPI</label><input class="input" name="d_npi" autocomplete="off" spellcheck="false" [(ngModel)]="m.declarant.npi" /></div>
                 <div class="field need" [class.missing]="miss('declarant.phone')"><label>Téléphone</label><input class="input" wkPhone name="d_ph" #dph="ngModel" [(ngModel)]="m.declarant.phone" [class.invalid]="err('declarant.phone') || (dph.touched && phoneError(m.declarant.phone))" />
                   <span class="field-error">{{ err('declarant.phone') || (dph.touched ? phoneError(m.declarant.phone) : '') }}</span></div>
@@ -231,7 +230,7 @@ const SUBMISSION_KEYS: string[] = [
             @if (canSubmit) {
               <button class="btn btn-primary" type="button" [disabled]="busy()" (click)="save('validate')">
                 @if (busy() && action === 'validate') { <span class="spinner"></span> }
-                <wk-icon name="shield" [size]="16" /> Enregistrer et envoyer à la validation de l'administrateur
+                <wk-icon name="shield" [size]="16" /> Enregistrer et envoyer à la validation
               </button>
             }
           </div>
@@ -269,7 +268,8 @@ export class DeclarationFormComponent implements OnInit {
   sec = false;
   /** Turned on by an attempt to send the dossier to validation: shows which required fields are still empty. */
   showMissing = false;
-  marital = MARITAL;
+  /** Wording agrees with the person: masculine for the father, feminine for the mother, neutral for the declarant. */
+  maritalFather = maritalOptions('father'); maritalMother = maritalOptions('mother'); maritalOther = maritalOptions('other');
 
   m: any = {
     hospital: null, hospital_document_ref: '', doctor_name: '', midwife_name: '', birth_date: '', birth_time: '', birth_place: '', notes: '',

@@ -11,7 +11,7 @@ avant la mise en production. Légende : ⏳ à confirmer.
 | 3 | **Liste des statuts** | Brouillon, Transmis, Acte incomplet, En attente de validation, À corriger (collecte / secrétariat), Validé, Rejeté (clos), Délivré | `core/workflow.py` |
 | 4 | **Circuit de retour** | Retour collecte → l'agent corrige et retransmet. Retour secrétariat → le secrétariat corrige et resoumet | `core/workflow.py` |
 | 5 | **Signatures et mentions** | Mention textuelle de l'officier d'état civil ; pas de signature électronique | `actes.Acte` |
-| 6 | **Modèle officiel du document** | Modèle de travail HTML imprimable, en lecture seule, calqué sur la fiche papier (volet n° 1 : en-tête de registre, ENFANT, PARENTS, DÉCLARANT, dates et heure en lettres, NPI, téléphones), avec filigrane « ACTE NON VALIDE » avant validation. Les formulaires fournis sont des références, pas des modèles validés | `frontend/.../acte-document.component.ts` |
+| 6 | **Modèle officiel du document** | Modèle de travail HTML imprimable, en lecture seule, calqué sur la fiche papier (volet n° 1 : en-tête de registre, ENFANT, PARENTS, DÉCLARANT, dates et heure en lettres, NPI, téléphones), avec filigrane « ACTE INCOMPLET » avant validation. Les formulaires fournis sont des références, pas des modèles validés | `frontend/.../acte-document.component.ts` |
 | 7 | **Impression / délivrance** | Après validation uniquement. Chaque impression est journalisée. Une 2ᵉ délivrance est enregistrée comme *duplicata* | `actes/services.py` |
 | 8 | **Qui imprime / délivre** | Secrétaire et administrateur. L'agent de collecte non | rôles par défaut |
 | 9 | **Corrections après validation** | **Non prévues** : un dossier validé, rejeté ou délivré est figé. Procédure (rectification, mention marginale, nouvelle version) à définir | — |
@@ -85,6 +85,14 @@ avant la mise en production. Légende : ⏳ à confirmer.
 
 ## Situation matrimoniale, déclarant, en-tête de l'acte
 
-- **Situation matrimoniale** pour le père, la mère et le déclarant : *Célibataire*, *Marié(e)*, *Veuf(ve)* (les trois cases de la fiche papier ; « Divorcé(e) » n'existe pas sur la fiche, à ajouter si la mairie le souhaite). Exigée, comme les autres champs, pour envoyer à la validation ; cochée sur l'aperçu de l'acte.
+- **Situation matrimoniale** pour le père, la mère et le déclarant : *Célibataire*, *Marié(e)*, *Divorcé(e)*, *Veuf(ve)*. Le libellé s'accorde avec la personne : masculin pour le père (Marié, Divorcé, Veuf), féminin pour la mère (Mariée, Divorcée, Veuve), neutre pour le déclarant (Marié(e)…). La fiche papier n'a que trois cases : l'aperçu en affiche quatre. Exigée, comme les autres champs, pour envoyer à la validation ; cochée sur l'aperçu de l'acte.
 - **Déclarant** : « Le père » / « La mère » reprennent les informations du parent ; « **Une autre personne** » ouvre des champs **vides** à remplir (rien n'est repris du parent). Sur l'**aperçu de l'acte**, quand le déclarant est le père ou la mère, **seule la case « Père » / « Mère » est cochée** : ses informations ne sont pas répétées dans le bloc DÉCLARANT (elles figurent déjà dans PARENTS). Elles ne sont remplies que pour « Autre ».
 - **Circonscription de l'en-tête** (secrétariat) : Région administrative de, Préfecture, Commune **Urbaine ou Rurale** de, Centre **Principal ou Secondaire** de ; les cases sont cochées sur l'aperçu. Pré-remplissage proposé : Commune *Urbaine*, Centre *Principal* (réglages `acte.default_commune_type` et `acte.default_centre_type`, modifiables acte par acte). *À confirmer avec la mairie.* Ces champs sont exigés pour l'envoi à la validation.
+
+## Répartition des dossiers entre trois pages
+
+- **Déclarations** (secrétariat et administrateur) : les dossiers **en cours** — brouillons, transmis, à corriger, rejetés. Une fois que le secrétaire a cliqué sur **Enregistrer et envoyer à la validation**, le dossier quitte cette page.
+- **Actes de naissance** : uniquement les dossiers **en attente de validation** et **validés**.
+- **Délivrances** : les actes **remis** au demandeur ; un acte délivré quitte « Actes de naissance ».
+- Une **recherche**, un statut choisi dans le filtre ou un chiffre du tableau de bord permet toujours de retrouver n'importe quel dossier dans « Déclarations ». L'agent de collecte, qui n'a pas accès aux actes, continue de voir tous ses dossiers.
+- L'aperçu avant validation porte le filigrane **« ACTE INCOMPLET »**. Le bouton du formulaire s'appelle **« Enregistrer et envoyer à la validation »**.

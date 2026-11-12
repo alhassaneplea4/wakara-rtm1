@@ -7,16 +7,18 @@ import { ApiService, errorMessage } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { Acte, ActeDocument, Person } from '../core/models';
 import { ToastService } from '../core/toast.service';
+import { maritalLabel } from '../shared/marital';
 import { IconComponent, PageHeaderComponent } from '../shared/ui';
 
 /**
  * Display-only copy of the acte, laid out like the paper form of the civil registry (« Acte de naissance »,
  * volet n° 1 — déclarant): header with the registry references, then the sections ENFANT, PARENTS (père, mère)
  * and DÉCLARANT. Nothing here can be edited. Until the dossier is validated the page carries a
- * "ACTE NON VALIDE" watermark and printing is not recorded.
+ * "ACTE INCOMPLET" watermark and printing is not recorded.
  *
  * Boxes the data does not tell stay empty, as on a blank form: they can be ticked by hand once printed.
- * Declarant: father or mother → only the box is ticked; another person → identity lines are filled.
+ * Declarant: father or mother → only the box is ticked and nothing else is shown in that zone (their data are in
+ * PARENTS); another person → the identity lines are filled.
  */
 @Component({
   selector: 'wk-acte-document', standalone: true,
@@ -41,7 +43,7 @@ import { IconComponent, PageHeaderComponent } from '../shared/ui';
 
       @if (doc(); as d) {
         <article class="form" [class.draft]="!d.is_official" aria-label="Acte de naissance">
-          @if (!d.is_official) { <div class="watermark" aria-hidden="true">ACTE NON VALIDE</div> }
+          @if (!d.is_official) { <div class="watermark" aria-hidden="true">ACTE INCOMPLET</div> }
 
           <header class="top">
             <div class="rep"><b>RÉPUBLIQUE DE GUINÉE</b><small>Travail · Justice · Solidarité</small></div>
@@ -81,12 +83,13 @@ import { IconComponent, PageHeaderComponent } from '../shared/ui';
               <p class="line"><span class="k">Nationalité :</span><span class="v uc">{{ r.p.nationality }}</span></p>
               <p class="line"><span class="k">Profession :</span><span class="v uc">{{ r.p.profession }}</span></p>
               <p class="line"><span class="k">Domicile :</span><span class="v uc">{{ r.p.address }}</span></p>
-              <p class="line"><span class="k">Situation matrimoniale :</span><span class="opt"><i class="cb" [class.on]="r.p.marital_status === 'CELIBATAIRE'"></i>Célibataire</span><span class="opt"><i class="cb" [class.on]="r.p.marital_status === 'MARIE'"></i>{{ r.married }}</span><span class="opt"><i class="cb" [class.on]="r.p.marital_status === 'VEUF'"></i>{{ r.widowed }}</span></p>
+              <p class="line"><span class="k">Situation matrimoniale :</span>@for (c of marital(r.kind); track c.code) { <span class="opt"><i class="cb" [class.on]="r.p.marital_status === c.code"></i>{{ c.label }}</span> }</p>
               <p class="line"><span class="k">Téléphone :</span><span class="v">{{ r.p.phone }}</span></p>
             }
 
             <h2 class="tag wide">DÉCLARANT
               <span class="who"><span class="opt">Père<i class="cb" [class.on]="who(d) === 'father'"></i></span><span class="opt">Mère<i class="cb" [class.on]="who(d) === 'mother'"></i></span><span class="opt">Autre<i class="cb" [class.on]="who(d) === 'other'"></i></span></span></h2>
+            @if (who(d) !== 'father' && who(d) !== 'mother') {
             <p class="line"><span class="k">NPI :</span><span class="v uc">{{ dec(d).npi }}</span></p>
             <p class="line"><span class="k">Prénoms :</span><span class="v uc">{{ dec(d).first_names }}</span></p>
             <p class="line"><span class="k">Nom :</span><span class="v uc">{{ dec(d).last_name }}</span></p>
@@ -95,10 +98,11 @@ import { IconComponent, PageHeaderComponent } from '../shared/ui';
             <p class="line"><span class="k">Nationalité :</span><span class="v uc">{{ dec(d).nationality }}</span></p>
             <p class="line"><span class="k">Profession :</span><span class="v uc">{{ dec(d).profession }}</span></p>
             <p class="line"><span class="k">Domicile :</span><span class="v uc">{{ dec(d).address }}</span></p>
-            <p class="line"><span class="k">Situation matrimoniale :</span><span class="opt"><i class="cb" [class.on]="dec(d).marital_status === 'CELIBATAIRE'"></i>Célibataire</span><span class="opt"><i class="cb" [class.on]="dec(d).marital_status === 'MARIE'"></i>Marié(e)</span><span class="opt"><i class="cb" [class.on]="dec(d).marital_status === 'VEUF'"></i>Veuf(ve)</span></p>
+            <p class="line"><span class="k">Situation matrimoniale :</span>@for (c of marital('other'); track c.code) { <span class="opt"><i class="cb" [class.on]="dec(d).marital_status === c.code"></i>{{ c.label }}</span> }</p>
             <p class="line"><span class="k">Téléphone :</span><span class="v">{{ dec(d).phone }}</span></p>
             <p class="line"><span class="k">Lien de parenté :</span><span class="v uc">{{ who(d) === 'other' ? d.declarant?.relationship : '' }}</span></p>
             <p class="line"><span class="k">Date de déclaration <small>(en lettres)</small> :</span><span class="v">{{ lettres(d.declaration_date) }}</span></p>
+            }
 
             @if (d.mentions) { <p class="line mentions"><span class="k">Mentions :</span><span class="v">{{ d.mentions }}</span></p> }
           </div>
@@ -196,11 +200,14 @@ export class ActeDocumentComponent implements OnInit {
     return date ? (hour ? `${date} à ${hour}` : date) : '';
   }
 
+  /** The four boxes of « Situation matrimoniale », worded for the father, the mother or another person. */
+  marital(kind: 'father' | 'mother' | 'other') { return ['CELIBATAIRE', 'MARIE', 'DIVORCE', 'VEUF'].map(code => ({ code, label: maritalLabel(code, kind) })); }
+
   /** The father and the mother, as the form lists them; an unknown parent leaves empty lines. */
   parents(d: ActeDocument) {
     return [
-      { title: 'PÈRE', p: d.father ?? ActeDocumentComponent.NONE, married: 'Marié', widowed: 'Veuf' },
-      { title: 'MÈRE', p: d.mother ?? ActeDocumentComponent.NONE, married: 'Mariée', widowed: 'Veuve' },
+      { title: 'PÈRE', kind: 'father' as const, p: d.father ?? ActeDocumentComponent.NONE },
+      { title: 'MÈRE', kind: 'mother' as const, p: d.mother ?? ActeDocumentComponent.NONE },
     ];
   }
 

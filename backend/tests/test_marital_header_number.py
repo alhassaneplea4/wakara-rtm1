@@ -17,6 +17,14 @@ class MaritalStatusTests(WakaraTestCase):
         self.assertEqual(det['father']['marital_status'], 'CELIBATAIRE')
         self.assertEqual(det['declarant']['marital_status'], 'VEUF')
 
+    def test_divorced_is_accepted_for_everyone(self):
+        d = self.create_declaration(
+            mother={'first_names': 'F', 'last_name': 'B', 'marital_status': 'DIVORCE'},
+            father={'first_names': 'O', 'last_name': 'D', 'marital_status': 'DIVORCE'},
+            declarant={'first_names': 'A', 'last_name': 'B', 'relationship': 'Tante', 'marital_status': 'DIVORCE'})
+        det = self.client_for(self.agent).get(f'/api/declarations/{d["uuid"]}/').data
+        self.assertEqual([det[k]['marital_status'] for k in ('mother', 'father', 'declarant')], ['DIVORCE'] * 3)
+
     def test_it_is_optional_for_the_agent_and_only_known_values_are_accepted(self):
         d = self.create_declaration(mother={'first_names': 'F', 'last_name': 'B'})
         self.assertEqual(self.client_for(self.agent).get(f'/api/declarations/{d["uuid"]}/').data['mother']['marital_status'], '')

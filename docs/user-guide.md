@@ -49,5 +49,5 @@ Vous ne pouvez ni valider ni rejeter.
 
 ## Important
 
-- Un document n'a de valeur qu'**après validation définitive** ; avant, l'aperçu porte la mention *ACTE NON VALIDE*.
+- Un document n'a de valeur qu'**après validation définitive** ; avant, l'aperçu porte la mention *ACTE INCOMPLET*.
 - L'aperçu de l'acte est **en lecture seule** et reprend la présentation de la fiche de l'état civil (volet n° 1, déclarant) : en-tête (année, registre, feuillet, n° de l'acte), puis les rubriques ENFANT, PARENTS (père, mère) et DÉCLARANT. Les cases que le dossier ne renseigne pas (commune urbaine/rurale, centre principal/secondaire, situation matrimoniale) restent vides et se cochent à la main après impression. Le modèle imprimé reste un modèle de travail, en attente de validation par la mairie.

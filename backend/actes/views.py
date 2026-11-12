@@ -56,9 +56,10 @@ class ActeViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Updat
         visible = visible_declarations(self.request.user)
         qs = qs.filter(declaration__in=visible)
         if self.action == 'list':
-            # The "Actes de naissance" list shows only the definitively validated acts (and the delivered ones,
-            # which were validated too). A dossier still being drafted is reached from the secretariat queue.
-            qs = qs.filter(declaration__status__in=(Status.VALIDATED, Status.DELIVERED))
+            # The "Actes de naissance" list holds the dossiers the secretariat has finished: waiting for the
+            # validation decision, or validated. Dossiers still being worked on stay in « Déclarations »; once an
+            # act is handed over it moves to « Délivrances ».
+            qs = qs.filter(declaration__status__in=(Status.PENDING_VALIDATION, Status.VALIDATED))
         return qs
 
     def get_serializer_class(self):
