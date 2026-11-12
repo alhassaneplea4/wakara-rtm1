@@ -9,8 +9,10 @@ from .base import WakaraTestCase
 class AgentsFilterTests(WakaraTestCase):
     def test_agents_endpoint_lists_responsibles_for_privileged_roles_only(self):
         d = self.create_declaration(self.agent)
-        self.create_declaration(self.agent)  # same responsible twice: must be listed once
-        self.create_declaration(self.agent2)
+        other = self.create_declaration(self.agent)  # same responsible twice: must be listed once
+        third = self.create_declaration(self.agent2)
+        for x, who in ((d, self.agent), (other, self.agent), (third, self.agent2)):
+            self.transition(who, x['uuid'], 'TRANSMITTED')   # drafts are not visible to the secretary
         r = self.client_for(self.secretary).get('/api/declarations/agents/')
         self.assertEqual(r.status_code, 200)
         self.assertEqual(len(r.data), 2)

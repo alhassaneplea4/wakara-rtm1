@@ -187,6 +187,8 @@ class DocumentTests(WakaraTestCase):
         self.assertEqual(APIClient().get(url).status_code, 401)
         self.assertEqual(self.client_for(self.agent2).get(url).status_code, 404)  # not their dossier
         self.assertEqual(self.client_for(self.nobody).get(url).status_code, 403)
+        self.assertEqual(self.client_for(self.secretary).get(url).status_code, 404)   # a draft stays in the agent's space
+        self.transition(self.agent, d['uuid'], 'TRANSMITTED')
         self.assertEqual(self.client_for(self.secretary).get(url).status_code, 200)
 
     def test_dangerous_or_mismatched_files_rejected(self):
@@ -213,14 +215,18 @@ class DocumentTests(WakaraTestCase):
         # a second page, then both are listed for the dossier (agent and secretary), filtered by kind
         self.upload(self.agent, d['uuid'], 'verso.png', b'\x89PNG' + b'0' * 64, kind='PAPER_FORM')
         self.upload(self.agent, d['uuid'], 'cni.pdf', PDF, kind='PARENT_ID')
-        for user in (self.agent, self.secretary):
-            res = self.client_for(user).get(f'/api/documents/?declaration={d["uuid"]}&kind=PAPER_FORM')
-            self.assertEqual(res.data['count'], 2)
+        res = self.client_for(self.agent).get(f'/api/documents/?declaration={d["uuid"]}&kind=PAPER_FORM')
+        self.assertEqual(res.data['count'], 2)
         self.assertEqual(self.client_for(self.agent2).get(f'/api/documents/?declaration={d["uuid"]}').data['count'], 0)
         # a wrongly taken photo can be archived while the dossier is editable, never physically deleted
         self.assertEqual(self.client_for(self.agent).delete(f'/api/documents/{r.data["uuid"]}/').status_code, 204)
         self.assertEqual(self.client_for(self.agent).get(f'/api/documents/?declaration={d["uuid"]}&kind=PAPER_FORM').data['count'], 1)
         self.assertTrue(SupportingDocument.all_objects.filter(uuid=r.data['uuid']).exists())
+        # once transmitted the secretary finds the remaining page (and could not see it before)
+        self.assertEqual(self.client_for(self.secretary).get(f'/api/documents/?declaration={d["uuid"]}').data['count'], 0)
+        self.transition(self.agent, d['uuid'], 'TRANSMITTED')
+        res = self.client_for(self.secretary).get(f'/api/documents/?declaration={d["uuid"]}&kind=PAPER_FORM')
+        self.assertEqual(res.data['count'], 1)
 
     def test_stored_name_is_random_and_not_publicly_routable(self):
         d = self.create_declaration()
@@ -274,7 +280,7 @@ class StatisticsTests(WakaraTestCase):
     def test_stats_forbidden_without_permission_and_scoped_by_visibility(self):
         self.assertEqual(self.client_for(self.agent).get('/api/stats/dashboard/').status_code, 403)
         sec = self.client_for(self.secretary).get('/api/stats/dashboard/').data
-        self.assertEqual(sec['kpis']['births_declared'], 6)
+        self.assertEqual(sec['kpis']['births_declared'], 4)   # the 2 drafts of the agents are not visible to the secretary
 
     def test_inbox_counts_work_waiting_for_each_role(self):
         adm = self.client_for(self.admin).get('/api/inbox/').data

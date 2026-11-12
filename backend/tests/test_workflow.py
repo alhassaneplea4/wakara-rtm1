@@ -97,7 +97,11 @@ class AuthorisationTests(WakaraTestCase):
         self.assertEqual(c.get(f'/api/declarations/{theirs["uuid"]}/').status_code, 404)
         self.assertEqual(c.patch(f'/api/declarations/{theirs["uuid"]}/', {'notes': 'x'}, format='json').status_code, 404)
         self.assertEqual(self.transition(self.agent, theirs['uuid'], 'TRANSMITTED').status_code, 404)
-        # the secretary sees everything
+        # the secretary does not see the agents' drafts...
+        self.assertEqual(self.client_for(self.secretary).get('/api/declarations/').data['count'], 0)
+        # ... only what they have transmitted
+        self.transition(self.agent, mine['uuid'], 'TRANSMITTED')
+        self.transition(self.agent2, theirs['uuid'], 'TRANSMITTED')
         self.assertEqual(self.client_for(self.secretary).get('/api/declarations/').data['count'], 2)
 
 

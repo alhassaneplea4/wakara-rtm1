@@ -96,3 +96,8 @@ avant la mise en production. Légende : ⏳ à confirmer.
 - **Délivrances** : les actes **remis** au demandeur ; un acte délivré quitte « Actes de naissance ».
 - Une **recherche**, un statut choisi dans le filtre ou un chiffre du tableau de bord permet toujours de retrouver n'importe quel dossier dans « Déclarations ». L'agent de collecte, qui n'a pas accès aux actes, continue de voir tous ses dossiers.
 - L'aperçu avant validation porte le filigrane **« ACTE INCOMPLET »**. Le bouton du formulaire s'appelle **« Enregistrer et envoyer à la validation »**.
+
+## Brouillons des agents
+
+- Un **brouillon reste dans l'espace de son auteur** jusqu'à sa transmission : le secrétariat ne le voit ni dans « Déclarations », ni par recherche, ni dans les chiffres ou les pastilles. Il apparaît au secrétariat dès que l'agent le transmet.
+- Chaque agent ne voit toujours que ses propres dossiers. L'administrateur technique (droit d'archivage) voit encore les brouillons, pour pouvoir archiver un brouillon oublié.

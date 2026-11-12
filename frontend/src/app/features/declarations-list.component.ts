@@ -151,7 +151,9 @@ export class DeclarationsListComponent implements OnInit {
     this.text = MODE_TEXT[this.mode];
     // every 30 s: same filters as the last search the user applied, without the loading flash
     this.autoRefresh.on(this.destroyRef, () => this.silentReload());
-    this.statusOptions = this.mode === 'all' ? (Object.keys(STATUS_LABELS) as Status[]) : this.text.statuses;
+    // the secretariat never sees the agents' drafts (they stay in the agents' own space until transmitted)
+    const seesDrafts = this.auth.can('declaration.create') || this.auth.can('declaration.archive') || !this.auth.can('declaration.view_all');
+    this.statusOptions = this.mode === 'all' ? (Object.keys(STATUS_LABELS) as Status[]).filter(s => seesDrafts || s !== 'DRAFT') : this.text.statuses;
     this.route.queryParamMap.subscribe(q => {
       this.search = q.get('search') ?? '';
       this.status = q.get('status') ?? '';

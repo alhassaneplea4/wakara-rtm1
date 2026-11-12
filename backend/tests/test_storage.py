@@ -36,6 +36,7 @@ class DatabaseStorageTests(WakaraTestCase):
             format='multipart')
         self.assertEqual(r.status_code, 201, r.content)
         self.assertEqual(StoredFile.objects.count(), 1)
+        self.transition(self.agent, d['uuid'], 'TRANSMITTED')    # the secretary only sees it once transmitted
         resp = self.client_for(self.secretary).get(f'/api/documents/{r.data["uuid"]}/download/')
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(b''.join(resp.streaming_content), JPEG)

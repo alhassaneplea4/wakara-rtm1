@@ -139,3 +139,29 @@ class EveryFieldButTheNpiBeforeValidation(WakaraTestCase):
         r = self.submit(uuid)
         self.assertEqual(r.status_code, 400)
         self.assertEqual(r.data['missing_fields'], ['mother.profession'])
+
+
+class DraftsStayInTheAgentsSpace(WakaraTestCase):
+    def list_for(self, user, **params):
+        return [x['uuid'] for x in self.client_for(user).get('/api/declarations/', params).data['results']]
+
+    def test_the_secretariat_never_sees_a_draft_until_it_is_transmitted(self):
+        mine = self.create_declaration(self.agent)['uuid']
+        other = self.create_declaration(self.agent2)['uuid']
+        c = self.client_for(self.secretary)
+        self.assertEqual(self.list_for(self.secretary), [])
+        self.assertEqual(self.list_for(self.secretary, status='DRAFT'), [])
+        self.assertEqual(self.list_for(self.secretary, search='Diallo'), [])
+        self.assertEqual(c.get(f'/api/declarations/{mine}/').status_code, 404)
+        self.assertEqual(c.patch(f'/api/declarations/{mine}/', {'notes': 'x'}, format='json').status_code, 404)
+        self.assertEqual(c.get('/api/inbox/').data['badges'], {})
+        self.transition(self.agent, mine, 'TRANSMITTED')
+        self.assertEqual(self.list_for(self.secretary), [mine])           # the other agent's draft is still hidden
+        self.assertEqual(c.get(f'/api/declarations/{mine}/').status_code, 200)
+        self.assertEqual(c.get(f'/api/declarations/{other}/').status_code, 404)
+
+    def test_each_agent_keeps_seeing_his_own_drafts_and_the_administrator_may_clear_them(self):
+        mine = self.create_declaration(self.agent)['uuid']
+        self.assertEqual(self.list_for(self.agent), [mine])
+        self.assertEqual(self.list_for(self.agent2), [])
+        self.assertEqual(self.list_for(self.admin), [mine])               # may archive a forgotten draft

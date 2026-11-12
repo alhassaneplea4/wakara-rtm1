@@ -11,6 +11,7 @@ import datetime
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from audit import service as audit
@@ -25,10 +26,18 @@ from .models import Child, Declarant, Declaration, Parent, ReferenceCounter, Sta
 # ── Visibility & edit rights ──────────────────────
 
 def visible_declarations(user, queryset=None):
-    """Declarations the user may see: everything with view_all, otherwise only own."""
+    """
+    Declarations the user may see: everything with view_all, otherwise only own.
+
+    A DRAFT stays in its author's own space until it is transmitted: the secretariat (view_all) never sees the
+    drafts of the collection agents. Only the administrator, who may have to archive a forgotten draft
+    (declaration.archive), still sees them.
+    """
     qs = queryset if queryset is not None else Declaration.objects.all()
     if user_has_perm(user, 'declaration.view_all'):
-        return qs
+        if user_has_perm(user, 'declaration.archive'):
+            return qs
+        return qs.exclude(Q(status=Status.DRAFT) & ~Q(created_by=user))
     return qs.filter(created_by=user)
 
 
