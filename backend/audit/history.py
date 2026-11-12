@@ -52,7 +52,7 @@ KIND_LABELS = {
 
 GROUPS = {'child': 'Enfant', 'mother': 'Mère', 'father': 'Père', 'declarant': 'Déclarant'}
 FIELDS = {
-    'first_names': 'Prénoms', 'last_name': 'Nom', 'gender': 'Sexe', 'nationality': 'Nationalité', 'npi': 'NPI',
+    'first_names': 'Prénoms', 'last_name': 'Nom', 'gender': 'Sexe', 'nationality': 'Nationalité', 'npi': 'NPI', 'marital_status': 'Situation matrimoniale',
     'birth_rank': 'Rang de naissance', 'age': 'Âge', 'profession': 'Profession', 'address': 'Domicile',
     'phone': 'Téléphone', 'date_of_birth': 'Date de naissance', 'birth_place': 'Lieu de naissance',
     'id_type': 'Type de pièce', 'id_number': 'N° de pièce', 'relationship': "Lien avec l'enfant",
@@ -62,8 +62,9 @@ TOP_FIELDS = {
     'midwife_name': 'Sage-femme', 'birth_date': "Date de naissance de l'enfant", 'birth_time': "Heure de naissance",
     'birth_place': "Lieu de naissance de l'enfant", 'notes': 'Observations',
     # acte
-    'annee': 'Année', 'registre': 'Registre', 'feuillet': 'Feuillet', 'region': 'Région', 'prefecture': 'Préfecture',
-    'commune': 'Commune', 'centre': 'Centre', 'declaration_date': 'Date de déclaration',
+    'annee': 'Année', 'registre': 'Registre', 'feuillet': 'Feuillet', 'numero_acte': "N° officiel de l'acte",
+    'region': 'Région', 'prefecture': 'Préfecture', 'commune_type': 'Type de commune', 'commune': 'Commune',
+    'centre_type': 'Type de centre', 'centre': 'Centre', 'declaration_date': 'Date de déclaration',
     'officer_name': "Officier d'état civil", 'mentions': 'Mentions',
 }
 DATE_RE = re.compile(r'^(\d{4})-(\d{2})-(\d{2})$')

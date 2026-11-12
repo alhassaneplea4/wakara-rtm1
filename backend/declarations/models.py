@@ -93,6 +93,11 @@ class Child(BaseModel):
         return f"{self.first_names} {self.last_name}".strip()
 
 
+MARITAL_STATUS_CHOICES = [
+    ('CELIBATAIRE', 'Célibataire'), ('MARIE', 'Marié(e)'), ('VEUF', 'Veuf(ve)'),
+]  # the three boxes of the paper form (« Situation matrimoniale »)
+
+
 class Parent(BaseModel):
     FATHER = 'FATHER'
     MOTHER = 'MOTHER'
@@ -108,6 +113,8 @@ class Parent(BaseModel):
     age = models.PositiveSmallIntegerField("Âge", null=True, blank=True)
     nationality = models.CharField("Nationalité", max_length=100, blank=True)
     npi = models.CharField("NPI", max_length=50, blank=True)
+    marital_status = models.CharField(
+        "Situation matrimoniale", max_length=20, blank=True, choices=MARITAL_STATUS_CHOICES)
     profession = models.CharField("Profession", max_length=100, blank=True)
     address = models.TextField("Domicile", blank=True)
     phone = models.CharField("Téléphone", max_length=20, blank=True)
@@ -136,6 +143,8 @@ class Declarant(BaseModel):
     relationship = models.CharField("Lien avec l'enfant", max_length=50, blank=True)
     nationality = models.CharField("Nationalité", max_length=100, blank=True)
     npi = models.CharField("NPI", max_length=50, blank=True)
+    marital_status = models.CharField(
+        "Situation matrimoniale", max_length=20, blank=True, choices=MARITAL_STATUS_CHOICES)
     profession = models.CharField("Profession", max_length=100, blank=True)
     phone = models.CharField("Téléphone", max_length=20, blank=True)
     address = models.TextField("Domicile", blank=True)

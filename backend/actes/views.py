@@ -72,6 +72,11 @@ class ActeViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Updat
         before = audit.snapshot(acte, list(ActeUpdateSerializer.Meta.fields))
         serializer = ActeUpdateSerializer(acte, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        if 'numero_acte' in data:
+            data['numero_acte'] = (data['numero_acte'] or '').strip() or None
+            services.check_number_is_free(
+                acte, data.get('annee', acte.annee), data.get('registre', acte.registre), data['numero_acte'])
         serializer.save(updated_by=request.user)
         changes = audit.diff(before, audit.snapshot(acte, list(ActeUpdateSerializer.Meta.fields)))
         if changes:

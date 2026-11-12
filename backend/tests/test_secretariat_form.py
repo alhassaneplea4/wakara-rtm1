@@ -14,8 +14,8 @@ FULL_RULE = settings.DEFAULT_ACTE_REQUIRED_FOR_SUBMISSION.split(',')
 
 def person(first='Fatoumata', last='Bah', **extra):
     return {'first_names': first, 'last_name': last, 'date_of_birth': '1990-05-04', 'birth_place': 'Conakry',
-            'age': 36, 'nationality': 'Guinéenne', 'profession': 'Commerçante', 'address': 'Ratoma',
-            'phone': '+224 624 62 94 77', **extra}
+            'age': 36, 'nationality': 'Guinéenne', 'marital_status': 'MARIE', 'profession': 'Commerçante',
+            'address': 'Ratoma', 'phone': '+224 624 62 94 77', **extra}
 
 
 def complete():
@@ -26,9 +26,11 @@ def complete():
         'mother': person(),
         'father': person('Oumar', 'Diallo', profession='Enseignant'),
         'declarant': {'first_names': 'Oumar', 'last_name': 'Diallo', 'relationship': 'Père',
-                      'nationality': 'Guinéenne', 'profession': 'Enseignant', 'address': 'Ratoma',
-                      'phone': '+224 622 11 22 33'},
-        'acte': {'annee': 2026, 'registre': 'R1', 'feuillet': '12',
+                      'nationality': 'Guinéenne', 'marital_status': 'MARIE', 'profession': 'Enseignant',
+                      'address': 'Ratoma', 'phone': '+224 622 11 22 33'},
+        'acte': {'annee': 2026, 'registre': 'R1', 'feuillet': '12', 'region': 'Conakry', 'prefecture': 'Conakry',
+                 'commune_type': 'URBAINE', 'commune': 'Ratoma', 'centre_type': 'PRINCIPAL',
+                 'centre': "Centre d'état civil de Ratoma",
                  'declaration_date': datetime.date.today().isoformat(), 'officer_name': 'AMADOU KONIA CAMARA'},
     }
 
@@ -64,7 +66,7 @@ class SecretariatEditsTheTransmittedDossier(WakaraTestCase):
         acte = Acte.objects.get(declaration__uuid=uuid)
         self.assertEqual((acte.annee, acte.registre, acte.feuillet, acte.officer_name), (2026, 'R7', '3', 'Mr X'))
         self.assertEqual(acte.declaration_date, datetime.date(2026, 11, 2))
-        self.assertFalse(acte.numero_acte)                     # the official number is only attributed at validation
+        self.assertEqual(acte.numero_acte, '99')               # free text, typed by the secretariat
 
     def test_the_agent_cannot_write_the_header(self):
         d = self.create_declaration()                          # still a draft, owned by the agent

@@ -33,6 +33,8 @@ def ensure_acte(declaration: Declaration, user) -> Acte:
         prefecture=get_setting('acte.default_prefecture'),
         commune=get_setting('acte.default_commune'),
         centre=get_setting('acte.default_centre'),
+        commune_type=get_setting('acte.default_commune_type'),
+        centre_type=get_setting('acte.default_centre_type'),
         officer_name=get_setting('acte.default_officer'),
         created_by=user, updated_by=user,
     )
@@ -52,8 +54,15 @@ def can_edit_acte(user, acte) -> bool:
     return can_edit_acte_in_status(user, acte.declaration.status)
 
 
-ACTE_EDITABLE_FIELDS = ['annee', 'registre', 'feuillet', 'region', 'prefecture', 'commune', 'centre',
-                        'declaration_date', 'officer_name', 'mentions']
+ACTE_EDITABLE_FIELDS = ['annee', 'registre', 'feuillet', 'numero_acte', 'region', 'prefecture', 'commune_type',
+                        'commune', 'centre_type', 'centre', 'declaration_date', 'officer_name', 'mentions']
+
+
+def check_number_is_free(acte, annee, registre, numero):
+    """An official number is unique per (year, registry): refuse a clash with a clear message."""
+    if numero and Acte.all_objects.filter(
+            annee=annee, registre=registre, numero_acte=numero).exclude(pk=acte.pk).exists():
+        raise ValidationError({'numero_acte': "Ce numéro est déjà attribué dans ce registre."})
 
 
 @transaction.atomic
@@ -69,7 +78,10 @@ def update_acte_data(user, declaration: Declaration, data: dict) -> Acte:
     before = audit.snapshot(acte, ACTE_EDITABLE_FIELDS)
     for field, value in data.items():
         if field in ACTE_EDITABLE_FIELDS:
+            if field == 'numero_acte':
+                value = (value or '').strip() or None  # an empty number is "no number", never ''
             setattr(acte, field, value)
+    check_number_is_free(acte, acte.annee, acte.registre, acte.numero_acte)
     acte.updated_by = user
     acte.save()
     changes = audit.diff(before, audit.snapshot(acte, ACTE_EDITABLE_FIELDS))
@@ -87,8 +99,8 @@ def assign_official_number(acte: Acte, user, *, annee=None, registre=None, feuil
     Auto mode (only if enabled): next value of the (annee, registre) sequence, row-locked.
     """
     acte = Acte.all_objects.select_for_update().get(pk=acte.pk)
-    if acte.numero_acte:
-        return acte  # already attributed: never overwritten
+    if acte.numero_assigned_at:
+        return acte  # already confirmed at a validation: never overwritten
 
     if annee is not None:
         acte.annee = annee
@@ -99,7 +111,8 @@ def assign_official_number(acte: Acte, user, *, annee=None, registre=None, feuil
     if not acte.annee:
         raise ValidationError({'annee': "L'année du registre est requise pour attribuer le numéro."})
 
-    numero_acte = (numero_acte or '').strip()
+    # the number typed at validation wins; otherwise the one the secretariat entered is confirmed
+    numero_acte = (numero_acte or '').strip() or (acte.numero_acte or '')
     if not numero_acte:
         if not settings.ACTE_AUTO_NUMBERING:
             raise ValidationError({'numero_acte': (
@@ -162,6 +175,7 @@ def build_document(acte: Acte) -> dict:
             'birth_place': getattr(p, 'birth_place', ''),
             'age': getattr(p, 'age', None), 'nationality': getattr(p, 'nationality', ''),
             'npi': getattr(p, 'npi', ''), 'phone': getattr(p, 'phone', ''),
+            'marital_status': getattr(p, 'marital_status', ''),
             'profession': p.profession, 'address': p.address,
         }
 
@@ -172,7 +186,8 @@ def build_document(acte: Acte) -> dict:
         'official_number': acte.numero_acte,
         'annee': acte.annee, 'registre': acte.registre, 'feuillet': acte.feuillet,
         'region': acte.region, 'prefecture': acte.prefecture,
-        'commune': acte.commune, 'centre': acte.centre,
+        'commune_type': acte.commune_type, 'commune': acte.commune,
+        'centre_type': acte.centre_type, 'centre': acte.centre,
         'declaration_date': acte.declaration_date,
         'child': {
             'first_names': child.first_names if child else '',

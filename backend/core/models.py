@@ -36,6 +36,8 @@ DEFAULT_SETTINGS = [
     ('acte.default_prefecture', 'Conakry', "Préfecture par défaut des actes", False),
     ('acte.default_commune', 'Ratoma', "Commune par défaut des actes", False),
     ('acte.default_centre', "Centre d'état civil de Ratoma", "Centre par défaut des actes", False),
+    ('acte.default_commune_type', 'URBAINE', "Type de commune par défaut des actes (URBAINE ou RURALE)", False),
+    ('acte.default_centre_type', 'PRINCIPAL', "Type de centre par défaut des actes (PRINCIPAL ou SECONDAIRE)", False),
     ('acte.default_officer', 'AMADOU KONIA CAMARA', "Officier d'état civil pré-rempli sur les actes", False),
 ]
 

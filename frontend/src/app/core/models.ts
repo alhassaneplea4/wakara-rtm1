@@ -37,10 +37,10 @@ export interface DeclarationListItem {
 export interface Child { first_names: string; last_name: string; gender: 'M' | 'F' | ''; nationality?: string; npi?: string; birth_rank?: number | null; }
 export interface Person {
   first_names: string; last_name: string; date_of_birth?: string | null; birth_place?: string; age?: number | null;
-  nationality?: string; npi?: string; profession?: string; address?: string; phone?: string;
+  nationality?: string; npi?: string; marital_status?: string; profession?: string; address?: string; phone?: string;
 }
 export interface Declarant {
-  first_names: string; last_name: string; relationship?: string; nationality?: string; npi?: string; profession?: string; phone?: string;
+  first_names: string; last_name: string; relationship?: string; nationality?: string; npi?: string; marital_status?: string; profession?: string; phone?: string;
   address?: string;
 }
 export interface StatusHistoryEntry { from_status: string; to_status: string; changed_by_name: string; changed_at: string; reason: string; }
@@ -65,12 +65,13 @@ export interface Acte {
   uuid: string; declaration_uuid: string; reference: string; status: Status; status_label: string;
   child_name: string; hospital_name: string | null; annee: number | null; registre: string; feuillet: string;
   numero_acte: string | null; updated_at: string; region: string; prefecture: string; commune: string;
+  commune_type: string; centre_type: string;
   centre: string; declaration_date: string | null; officer_name: string; mentions: string; can_edit: boolean;
 }
 
 export interface ActeDocument {
   is_official: boolean; status: Status; reference: string; official_number: string | null; annee: number | null;
-  registre: string; feuillet: string; region: string; prefecture: string; commune: string; centre: string;
+  registre: string; feuillet: string; region: string; prefecture: string; commune_type: string; commune: string; centre_type: string; centre: string;
   declaration_date: string | null; child: { first_names: string; last_name: string; gender: string; nationality?: string; npi?: string; birth_rank?: number | null; birth_date: string; birth_time: string | null; birth_place: string };
   father: Person | null; mother: Person | null; declarant: (Person & { relationship: string }) | null;
   hospital: string; mentions: string; officer_name: string; validated_at: string | null;

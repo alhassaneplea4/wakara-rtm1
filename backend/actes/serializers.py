@@ -26,7 +26,7 @@ class ActeSerializer(ActeListSerializer):
 
     class Meta(ActeListSerializer.Meta):
         fields = ActeListSerializer.Meta.fields + [
-            'region', 'prefecture', 'commune', 'centre', 'declaration_date',
+            'region', 'prefecture', 'commune_type', 'commune', 'centre_type', 'centre', 'declaration_date',
             'officer_name', 'mentions', 'numero_assigned_at', 'can_edit',
         ]
 
@@ -36,12 +36,18 @@ class ActeSerializer(ActeListSerializer):
 
 
 class ActeUpdateSerializer(serializers.ModelSerializer):
-    """The official number is NOT editable here: it is attributed at validation."""
+    """
+    Registry header, as the secretariat (or the validator) edits it. The official number is free text: the
+    secretariat may enter it, the validator confirms or corrects it at the final validation.
+    """
 
     class Meta:
         model = Acte
-        fields = ['annee', 'registre', 'feuillet', 'region', 'prefecture', 'commune', 'centre',
-                  'declaration_date', 'officer_name', 'mentions']
+        fields = ['annee', 'registre', 'feuillet', 'numero_acte', 'region', 'prefecture', 'commune_type',
+                  'commune', 'centre_type', 'centre', 'declaration_date', 'officer_name', 'mentions']
+        # the (year, registry, number) uniqueness is checked by the service with a clear message; the automatic
+        # unique-together validator would wrongly make the three fields mandatory
+        validators = []
 
 
 def _person_name(user):

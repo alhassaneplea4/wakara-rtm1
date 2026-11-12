@@ -265,13 +265,20 @@ class OfficialNumberTests(WakaraTestCase):
         assign_official_number(acte, self.admin, numero_acte='10')
         self.assertEqual(Acte.objects.get(pk=acte.pk).numero_acte, '9')
 
-    def test_official_number_not_editable_through_acte_patch(self):
+    def test_official_number_can_be_typed_by_the_secretariat_through_the_acte_patch(self):
         d = self.create_declaration()
         self.transition(self.agent, d['uuid'], 'TRANSMITTED')
         self.transition(self.secretary, d['uuid'], 'IN_COMPLETION')
         acte = Acte.objects.get(declaration__uuid=d['uuid'])
-        self.client_for(self.secretary).patch(f'/api/actes/{acte.uuid}/', {'numero_acte': '77'}, format='json')
-        self.assertIsNone(Acte.objects.get(pk=acte.pk).numero_acte)
+        r = self.client_for(self.secretary).patch(f'/api/actes/{acte.uuid}/', {'numero_acte': '77'}, format='json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(Acte.objects.get(pk=acte.pk).numero_acte, '77')
+        # the agent still cannot touch it
+        d2 = self.create_declaration()
+        self.transition(self.agent, d2['uuid'], 'TRANSMITTED')
+        acte2 = Acte.objects.get(declaration__uuid=d2['uuid'])
+        r = self.client_for(self.agent).patch(f'/api/actes/{acte2.uuid}/', {'numero_acte': '78'}, format='json')
+        self.assertEqual(r.status_code, 403)
 
 
 class DocumentOutputTests(WakaraTestCase):

@@ -32,9 +32,15 @@ class Acte(BaseModel, CreatedByMixin):
         related_name='+', verbose_name="Numéro attribué par",
     )
     # Administrative geography
+    URBAINE, RURALE = 'URBAINE', 'RURALE'
+    PRINCIPAL, SECONDAIRE = 'PRINCIPAL', 'SECONDAIRE'
     region = models.CharField("Région administrative", max_length=100, blank=True)
     prefecture = models.CharField("Préfecture", max_length=100, blank=True)
+    commune_type = models.CharField(
+        "Type de commune", max_length=10, blank=True, choices=[(URBAINE, 'Urbaine'), (RURALE, 'Rurale')])
     commune = models.CharField("Commune", max_length=100, blank=True)
+    centre_type = models.CharField(
+        "Type de centre", max_length=12, blank=True, choices=[(PRINCIPAL, 'Principal'), (SECONDAIRE, 'Secondaire')])
     centre = models.CharField("Centre", max_length=150, blank=True)
     # Act content
     declaration_date = models.DateField("Date de déclaration", null=True, blank=True)

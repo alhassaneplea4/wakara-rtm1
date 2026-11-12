@@ -15,8 +15,8 @@ import { IconComponent, PageHeaderComponent } from '../shared/ui';
  * and DÉCLARANT. Nothing here can be edited. Until the dossier is validated the page carries a
  * "ACTE NON VALIDE" watermark and printing is not recorded.
  *
- * Boxes the data does not tell (commune urbaine/rurale, centre principal/secondaire, situation matrimoniale)
- * stay empty, as on a blank form: they can be ticked by hand once printed.
+ * Boxes the data does not tell stay empty, as on a blank form: they can be ticked by hand once printed.
+ * Declarant: father or mother → only the box is ticked; another person → identity lines are filled.
  */
 @Component({
   selector: 'wk-acte-document', standalone: true,
@@ -58,8 +58,8 @@ import { IconComponent, PageHeaderComponent } from '../shared/ui';
           <div class="body">
             <p class="line"><span class="k">Région Administrative de :</span><span class="v uc">{{ d.region }}</span></p>
             <p class="line"><span class="k">Préfecture :</span><span class="v uc">{{ d.prefecture }}</span></p>
-            <p class="line"><span class="k">Commune :</span><span class="opt"><i class="cb"></i>Urbaine</span><span class="opt"><i class="cb"></i>Rurale de :</span><span class="v uc">{{ d.commune }}</span></p>
-            <p class="line"><span class="k">Centre :</span><span class="opt"><i class="cb"></i>Principal</span><span class="opt"><i class="cb"></i>Secondaire de :</span><span class="v uc">{{ d.centre }}</span></p>
+            <p class="line"><span class="k">Commune :</span><span class="opt"><i class="cb" [class.on]="d.commune_type === 'URBAINE'"></i>Urbaine</span><span class="opt"><i class="cb" [class.on]="d.commune_type === 'RURALE'"></i>Rurale de :</span><span class="v uc">{{ d.commune }}</span></p>
+            <p class="line"><span class="k">Centre :</span><span class="opt"><i class="cb" [class.on]="d.centre_type === 'PRINCIPAL'"></i>Principal</span><span class="opt"><i class="cb" [class.on]="d.centre_type === 'SECONDAIRE'"></i>Secondaire de :</span><span class="v uc">{{ d.centre }}</span></p>
             <p class="line"><span class="k">Je soussigné :</span><span class="v uc">AMADOU KONIA CAMARA</span><span class="k">(L'officier délégué de l'état civil)</span></p>
 
             <h2 class="tag">ENFANT <span class="npi">NPI :</span><span class="v uc">{{ d.child.npi }}</span></h2>
@@ -81,7 +81,7 @@ import { IconComponent, PageHeaderComponent } from '../shared/ui';
               <p class="line"><span class="k">Nationalité :</span><span class="v uc">{{ r.p.nationality }}</span></p>
               <p class="line"><span class="k">Profession :</span><span class="v uc">{{ r.p.profession }}</span></p>
               <p class="line"><span class="k">Domicile :</span><span class="v uc">{{ r.p.address }}</span></p>
-              <p class="line"><span class="k">Situation matrimoniale :</span><span class="opt"><i class="cb"></i>Célibataire</span><span class="opt"><i class="cb"></i>{{ r.married }}</span><span class="opt"><i class="cb"></i>{{ r.widowed }}</span></p>
+              <p class="line"><span class="k">Situation matrimoniale :</span><span class="opt"><i class="cb" [class.on]="r.p.marital_status === 'CELIBATAIRE'"></i>Célibataire</span><span class="opt"><i class="cb" [class.on]="r.p.marital_status === 'MARIE'"></i>{{ r.married }}</span><span class="opt"><i class="cb" [class.on]="r.p.marital_status === 'VEUF'"></i>{{ r.widowed }}</span></p>
               <p class="line"><span class="k">Téléphone :</span><span class="v">{{ r.p.phone }}</span></p>
             }
 
@@ -95,9 +95,9 @@ import { IconComponent, PageHeaderComponent } from '../shared/ui';
             <p class="line"><span class="k">Nationalité :</span><span class="v uc">{{ dec(d).nationality }}</span></p>
             <p class="line"><span class="k">Profession :</span><span class="v uc">{{ dec(d).profession }}</span></p>
             <p class="line"><span class="k">Domicile :</span><span class="v uc">{{ dec(d).address }}</span></p>
-            <p class="line"><span class="k">Situation matrimoniale :</span><span class="opt"><i class="cb"></i>Célibataire</span><span class="opt"><i class="cb"></i>Marié(e)</span><span class="opt"><i class="cb"></i>Veuf(ve)</span></p>
+            <p class="line"><span class="k">Situation matrimoniale :</span><span class="opt"><i class="cb" [class.on]="dec(d).marital_status === 'CELIBATAIRE'"></i>Célibataire</span><span class="opt"><i class="cb" [class.on]="dec(d).marital_status === 'MARIE'"></i>Marié(e)</span><span class="opt"><i class="cb" [class.on]="dec(d).marital_status === 'VEUF'"></i>Veuf(ve)</span></p>
             <p class="line"><span class="k">Téléphone :</span><span class="v">{{ dec(d).phone }}</span></p>
-            <p class="line"><span class="k">Lien de parenté :</span><span class="v uc">{{ d.declarant?.relationship }}</span></p>
+            <p class="line"><span class="k">Lien de parenté :</span><span class="v uc">{{ who(d) === 'other' ? d.declarant?.relationship : '' }}</span></p>
             <p class="line"><span class="k">Date de déclaration <small>(en lettres)</small> :</span><span class="v">{{ lettres(d.declaration_date) }}</span></p>
 
             @if (d.mentions) { <p class="line mentions"><span class="k">Mentions :</span><span class="v">{{ d.mentions }}</span></p> }
@@ -204,7 +204,11 @@ export class ActeDocumentComponent implements OnInit {
     ];
   }
 
-  dec(d: ActeDocument): Partial<Person> { return d.declarant ?? ActeDocumentComponent.NONE; }
+  /**
+   * The declarant's identity lines are filled ONLY when the declarant is another person. When it is the father or
+   * the mother, the box « Père » / « Mère » is ticked and the lines stay empty: their data are already in PARENTS.
+   */
+  dec(d: ActeDocument): Partial<Person> { return this.who(d) === 'other' && d.declarant ? d.declarant : ActeDocumentComponent.NONE; }
 
   /** Which box of « Déclarant : père / mère / autre » is ticked, from the declared relationship. */
   who(d: ActeDocument): 'father' | 'mother' | 'other' | '' {

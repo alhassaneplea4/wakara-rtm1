@@ -28,7 +28,7 @@ class ParentSerializer(PhoneMixin, serializers.ModelSerializer):
     class Meta:
         model = Parent
         fields = ['first_names', 'last_name', 'date_of_birth', 'birth_place', 'age',
-                  'nationality', 'npi', 'profession', 'address', 'phone']
+                  'nationality', 'npi', 'marital_status', 'profession', 'address', 'phone']
         extra_kwargs = {'age': {'min_value': 0, 'max_value': 120}}
 
     def validate_date_of_birth(self, value):
@@ -41,8 +41,8 @@ class ParentSerializer(PhoneMixin, serializers.ModelSerializer):
 class DeclarantSerializer(PhoneMixin, serializers.ModelSerializer):
     class Meta:
         model = Declarant
-        fields = ['first_names', 'last_name', 'relationship', 'nationality', 'npi', 'profession', 'phone',
-                  'address']
+        fields = ['first_names', 'last_name', 'relationship', 'nationality', 'npi', 'marital_status', 'profession',
+                  'phone', 'address']
 
 
 class StatusHistorySerializer(serializers.ModelSerializer):

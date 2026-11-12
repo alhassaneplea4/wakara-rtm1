@@ -125,6 +125,11 @@ FIELD_LABELS = {
     'declarant.first_names': 'prénoms du déclarant', 'declarant.last_name': 'nom du déclarant',
     'declarant.nationality': 'nationalité du déclarant', 'declarant.profession': 'profession du déclarant',
     'declarant.address': 'domicile du déclarant', 'declarant.phone': 'téléphone du déclarant',
+    'father.marital_status': 'situation matrimoniale du père', 'mother.marital_status': 'situation matrimoniale de la mère',
+    'declarant.marital_status': 'situation matrimoniale du déclarant',
+    'acte.region': 'région administrative', 'acte.prefecture': 'préfecture', 'acte.commune': 'commune',
+    'acte.commune_type': 'type de commune (urbaine ou rurale)', 'acte.centre': 'centre',
+    'acte.centre_type': 'type de centre (principal ou secondaire)',
 }
 
 
@@ -214,12 +219,12 @@ def _full_snapshot(declaration) -> dict:
         prefix = parent.parent_type.lower()
         snap.update({f'{prefix}.{k}': v for k, v in audit.snapshot(
             parent, ['first_names', 'last_name', 'age', 'profession', 'address', 'nationality',
-                     'date_of_birth', 'birth_place', 'npi', 'phone']).items()})
+                     'date_of_birth', 'birth_place', 'npi', 'marital_status', 'phone']).items()})
     declarant = getattr(declaration, 'declarant', None)
     if declarant:
         snap.update({f'declarant.{k}': v for k, v in audit.snapshot(
             declarant, ['first_names', 'last_name', 'relationship', 'nationality', 'profession', 'phone',
-                        'address', 'npi']).items()})
+                        'address', 'npi', 'marital_status']).items()})
     return snap
 
 

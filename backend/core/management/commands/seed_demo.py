@@ -38,16 +38,18 @@ LAST = ['Bah', 'Diallo', 'Camara', 'Fofana', 'Sylla', 'Barry', 'Soumah', 'Keïta
 def complete_dossier(d, secretary, today, registre='DEMO'):
     """What the secretariat fills in before sending a dossier to validation (every field but the NPI)."""
     person = {'date_of_birth': datetime.date(1992, 3, 14), 'birth_place': 'Conakry', 'age': 34,
-              'nationality': 'Guinéenne', 'profession': 'Commerçant(e)', 'address': 'Ratoma, Conakry',
-              'phone': '+224 622 00 00 00'}
+              'nationality': 'Guinéenne', 'marital_status': 'MARIE', 'profession': 'Commerçant(e)',
+              'address': 'Ratoma, Conakry', 'phone': '+224 622 00 00 00'}
     services.update_declaration(secretary, Declaration.objects.get(pk=d.pk), {
         'child': {'nationality': 'Guinéenne', 'birth_rank': 1},
         'mother': person,
         'father': {**person, 'first_names': 'Oumar', 'last_name': 'Démo'},
         'declarant': {'first_names': 'Oumar', 'last_name': 'Démo', 'relationship': 'Père',
-                      'nationality': 'Guinéenne', 'profession': 'Commerçant(e)', 'address': 'Ratoma, Conakry',
-                      'phone': '+224 622 00 00 00'},
-        'acte': {'annee': today.year, 'registre': registre, 'feuillet': '1', 'declaration_date': today,
+                      'nationality': 'Guinéenne', 'marital_status': 'MARIE', 'profession': 'Commerçant(e)',
+                      'address': 'Ratoma, Conakry', 'phone': '+224 622 00 00 00'},
+        'acte': {'annee': today.year, 'registre': registre, 'feuillet': '1', 'region': 'Conakry', 'prefecture': 'Conakry',
+                 'commune_type': 'URBAINE', 'commune': 'Ratoma', 'centre_type': 'PRINCIPAL',
+                 'centre': "Centre d'état civil de Ratoma", 'declaration_date': today,
                  'officer_name': 'AMADOU KONIA CAMARA'},
     })
 
