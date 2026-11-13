@@ -35,3 +35,15 @@ En production, fournir les mêmes variables par l'environnement du service.
 
 Écran **Paramètres** : textes de la page de connexion (étiquette, titre — `*mot*` met en couleur, description, pied de page)
 et valeurs par défaut des actes (région, préfecture, commune, centre).
+
+## Mode hors connexion (branche `wakara-hors-ligne`)
+
+| Variable | Défaut | Effet |
+|---|---|---|
+| `SYNC_MAX_BATCH` | `20` | Opérations acceptées par envoi d'un appareil |
+| `SYNC_CLOCK_TOLERANCE_SECONDS` | `300` | Écart d'horloge toléré avant correction des dates de l'appareil |
+| `SYNC_MAX_DEVICE_AGE_DAYS` | `30` | Au-delà, la date de l'appareil n'est pas retenue |
+| `SYNC_PULL_PAGE_SIZE` | `50` | Dossiers envoyés à l'appareil par appel |
+| `SYNC_PULL_INITIAL_DAYS` | `90` | Ancienneté des dossiers envoyés à la première synchronisation |
+
+Paramètre de l'écran **Paramètres** : `offline.enabled` (`true` / `false`) — coupe le mode hors connexion sur tous les appareils sans redéploiement. Détails : [hors-ligne/exploitation.md](hors-ligne/exploitation.md).

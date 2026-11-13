@@ -21,6 +21,7 @@
 | `documents` | Pièces justificatives en stockage **privé**, téléchargement authentifié et audité |
 | `audit` | Journal d'audit en ajout seul, middleware de contexte (IP, agent) |
 | `stats` | Tableau de bord calculé depuis la base |
+| `sync` | Mode hors connexion des agents de collecte : appareils, opérations idempotentes, push / pull (branche `wakara-hors-ligne`, voir [hors-ligne/architecture.md](hors-ligne/architecture.md)) |
 
 ## Modèle de données (résumé)
 
@@ -77,8 +78,17 @@ porté par l'acte).
 - Jetons côté navigateur : `sessionStorage` par défaut ; « Se souvenir de moi » utilise `localStorage`
   (refresh token à durée limitée côté serveur et mis en liste noire à la déconnexion).
 
+## Mode hors connexion (branche `wakara-hors-ligne`)
+
+Hors périmètre de la version 1.0 livrée, le travail hors connexion des agents de collecte est développé sur la branche
+`wakara-hors-ligne` : saisie, photos et transmission sans Internet, données locales chiffrées par un code de verrouillage,
+synchronisation idempotente qui rejoue les services métier existants. Validation, numéro officiel et délivrance restent
+des opérations centrales. Documentation : [architecture](hors-ligne/architecture.md), [exploitation](hors-ligne/exploitation.md),
+[guide de l'agent](hors-ligne/guide-agent.md). Le cahier des charges livré à la mairie mentionne encore le hors-ligne comme
+hors périmètre : un avenant est à prévoir avant la mise en production.
+
 ## Hors périmètre de la v1
 
-Mode hors connexion (non requis), signature électronique, réinitialisation du mot de passe par e-mail
+Signature électronique, réinitialisation du mot de passe par e-mail
 (l'administrateur remet un mot de passe temporaire), génération PDF serveur (l'acte est rendu en HTML
 imprimable ; le modèle officiel reste à valider).
