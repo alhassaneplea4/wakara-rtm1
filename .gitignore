@@ -25,3 +25,4 @@ frontend/out-tsc/
 # End-to-end tests
 frontend/test-results/
 frontend/playwright-report/
+frontend/.local-test/

@@ -8,7 +8,9 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "test:ci": "ng test --watch=false --browsers=ChromeHeadlessCI",
-    "e2e": "ng build && playwright test"
+    "e2e": "ng build && playwright test",
+    "local": "node local-test/serve.mjs",
+    "local:reset": "node local-test/serve.mjs --reset"
   },
   "private": true,
   "dependencies": {
