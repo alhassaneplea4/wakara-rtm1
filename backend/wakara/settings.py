@@ -17,13 +17,25 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security
 # ──────────────────────────────────────────────
 ON_VERCEL = bool(os.environ.get('VERCEL'))
-SECRET_KEY = config('SECRET_KEY', default='')
-if not SECRET_KEY and ON_VERCEL and os.environ.get('DATABASE_URL'):
+VERCEL_ENV = os.environ.get('VERCEL_ENV', '')
+# A PREVIEW deployment (a branch pushed to GitHub) NEVER uses the production database, even when the Neon
+# integration also exposes DATABASE_URL to the Preview environment: it uses PREVIEW_DATABASE_URL, a separate Neon
+# database connected to Preview only, and refuses to start without it. It also never shares the production secret key.
+# (the Neon integration, given the prefix PREVIEW_DATABASE, names it PREVIEW_DATABASE_DATABASE_URL)
+if VERCEL_ENV == 'preview':
+    DATABASE_URL = config('PREVIEW_DATABASE_URL', default='') or config('PREVIEW_DATABASE_DATABASE_URL', default='')
+else:
+    DATABASE_URL = config('DATABASE_URL', default='')  # postgres://user:pass@host:port/name?sslmode=require
+if VERCEL_ENV == 'preview' and not DATABASE_URL:
+    raise RuntimeError("Aperçu Vercel sans PREVIEW_DATABASE_URL : un aperçu n'utilise jamais la base de production. "
+                       "Connectez une base Neon de test à l'environnement Preview (préfixe PREVIEW).")
+SECRET_KEY = config('SECRET_KEY', default='') if VERCEL_ENV != 'preview' else ''
+if not SECRET_KEY and ON_VERCEL and DATABASE_URL:
     # No SECRET_KEY configured on Vercel: derive a stable, private one from the database credentials
     # (random, known only to Vercel and Neon). Define SECRET_KEY explicitly to use your own value.
     import hashlib
     import hmac
-    SECRET_KEY = hmac.new(os.environ['DATABASE_URL'].encode(), b'wakara-django-secret-key-v1', hashlib.sha256).hexdigest()
+    SECRET_KEY = hmac.new(DATABASE_URL.encode(), b'wakara-django-secret-key-v1', hashlib.sha256).hexdigest()
 if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY manquante : renseignez-la dans backend/.env (voir .env.example).")
 DEBUG = config('DEBUG', default=False, cast=bool)
@@ -102,8 +114,6 @@ WSGI_APPLICATION = 'wakara.wsgi.application'
 # Database
 # ──────────────────────────────────────────────
 DB_ENGINE = config('DB_ENGINE', default='django.db.backends.sqlite3')
-DATABASE_URL = config('DATABASE_URL', default='')  # postgres://user:pass@host:port/name?sslmode=require
-
 if DATABASE_URL:
     # Hosted PostgreSQL (Neon, Supabase, Vercel Postgres…). Serverless: no persistent connection is kept,
     # and server-side cursors are disabled so that connection poolers (pgbouncer) work.
