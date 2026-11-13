@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { ApiService, errorMessage } from '../core/api.service';
 import { Page, SupportingDocument } from '../core/models';
 import { ToastService } from '../core/toast.service';
+import { SyncChipComponent } from './sync-ui';
 import { IconComponent } from './ui';
 
 interface Pending { file: File; preview: string | null; }
@@ -13,20 +14,39 @@ const MAX_SIDE = 2400;          // longest side of an uploaded photo, in pixels
 const RECOMPRESS_ABOVE = 1e6;   // bytes: smaller photos are sent untouched
 const TARGET_SIZE = 3.5e6;      // bytes: stays under the 4.5 MB request limit of serverless hosting
 
+/**
+ * Photo quality chosen by the user (kept on the device). Each profile is a list of [longest side, JPEG quality]
+ * tried in turn until the file is under its target size.
+ *   standard  the historical behaviour: small photos untouched, others brought under 3.5 MB
+ *   economy   always re-encoded small: least storage on the device and fastest upload on a weak network
+ *   high      best readability, still under the 4 MB limit of the server
+ */
+export type PhotoQuality = 'standard' | 'economy' | 'high';
+export const QUALITY_KEY = 'wk_photo_quality';
+const PROFILES: Record<PhotoQuality, { above: number; target: number; steps: readonly (readonly [number, number])[] }> = {
+  standard: { above: RECOMPRESS_ABOVE, target: TARGET_SIZE, steps: [[MAX_SIDE, 0.85], [2000, 0.78], [1600, 0.7]] },
+  economy: { above: 3e5, target: 7e5, steps: [[1600, 0.6], [1280, 0.5], [1024, 0.45]] },
+  high: { above: TARGET_SIZE, target: TARGET_SIZE, steps: [[3200, 0.92], [2800, 0.88], [MAX_SIDE, 0.85], [2000, 0.78]] },
+};
+export function readQuality(): PhotoQuality {
+  try { const q = localStorage.getItem(QUALITY_KEY) as PhotoQuality | null; return q && q in PROFILES ? q : 'standard'; } catch { return 'standard'; }
+}
+
 /** Re-encodes a phone photo as a reasonably sized JPEG; falls back to the original if the browser cannot decode it. */
-async function shrink(file: File): Promise<File> {
-  if (!file.type.startsWith('image/') || file.size <= RECOMPRESS_ABOVE) return file;
+export async function shrink(file: File, quality: PhotoQuality = 'standard'): Promise<File> {
+  const profile = PROFILES[quality] ?? PROFILES.standard;
+  if (!file.type.startsWith('image/') || file.size <= profile.above) return file;
   try {
     const bitmap = await createImageBitmap(file);
     let blob: Blob | null = null;
     // Re-encode, then shrink step by step until the file is light enough.
-    for (const [side, quality] of [[MAX_SIDE, 0.85], [2000, 0.78], [1600, 0.7]] as const) {
+    for (const [side, jpeg] of profile.steps) {
       const k = Math.min(1, side / Math.max(bitmap.width, bitmap.height));
       const canvas = document.createElement('canvas');
       canvas.width = Math.round(bitmap.width * k); canvas.height = Math.round(bitmap.height * k);
       canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-      blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', quality));
-      if (blob && blob.size <= TARGET_SIZE) break;
+      blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', jpeg));
+      if (blob && blob.size <= profile.target) break;
     }
     bitmap.close();
     if (!blob || blob.size >= file.size) return file;
@@ -40,7 +60,7 @@ async function shrink(file: File): Promise<File> {
  * - Without it (new dossier): files are kept in memory until the parent calls `uploadPending(uuid)`.
  */
 @Component({
-  selector: 'wk-paper-form', standalone: true, imports: [CommonModule, DatePipe, IconComponent],
+  selector: 'wk-paper-form', standalone: true, imports: [CommonModule, DatePipe, IconComponent, SyncChipComponent],
   template: `
     <div class="head">
       <div>
@@ -53,6 +73,9 @@ async function shrink(file: File): Promise<File> {
             <input #camera type="file" hidden accept="image/*" capture="environment" (change)="pick($event)" /></label>
           <label class="btn btn-sm"><wk-icon name="upload" [size]="14" /> Importer un fichier
             <input #library type="file" hidden multiple accept="image/*,.pdf,application/pdf" (change)="pick($event)" /></label>
+          <select class="input quality" [value]="quality()" (change)="setQuality($any($event.target).value)" aria-label="Qualité des photos" title="Qualité des photos : une qualité plus légère prend moins de place et s'envoie plus vite">
+            <option value="standard">Qualité standard</option><option value="economy">Économique (léger)</option><option value="high">Haute qualité</option>
+          </select>
         </div>
       }
     </div>
@@ -68,6 +91,7 @@ async function shrink(file: File): Promise<File> {
           <figcaption>
             <span class="name">{{ s.doc.original_name }}</span>
             <small class="muted">{{ s.doc.uploaded_by_name }} · {{ s.doc.created_at | date: 'dd/MM/yyyy HH:mm' }}</small>
+            @if ($any(s.doc).sync_state; as st) { <wk-sync [state]="st" /> }
             @if (editable) { <button type="button" class="link danger" (click)="remove(s)">Retirer</button> }
           </figcaption>
         </figure>
@@ -104,6 +128,8 @@ async function shrink(file: File): Promise<File> {
     .head .row{flex-wrap:wrap}
     .head p{margin-top:4px;max-width:560px}
     .photo{background:var(--wk-royal);border-color:var(--wk-royal);color:#fff}
+    .quality{width:auto;min-height:32px;padding:4px 8px;font-size:13px}
+    figcaption wk-sync{align-self:flex-start;margin-top:2px}
     .pages{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
     figure{margin:0;display:flex;flex-direction:column;gap:6px;min-width:0}
     .thumb{display:grid;place-items:center;aspect-ratio:3/4;border:1px solid var(--wk-border);border-radius:10px;background:#f4f7fc;overflow:hidden;padding:0;cursor:pointer;color:var(--wk-text-mute)}
@@ -134,6 +160,7 @@ export class PaperFormComponent implements OnChanges, OnDestroy {
   saved = signal<Saved[]>([]);
   pending = signal<Pending[]>([]);
   busy = signal(false);
+  quality = signal<PhotoQuality>(readQuality());
   message = signal('');
   viewer = signal<{ url: string; name: string } | null>(null);
   private urls: string[] = [];
@@ -144,6 +171,11 @@ export class PaperFormComponent implements OnChanges, OnDestroy {
   ngOnDestroy() { this.urls.forEach(u => URL.revokeObjectURL(u)); }
 
   hasPending() { return this.pending().length > 0; }
+
+  setQuality(value: PhotoQuality) {
+    this.quality.set(value);
+    try { localStorage.setItem(QUALITY_KEY, value); } catch { /* the choice lasts for this page only */ }
+  }
 
   private track(blob: Blob) { const u = URL.createObjectURL(blob); this.urls.push(u); return u; }
 
@@ -170,7 +202,7 @@ export class PaperFormComponent implements OnChanges, OnDestroy {
     this.message.set(''); this.busy.set(true);
     try {
       for (const original of files) {
-        const file = await shrink(original);
+        const file = await shrink(original, this.quality());
         if (this.declaration) await this.send(file);
         else this.pending.update(p => [...p, { file, preview: file.type.startsWith('image/') ? this.track(file) : null }]);
       }

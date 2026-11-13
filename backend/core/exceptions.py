@@ -16,7 +16,20 @@ class IncompleteConfirmationRequired(Exception):
         self.labels = list(labels)
 
 
+class VersionConflict(Exception):
+    """An edit prepared offline targets a version of the dossier the server no longer holds."""
+
+    def __init__(self, expected, current):
+        super().__init__("Le dossier a été modifié sur le serveur depuis votre dernière synchronisation.")
+        self.expected = expected
+        self.current = current
+
+
 def wakara_exception_handler(exc, context):
+    if isinstance(exc, VersionConflict):
+        return Response({'code': 'version_conflict', 'detail': str(exc),
+                         'expected_version': exc.expected, 'current_version': exc.current},
+                        status=status.HTTP_409_CONFLICT)
     if isinstance(exc, IncompleteConfirmationRequired):
         return Response({
             'code': 'incomplete_confirmation_required',

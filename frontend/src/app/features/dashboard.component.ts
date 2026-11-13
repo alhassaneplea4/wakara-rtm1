@@ -31,6 +31,10 @@ const PALETTE = ['#1f5ed8', '#4f9bff', '#12a36a', '#8b7cf6', '#e58a0a', '#c3cde0
           <div class="field"><label for="f-agent">Responsable</label>
             <select id="f-agent" class="input" [(ngModel)]="agent" (ngModelChange)="load()"><option value="">Tous</option>@for (a of agents(); track a.uuid) { <option [value]="a.uuid">{{ a.name }}</option> }</select></div>
         }
+        <div class="field"><label for="f-origin">Origine</label>
+          <select id="f-origin" class="input" [(ngModel)]="origin" (ngModelChange)="load()">
+            <option value="">Toutes</option><option value="transmitted_offline">Transmis hors ligne</option><option value="entered_offline">Saisis hors ligne</option>
+          </select></div>
         <div class="field"><label for="f-from">Du</label><input id="f-from" type="date" class="input" [(ngModel)]="from" (ngModelChange)="load()" /></div>
         <div class="field"><label for="f-to">Au</label><input id="f-to" type="date" class="input" [(ngModel)]="to" (ngModelChange)="load()" /></div>
         @if (hasFilters()) { <button type="button" class="btn btn-ghost reset" (click)="reset()">Réinitialiser</button> }
@@ -56,6 +60,27 @@ const PALETTE = ['#1f5ed8', '#4f9bff', '#12a36a', '#8b7cf6', '#e58a0a', '#c3cde0
         <div><strong class="mono">{{ k.value }}</strong><span>{{ k.label }}</span></div>
         @if (k.link) { <wk-icon class="go" name="arrow" [size]="16" /> }
       </ng-template>
+
+      @if (data()?.offline; as o) {
+        <section class="card offline" aria-label="Mode hors ligne">
+          <span class="ico info"><wk-icon name="phone" [size]="22" /></span>
+          <div class="o-main">
+            <h2>Dossiers transmis hors ligne</h2>
+            <p class="soft">Saisis par un agent de collecte sans connexion, puis envoyés à la reconnexion. Date retenue : celle de l'appareil.</p>
+          </div>
+          <dl class="o-figs">
+            <div><dt>Transmis hors ligne</dt><dd class="mono">{{ o.transmitted }}</dd></div>
+            <div><dt>Part des reçus</dt><dd class="mono">{{ o.received ? ((o.transmitted / o.received) * 100 | number: '1.0-0') : 0 }} %</dd></div>
+            <div><dt>Saisis hors ligne</dt><dd class="mono">{{ o.entered }}</dd></div>
+          </dl>
+          <div class="o-act">
+            @if (auth.can('declaration.view')) {
+              <a class="btn btn-sm" routerLink="/declarations" [queryParams]="offlineQuery('transmitted')">Voir les dossiers transmis hors ligne</a>
+            }
+            @if (o.latest_device_transmission) { <span class="soft">Dernière transmission depuis un appareil : {{ o.latest_device_transmission | date: 'dd/MM/yyyy HH:mm' }}</span> }
+          </div>
+        </section>
+      }
 
       <div class="grid charts">
         <section class="card">
@@ -139,6 +164,11 @@ const PALETTE = ['#1f5ed8', '#4f9bff', '#12a36a', '#8b7cf6', '#e58a0a', '#c3cde0
     .filters .field{min-width:150px;flex:1 1 150px;max-width:240px}
     .filters .reset{align-self:flex-end}
     .range{margin:0 0 var(--s4)}
+    .offline{display:grid;grid-template-columns:auto minmax(0,1.4fr) minmax(0,1.2fr);gap:16px 20px;align-items:center;margin-bottom:var(--s4)}
+    .offline h2{margin:0 0 2px;font-size:16px} .offline .o-main p{margin:0;font-size:13px}
+    .o-figs{display:flex;gap:24px;margin:0;flex-wrap:wrap} .o-figs dt{font-size:12px;color:var(--wk-text-soft)} .o-figs dd{margin:0;font-size:24px;font-weight:800}
+    .o-act{grid-column:2 / -1;display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13px}
+    @media (max-width:900px){.offline{grid-template-columns:auto minmax(0,1fr)}.o-figs{grid-column:1 / -1}.o-act{grid-column:1 / -1}}
     .kpis{margin-bottom:var(--s4)}
     .kpi{display:flex;gap:16px;align-items:center;min-height:104px;position:relative}
     .kpi.link{color:inherit;text-decoration:none;cursor:pointer;transition:box-shadow .15s,transform .15s,border-color .15s}
@@ -194,7 +224,7 @@ export class DashboardComponent implements OnInit {
     { key: 'y1', label: String(this.currentYear - 1) },
     { key: 'y2', label: String(this.currentYear - 2) },
   ];
-  period = 'year'; hospital = ''; status = ''; agent = ''; from = ''; to = '';
+  period = 'year'; hospital = ''; status = ''; agent = ''; origin = ''; from = ''; to = '';
   hospitals = signal<Hospital[]>([]);
   agents = signal<{ uuid: string; name: string }[]>([]);
   data = signal<Dashboard | null>(null);
@@ -211,6 +241,11 @@ export class DashboardComponent implements OnInit {
     if (this.hospital) q['hospital'] = this.hospital;
     if (this.agent) q['agent'] = this.agent;
     return q;
+  }
+
+  /** Link to the list of the dossiers transmitted (or entered) on an agent's device, same period and filters. */
+  offlineQuery(kind: 'transmitted' | 'entered'): Record<string, string> {
+    return { ...this.scopeQuery(), offline: kind };
   }
 
   /** Link to the declarations list showing exactly what a figure counts (same period, filters and statuses). */
@@ -279,8 +314,8 @@ export class DashboardComponent implements OnInit {
   }
 
   clearRange() { this.from = ''; this.to = ''; }
-  hasFilters() { return !!(this.hospital || this.status || this.agent || this.from || this.to || this.period !== 'year'); }
-  reset() { this.period = 'year'; this.hospital = ''; this.status = ''; this.agent = ''; this.clearRange(); this.load(); }
+  hasFilters() { return !!(this.hospital || this.status || this.agent || this.origin || this.from || this.to || this.period !== 'year'); }
+  reset() { this.period = 'year'; this.hospital = ''; this.status = ''; this.agent = ''; this.origin = ''; this.clearRange(); this.load(); }
 
   load() {
     this.error.set('');
@@ -288,7 +323,7 @@ export class DashboardComponent implements OnInit {
     // a typed "Du / Au" interval takes precedence over the period
     this.api.get<Dashboard>('/stats/dashboard/', {
       year: this.from ? Number(this.from.slice(0, 4)) : r.year, date_from: this.from || r.date_from, date_to: this.to || r.date_to,
-      hospital: this.hospital, status: this.status, agent: this.agent,
+      hospital: this.hospital, status: this.status, agent: this.agent, origin: this.origin,
     }).subscribe({
       next: d => { this.data.set(d); this.buildCharts(d); },
       error: e => this.error.set(errorMessage(e)),

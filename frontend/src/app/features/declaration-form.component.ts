@@ -5,6 +5,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService, errorMessage, fieldErrors } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { Acte, DeclarationDetail, Hospital, Page } from '../core/models';
+import { OfflineGate } from '../core/offline/offline-gate.service';
 import { ToastService } from '../core/toast.service';
 import { DateLettersPipe } from '../shared/date-letters.pipe';
 import { IntegerInputDirective, NationalityInputDirective, NationalityListComponent, PhoneInputDirective, ageFromBirthDate, phoneError } from '../shared/field-formats';
@@ -246,6 +247,10 @@ export class DeclarationFormComponent implements OnInit {
   private router = inject(Router);
   private toast = inject(ToastService);
   private auth = inject(AuthService);
+  private gate = inject(OfflineGate);
+
+  /** Offline mode: the dossier answered by the device is not on the server yet. */
+  private onDevice(d: DeclarationDetail) { const s = (d as any).sync_state; return !!s && s !== 'synced'; }
 
   @ViewChild(PaperFormComponent) paper?: PaperFormComponent;
 
@@ -456,12 +461,18 @@ export class DeclarationFormComponent implements OnInit {
         // New dossier: the photos taken before saving are attached now that the dossier exists.
         const failed = this.uuid ? 0 : (await this.paper?.uploadPending(d.uuid)) ?? 0;
         if (failed) this.toast.error(`${failed} fichier(s) de la fiche n'ont pas pu être joints : rouvrez le dossier pour les ajouter à nouveau.`);
-        if (action === 'draft') { this.busy.set(false); this.toast.success(this.uuid ? 'Modifications enregistrées.' : `Brouillon ${d.reference} enregistré.`); this.router.navigate(['/declarations', d.uuid]); return; }
+        if (action === 'draft') {
+          this.busy.set(false);
+          if (this.onDevice(d)) this.toast.info(this.gate.online() ? 'Enregistré : envoi au serveur en cours.' : 'Enregistré sur cet appareil. Le dossier sera envoyé au serveur au retour de la connexion.');
+          else this.toast.success(this.uuid ? 'Modifications enregistrées.' : `Brouillon ${d.reference} enregistré.`);
+          this.router.navigate(['/declarations', d.uuid]); return;
+        }
         const target = action === 'transmit' ? 'TRANSMITTED' : 'PENDING_VALIDATION';
         this.api.post<DeclarationDetail>(`/declarations/${d.uuid}/transition/`, { status: target }).subscribe({
-          next: () => {
+          next: sent => {
             this.busy.set(false);
-            this.toast.success(action === 'transmit' ? `Déclaration ${d.reference} transmise au secrétariat.` : `Dossier ${d.reference} envoyé à la validation de l'administrateur.`);
+            if (this.onDevice(sent)) this.toast.info(this.gate.online() ? 'Déclaration enregistrée : transmission au secrétariat en cours.' : 'Déclaration enregistrée sur cet appareil. Elle sera transmise au secrétariat au retour de la connexion.');
+            else this.toast.success(action === 'transmit' ? `Déclaration ${d.reference} transmise au secrétariat.` : `Dossier ${d.reference} envoyé à la validation de l'administrateur.`);
             this.router.navigate(['/declarations', d.uuid]);
           },
           error: e => {

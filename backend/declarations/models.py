@@ -63,6 +63,14 @@ class Declaration(BaseModel, CreatedByMixin):
         related_name='validated_declarations', verbose_name="Validée par",
     )
 
+    # ── Offline mode (see docs/hors-ligne) ──
+    # Incremented at every server-side change of the dossier: an offline edit is only applied when it was
+    # prepared on the version the server still holds (optimistic concurrency, no silent overwrite).
+    sync_version = models.PositiveIntegerField("Version (synchronisation)", default=1)
+    # Set only for a dossier entered / transmitted without connection: the moment of the entry on the device.
+    device_created_at = models.DateTimeField("Saisie sur l'appareil le", null=True, blank=True)
+    device_transmitted_at = models.DateTimeField("Transmise depuis l'appareil le", null=True, blank=True)
+
     class Meta(BaseModel.Meta):
         verbose_name = "Déclaration de naissance"
         verbose_name_plural = "Déclarations de naissance"
@@ -71,6 +79,14 @@ class Declaration(BaseModel, CreatedByMixin):
 
     def __str__(self):
         return f"Déclaration {self.reference}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            self.sync_version = (self.sync_version or 0) + 1
+            fields = kwargs.get('update_fields')
+            if fields is not None:
+                kwargs['update_fields'] = set(fields) | {'sync_version'}
+        super().save(*args, **kwargs)
 
 
 class Child(BaseModel):

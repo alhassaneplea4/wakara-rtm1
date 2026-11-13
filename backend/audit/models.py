@@ -32,6 +32,12 @@ class AuditAction:
     DOCUMENT_DOWNLOADED = 'document_downloaded'
     EXPORT = 'export'
     AUDIT_VIEWED = 'audit_viewed'
+    # offline mode
+    SYNC_REJECTED = 'sync_rejected'
+    SYNC_CONFLICT = 'sync_conflict'
+    DEVICE_REGISTERED = 'device_registered'
+    DEVICE_REVOKED = 'device_revoked'
+    DEVICE_RESTORED = 'device_restored'
 
     CHOICES = [(v, v) for k, v in vars().items() if k.isupper()]
 
@@ -51,6 +57,12 @@ class AuditLog(AppendOnlyModel):
     reason = models.TextField("Motif", blank=True)
     ip_address = models.GenericIPAddressField("Adresse IP", null=True, blank=True)
     user_agent = models.CharField("Agent utilisateur", max_length=255, blank=True)
+    # Offline mode: an event applied by the synchronisation keeps the device, the operation and the time of
+    # the entry on the device; ``created_at`` stays the server time. Empty for the events of the online API.
+    origin = models.CharField("Origine", max_length=20, blank=True, db_index=True)
+    device_id = models.UUIDField("Appareil", null=True, blank=True)
+    sync_op_id = models.UUIDField("Opération de synchronisation", null=True, blank=True)
+    device_time = models.DateTimeField("Date sur l'appareil", null=True, blank=True)
 
     class Meta:
         verbose_name = "Événement d'audit"

@@ -17,16 +17,7 @@ from declarations.models import Declaration
 from declarations.services import can_edit_data, visible_declarations
 
 from .models import SupportingDocument
-
-ALLOWED_TYPES = {
-    '.pdf': {'application/pdf'},
-    '.jpg': {'image/jpeg'}, '.jpeg': {'image/jpeg'},
-    '.png': {'image/png'},
-}
-MAGIC = {  # first bytes of each accepted format
-    '.pdf': b'%PDF', '.jpg': b'\xff\xd8\xff', '.jpeg': b'\xff\xd8\xff', '.png': b'\x89PNG',
-}
-
+from .services import store_document, upload_error
 
 class DocumentSerializer(serializers.ModelSerializer):
     declaration = serializers.SlugRelatedField(slug_field='uuid', queryset=Declaration.objects.all())
@@ -44,16 +35,9 @@ class DocumentSerializer(serializers.ModelSerializer):
         return (u.get_full_name() or u.username) if u else ''
 
     def validate_file(self, f):
-        ext = os.path.splitext(f.name)[1].lower()
-        if ext not in ALLOWED_TYPES:
-            raise serializers.ValidationError("Format non autorisé (PDF, JPG ou PNG uniquement).")
-        if f.size > settings.MAX_UPLOAD_SIZE:
-            raise serializers.ValidationError(
-                f"Fichier trop volumineux (max {settings.MAX_UPLOAD_SIZE // (1024 * 1024)} Mo).")
-        head = f.read(8)
-        f.seek(0)
-        if not head.startswith(MAGIC[ext]):
-            raise serializers.ValidationError("Le contenu du fichier ne correspond pas à son extension.")
+        error = upload_error(f)
+        if error:
+            raise serializers.ValidationError(error)
         return f
 
 
@@ -79,23 +63,9 @@ class DocumentViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Ret
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        declaration = serializer.validated_data['declaration']
-        if not visible_declarations(request.user).filter(pk=declaration.pk).exists():
-            raise PermissionDenied("Dossier inaccessible.")
-        if declaration.status in Status.FROZEN:
-            raise PermissionDenied("Le dossier est figé : impossible d'ajouter une pièce.")
-        upload = serializer.validated_data.pop('file')
-        doc = SupportingDocument(
-            **serializer.validated_data, original_name=os.path.basename(upload.name)[:255],
-            content_type=next(iter(ALLOWED_TYPES[os.path.splitext(upload.name)[1].lower()])),
-            size=upload.size, sha256=SupportingDocument.compute_sha256(upload),
-            uploaded_by=request.user,
-        )
-        doc.file.save(upload.name, upload, save=False)
-        doc.save()
-        audit.log(AuditAction.DOCUMENT_UPLOADED, user=request.user, obj=doc,
-                  changes={'declaration': declaration.reference, 'name': doc.original_name,
-                           'sha256': doc.sha256})
+        data = serializer.validated_data
+        doc = store_document(request.user, data['declaration'], data['file'], kind=data.get('kind', SupportingDocument.Kind.OTHER),
+                             description=data.get('description', ''))
         return Response(self.get_serializer(doc).data, status=status.HTTP_201_CREATED)
 
     def perform_destroy(self, instance):

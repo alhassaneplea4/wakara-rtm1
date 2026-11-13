@@ -6,6 +6,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { environment } from '@env/environment';
 import { errorMessage } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { readVaultHeader } from '../core/offline/vault-header';
 import { IconComponent } from '../shared/ui';
 
 interface PublicSettings { [key: string]: string; }
@@ -29,6 +30,8 @@ const FALLBACK: PublicSettings = {
           <p class="intro">Connectez-vous à votre espace de travail pour accéder à la gestion des déclarations et actes de naissance.</p>
 
           @if (expired()) { <div class="alert alert-warning" role="alert">Votre session a expiré. Veuillez vous reconnecter.</div> }
+          @if (blocked()) { <div class="alert alert-danger" role="alert">Cet appareil contient des déclarations non synchronisées de {{ owner() }}. Cette personne doit d'abord se connecter et synchroniser avant qu'un autre compte utilise l'appareil.</div> }
+          @if (owner()) { <p class="device">Appareil protégé — session de <strong>{{ owner() }}</strong>. <a href="/verrouillage" (click)="unlock($event)">Déverrouiller avec le code</a></p> }
           @if (error()) { <div class="alert alert-danger" role="alert">{{ error() }}</div> }
 
           <form (ngSubmit)="submit()" #f="ngForm" novalidate>
@@ -179,6 +182,9 @@ export class LoginComponent implements OnInit {
   error = signal('');
   forgot = signal(false);
   expired = signal(false);
+  blocked = signal(false);
+  /** Agent whose offline data are kept (encrypted) on this device, if any. */
+  owner = signal('');
   cfg = signal<PublicSettings>(FALLBACK);
 
   headline = () => {
@@ -187,13 +193,22 @@ export class LoginComponent implements OnInit {
   };
 
   ngOnInit() {
-    this.expired.set(this.route.snapshot.queryParamMap.has('expired'));
+    // followed live: the page may already be open when the application sends the user back here with a reason
+    this.route.queryParamMap.subscribe(q => {
+      this.expired.set(q.has('expired'));
+      this.blocked.set(q.has('blocked'));
+      const vault = readVaultHeader();
+      this.owner.set(vault ? vault.user.name || vault.user.username : '');
+      if (q.has('blocked')) this.loading.set(false);
+    });
     // Editable texts (Paramètres). Falls back to the built-in copy if the API is unreachable.
     this.http.get<PublicSettings>(`${environment.apiUrl}/public/settings/`).subscribe({
       next: s => this.cfg.set({ ...FALLBACK, ...Object.fromEntries(Object.entries(s).filter(([, v]) => v)) }),
       error: () => undefined,
     });
   }
+
+  unlock(e: Event) { e.preventDefault(); this.router.navigate(['/verrouillage']); }
 
   submit() {
     this.submitted = true;

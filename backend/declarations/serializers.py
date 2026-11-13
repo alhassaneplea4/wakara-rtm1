@@ -70,14 +70,24 @@ class DeclarationListSerializer(serializers.ModelSerializer):
     assigned_to_name = serializers.SerializerMethodField()
     official_number = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
+    transmitted_offline = serializers.SerializerMethodField()
+    entered_offline = serializers.SerializerMethodField()
 
     class Meta:
         model = Declaration
         fields = [
             'uuid', 'reference', 'status', 'status_label', 'hospital', 'hospital_name', 'hospital_code',
             'birth_date', 'received_at', 'child_name', 'assigned_to_name', 'official_number',
-            'can_edit', 'updated_at', 'created_at',
+            'can_edit', 'updated_at', 'created_at', 'sync_version',
+            'transmitted_offline', 'entered_offline', 'device_created_at', 'device_transmitted_at',
         ]
+
+    def get_transmitted_offline(self, obj):
+        """Last transmission made from the agent's device (offline queue), not online."""
+        return obj.device_transmitted_at is not None
+
+    def get_entered_offline(self, obj):
+        return obj.device_created_at is not None
 
     def get_can_edit(self, obj):
         return can_edit_data(self.context['request'].user, obj)

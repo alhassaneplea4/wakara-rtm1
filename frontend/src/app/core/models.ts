@@ -32,6 +32,8 @@ export interface DeclarationListItem {
   uuid: string; reference: string; status: Status; status_label: string; hospital: string | null;
   hospital_name: string | null; hospital_code?: string | null; birth_date: string; received_at: string; child_name: string;
   assigned_to_name: string; official_number: string | null; can_edit?: boolean; updated_at: string; created_at: string;
+  /** Offline mode: the last transmission / the entry was made on an agent's device (absent on dossiers prepared locally). */
+  transmitted_offline?: boolean; entered_offline?: boolean; device_transmitted_at?: string | null;
 }
 
 export interface Child { first_names: string; last_name: string; gender: 'M' | 'F' | ''; nationality?: string; npi?: string; birth_rank?: number | null; }
@@ -122,6 +124,7 @@ export interface SupportingDocument {
 export interface Dashboard {
   period: { year: number; date_from: string; date_to: string };
   kpis: { births_declared: number; declarations_received: number; in_progress: number; pending_validation: number; to_correct: number; validated: number; rejected: number; delivered: number };
+  offline?: { transmitted: number; entered: number; received: number; latest_device_transmission: string | null };
   monthly: { month: string; received: number; validated: number }[];
   by_hospital: { name: string; count: number }[];
   by_status: { status: Status; label: string; count: number }[];

@@ -8,7 +8,8 @@
 6. [Guide utilisateur par rôle](./user-guide.md)
 7. [Décisions métier à valider](./business-decisions.md)
 8. [Compte rendu des tests](./test-report.md)
-9. **[Dossier de livraison (7 documents Word et PDF)](./livraison/README.md)** — cahier des charges, dossier technique, manuel utilisateur, guide d'exploitation, rapport de tests, PV de recette, PV de livraison
+9. **Mode hors connexion** (branche `wakara-hors-ligne`) : [architecture technique](./hors-ligne/architecture.md) · [exploitation](./hors-ligne/exploitation.md) · [guide de l'agent](./hors-ligne/guide-agent.md) · [tester en local](./hors-ligne/test-local.md) · [audit initial](./hors-ligne/phase-0-audit.md)
+10. **[Dossier de livraison (7 documents Word et PDF)](./livraison/README.md)** — cahier des charges, dossier technique, manuel utilisateur, guide d'exploitation, rapport de tests, PV de recette, PV de livraison
 
 L'API est documentée automatiquement (OpenAPI) : en développement (`DEBUG=True`),
 `http://localhost:8000/api/docs/` (Swagger) et `/api/schema/`. Ces routes sont désactivées en production.

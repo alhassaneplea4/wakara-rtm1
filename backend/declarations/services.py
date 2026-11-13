@@ -16,7 +16,7 @@ from django.utils import timezone
 
 from audit import service as audit
 from audit.models import AuditAction
-from core.exceptions import IncompleteConfirmationRequired
+from core.exceptions import IncompleteConfirmationRequired, VersionConflict
 from core.permissions import user_has_perm
 from core.workflow import Status, available_transitions, get_transition
 
@@ -145,16 +145,29 @@ FIELD_LABELS = {
 # ── Creation ──────────────────────────────────────
 
 @transaction.atomic
-def create_declaration(user, data: dict) -> Declaration:
+def create_declaration(user, data: dict, *, uuid=None, device_created_at=None, history_note='') -> Declaration:
+    """
+    ``uuid`` and ``device_created_at`` are only given by the offline synchronisation (sync.services): the
+    identifier generated on the device makes the creation idempotent, and the reception date is the day of
+    the entry on the device (business decision, see docs/hors-ligne). The API never passes them.
+    """
     child = data.pop('child', None) or {}
     mother = data.pop('mother', None)
     father = data.pop('father', None)
     declarant = data.pop('declarant', None)
+    data.pop('acte', None)  # the acte section only exists once the secretariat works on the dossier
+    extra = {}
+    if uuid is not None:
+        extra['uuid'] = uuid
+    received_at = timezone.localdate()
+    if device_created_at is not None:
+        extra['device_created_at'] = device_created_at
+        received_at = timezone.localtime(device_created_at).date()
     declaration = Declaration.objects.create(
         reference=generate_reference(),
-        received_at=timezone.localdate(),
+        received_at=received_at,
         created_by=user, updated_by=user, assigned_to=user,
-        **data,
+        **extra, **data,
     )
     Child.objects.create(declaration=declaration, **child)
     for kind, payload in ((Parent.MOTHER, mother), (Parent.FATHER, father)):
@@ -163,17 +176,24 @@ def create_declaration(user, data: dict) -> Declaration:
     if declarant:
         Declarant.objects.create(declaration=declaration, **declarant)
     StatusHistory.objects.create(declaration=declaration, from_status='', to_status=Status.DRAFT,
-                                 changed_by=user)
+                                 changed_by=user, reason=history_note)
     audit.log(AuditAction.CREATE, user=user, obj=declaration,
               changes={'reference': declaration.reference, 'status': declaration.status})
     return declaration
 
 
 @transaction.atomic
-def update_declaration(user, declaration: Declaration, data: dict) -> Declaration:
-    """Apply a (partial) update of the declaration and its nested sections; audits the diff."""
+def update_declaration(user, declaration: Declaration, data: dict, *, expected_version=None) -> Declaration:
+    """
+    Apply a (partial) update of the declaration and its nested sections; audits the diff.
+
+    ``expected_version`` (offline synchronisation): the edit is refused with VersionConflict when the dossier
+    has changed on the server since the device read it. Nothing is overwritten silently.
+    """
     if not can_edit_data(user, declaration):
         raise PermissionDenied("Ce dossier ne peut pas être modifié dans son état actuel ou par vous.")
+    if expected_version is not None and declaration.sync_version != expected_version:
+        raise VersionConflict(expected_version, declaration.sync_version)
 
     before = _full_snapshot(declaration)
     child = data.pop('child', None)
@@ -249,7 +269,8 @@ AUDIT_ACTION_BY_TARGET = {
 
 
 @transaction.atomic
-def transition_status(declaration_pk, target: str, user, reason: str = '', payload: dict = None):
+def transition_status(declaration_pk, target: str, user, reason: str = '', payload: dict = None,
+                      device_time=None, history_note: str = ''):
     """
     Move a dossier to ``target``. Raises:
       ValidationError   unknown / forbidden transition, missing reason, incomplete data
@@ -315,7 +336,11 @@ def transition_status(declaration_pk, target: str, user, reason: str = '', paylo
     declaration.status = target
     declaration.updated_by = user
     if target == Status.TRANSMITTED:
-        declaration.transmitted_at = now
+        # Offline transmission: the date that counts is the moment the agent transmitted on the device;
+        # the server time of the synchronisation stays in the status history (changed_at).
+        declaration.transmitted_at = device_time or now
+        # device_transmitted_at tells HOW the last transmission was made: from the device (offline queue) or online
+        declaration.device_transmitted_at = device_time
     elif target == Status.VALIDATED:
         declaration.validated_at = now
         declaration.validated_by = user
@@ -327,7 +352,7 @@ def transition_status(declaration_pk, target: str, user, reason: str = '', paylo
 
     StatusHistory.objects.create(
         declaration=declaration, from_status=old_status, to_status=target,
-        changed_by=user, reason=reason)
+        changed_by=user, reason=reason or history_note)
     audit.log(
         AUDIT_ACTION_BY_TARGET.get(target, AuditAction.TRANSITION), user=user, obj=declaration,
         changes={'status': {'from': old_status, 'to': target},

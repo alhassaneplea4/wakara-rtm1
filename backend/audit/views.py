@@ -16,7 +16,7 @@ class AuditLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = AuditLog
         fields = ['id', 'created_at', 'username', 'action', 'object_type', 'object_id',
-                  'object_repr', 'changes', 'reason', 'ip_address']
+                  'object_repr', 'changes', 'reason', 'ip_address', 'origin', 'device_id', 'device_time']
 
 
 class AuditLogFilter(filters.FilterSet):
@@ -26,7 +26,7 @@ class AuditLogFilter(filters.FilterSet):
 
     class Meta:
         model = AuditLog
-        fields = ['action', 'object_type', 'object_id', 'username']
+        fields = ['action', 'object_type', 'object_id', 'username', 'origin']
 
 
 class AuditLogViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):

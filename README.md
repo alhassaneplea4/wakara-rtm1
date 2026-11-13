@@ -67,8 +67,10 @@ la complétude des données, puis écrit l'historique et le journal d'audit dans
 ## Tests
 
 ```bash
-cd backend && python manage.py test tests        # 95 tests (workflow, permissions, audit, intégrité, documents, stats, sauvegarde)
+cd backend && python manage.py test tests        # workflow, permissions, audit, intégrité, documents, stats, sauvegarde, synchronisation
 cd frontend && npm run build                     # compilation stricte
+cd frontend && npm run test:ci                   # tests unitaires (dont le mode hors connexion)
+cd frontend && npm run e2e                       # mode hors connexion de bout en bout (Chrome installé requis)
 ```
 
 Détails et limites : [docs/test-report.md](docs/test-report.md).

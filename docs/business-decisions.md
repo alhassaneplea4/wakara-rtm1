@@ -101,3 +101,16 @@ avant la mise en production. Légende : ⏳ à confirmer.
 
 - Un **brouillon reste dans l'espace de son auteur** jusqu'à sa transmission : le secrétariat ne le voit ni dans « Déclarations », ni par recherche, ni dans les chiffres ou les pastilles. Il apparaît au secrétariat dès que l'agent le transmet.
 - Chaque agent ne voit toujours que ses propres dossiers. L'administrateur technique (droit d'archivage) voit encore les brouillons, pour pouvoir archiver un brouillon oublié.
+
+## Mode hors connexion (branche `wakara-hors-ligne`)
+
+Décisions prises avec le porteur du projet (novembre 2026) ; à faire confirmer par la mairie avant la mise en production.
+
+- **Qui** : l'agent de collecte uniquement. Secrétariat, validation, numéro officiel et délivrance restent en ligne.
+- **Date qui fait foi** : pour la réception et la transmission, la date de la **saisie sur l'appareil**. L'heure du serveur à la synchronisation est conservée à côté (historique du dossier, journal). Une date d'appareil incohérente (horloge fausse, date future, plus de 30 jours) est corrigée ou remplacée par la date du serveur, et l'anomalie est notée.
+- **Photos** : incluses, avec trois qualités au choix de l'agent (standard, économique, haute qualité).
+- **Protection** : données locales chiffrées, protégées par un code de verrouillage choisi par l'agent. Un code oublié fait perdre les opérations non synchronisées de l'appareil.
+- **Déconnexion** : refusée tant que des opérations de l'appareil ne sont pas sur le serveur. Pour laisser l'appareil, l'agent le verrouille.
+- **Conflit** : rien n'est écrasé automatiquement ; l'agent choisit entre ses modifications et la version du serveur.
+- **Session** (proposition retenue par défaut, à confirmer) : la session est conservée sur l'appareil derrière le code de verrouillage ; verrouillage automatique après 15 minutes d'inactivité.
+- **Rétention sur l'appareil** (par défaut, à confirmer) : une opération envoyée est vidée de son contenu aussitôt et disparaît de l'historique local après 7 jours.

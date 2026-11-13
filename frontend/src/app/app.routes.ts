@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard, permissionGuard } from './core/guards';
+import { authGuard, guestGuard, lockGuard, offlineGuard, permissionGuard } from './core/guards';
 import { ShellComponent } from './layout/shell.component';
 import { LoginComponent } from './features/login.component';
 import { inject } from '@angular/core';
@@ -8,8 +8,10 @@ import { Router } from '@angular/router';
 
 export const routes: Routes = [
   { path: 'login', canActivate: [guestGuard], component: LoginComponent, title: 'Connexion — Wakara' },
+  // offline mode: choose or type the code that protects the data kept on this device
+  { path: 'verrouillage', canActivate: [lockGuard], title: 'Verrouillage — Wakara', loadComponent: () => import('./features/lock.component').then(m => m.LockComponent) },
   {
-    path: '', component: ShellComponent, canActivate: [authGuard], canActivateChild: [authGuard],
+    path: '', component: ShellComponent, canActivate: [authGuard, offlineGuard], canActivateChild: [authGuard, offlineGuard],
     children: [
       {
         path: '', pathMatch: 'full',
@@ -36,7 +38,9 @@ export const routes: Routes = [
       { path: 'history/:uuid', canActivate: [permissionGuard], data: { perms: ['audit.view'] }, title: "Historique d'un dossier — Wakara", loadComponent: () => import('./features/history-detail.component').then(m => m.HistoryDetailComponent) },
       { path: 'statistics', pathMatch: 'full', redirectTo: 'dashboard' },
       { path: 'audit', canActivate: [permissionGuard], data: { perms: ['audit.view'] }, title: "Journal d'activité — Wakara", loadComponent: () => import('./features/audit.component').then(m => m.AuditComponent) },
+      { path: 'appareils', canActivate: [permissionGuard], data: { perms: ['audit.view'] }, title: 'Appareils hors connexion — Wakara', loadComponent: () => import('./features/devices.component').then(m => m.DevicesComponent) },
       { path: 'settings', canActivate: [permissionGuard], data: { perms: ['settings.manage'] }, title: 'Paramètres — Wakara', loadComponent: () => import('./features/settings.component').then(m => m.SettingsComponent) },
+      { path: 'synchronisation', title: 'Synchronisation — Wakara', loadComponent: () => import('./features/sync-center.component').then(m => m.SyncCenterComponent) },
       { path: 'profile', title: 'Mon profil — Wakara', loadComponent: () => import('./features/profile.component').then(m => m.ProfileComponent) },
       { path: 'forbidden', title: 'Accès refusé — Wakara', loadComponent: () => import('./features/errors.component').then(m => m.ForbiddenComponent) },
       { path: '**', title: 'Page introuvable — Wakara', loadComponent: () => import('./features/errors.component').then(m => m.NotFoundComponent) },
