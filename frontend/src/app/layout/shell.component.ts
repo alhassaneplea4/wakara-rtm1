@@ -8,8 +8,10 @@ import { ApiService } from '../core/api.service';
 import { AutoRefreshService } from '../core/auto-refresh.service';
 import { AuthService } from '../core/auth.service';
 import { Inbox } from '../core/models';
+import { OfflineGate } from '../core/offline/offline-gate.service';
+import { ConnectionIndicatorComponent, ReauthComponent } from '../shared/sync-ui';
 import { ToastService } from '../core/toast.service';
-import { IconComponent, LogoComponent } from '../shared/ui';
+import { ConfirmComponent, IconComponent, LogoComponent } from '../shared/ui';
 
 interface NavItem { label: string; icon: string; link: string; perms: string[]; }
 
@@ -24,12 +26,14 @@ const NAV: NavItem[] = [
   { label: 'Rôles et permissions', icon: 'lock', link: '/roles', perms: ['role.view'] },
   { label: 'Historiques des actes', icon: 'search', link: '/history', perms: ['audit.view'] },
   { label: "Journaux d'activité", icon: 'history', link: '/audit', perms: ['audit.view'] },
+  { label: 'Appareils hors connexion', icon: 'phone', link: '/appareils', perms: ['audit.view'] },
   { label: 'Paramètres', icon: 'settings', link: '/settings', perms: ['settings.manage'] },
 ];
 
 @Component({
   selector: 'wk-shell', standalone: true,
-  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, IconComponent, LogoComponent],
+  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, IconComponent, LogoComponent, ConfirmComponent,
+    ConnectionIndicatorComponent, ReauthComponent],
   template: `
     <div class="shell" [class.nav-open]="navOpen()">
       <aside class="sidebar" aria-label="Navigation principale" [attr.aria-hidden]="null">
@@ -40,6 +44,12 @@ const NAV: NavItem[] = [
             <a [routerLink]="item.link" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: false }" ariaCurrentWhenActive="page" (click)="navOpen.set(false)">
               <wk-icon [name]="item.icon" /><span>{{ item.label }}</span>
               @if (badge(item.link); as n) { <span class="count" aria-hidden="true">{{ n > 99 ? '99+' : n }}</span><span class="sr-only">{{ n }} à traiter</span> }
+            </a>
+          }
+          @if (gate.visible()) {
+            <a routerLink="/synchronisation" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="navOpen.set(false)">
+              <wk-icon name="refresh" /><span>Synchronisation</span>
+              @if (gate.unsynced(); as n) { <span class="count" aria-hidden="true">{{ n > 99 ? '99+' : n }}</span><span class="sr-only">{{ n }} opération(s) en attente</span> }
             </a>
           }
         </nav>
@@ -60,6 +70,8 @@ const NAV: NavItem[] = [
             </form>
           }
           <div class="spacer"></div>
+
+          @if (gate.visible()) { <wk-connection /> }
 
           <div class="menu-wrap">
             <button class="btn btn-icon btn-ghost bell" (click)="toggle('inbox'); $event.stopPropagation()" aria-label="Notifications">
@@ -84,14 +96,38 @@ const NAV: NavItem[] = [
             @if (open() === 'account') {
               <div class="dropdown" role="menu" (click)="$event.stopPropagation()">
                 <a routerLink="/profile" role="menuitem" (click)="open.set('')">Mon profil</a>
+                @if (gate.visible()) { <button type="button" class="item" role="menuitem" (click)="gate.lock()">Verrouiller l'appareil</button> }
                 <button type="button" class="item" role="menuitem" (click)="logout()">Déconnexion</button>
               </div>
             }
           </div>
         </header>
+        @if (gate.visible() && auth.sessionExpired() && gate.online()) {
+          <div class="strip danger" role="alert"><span>Session expirée : vos saisies restent enregistrées sur cet appareil, mais rien n'est envoyé au serveur.</span>
+            <button type="button" class="btn btn-sm" (click)="reauth.set(true)">Se reconnecter</button></div>
+        }
+        @if (gate.visible() && gate.revoked()) {
+          <div class="strip danger" role="alert"><span>Cet appareil a été révoqué par l'administrateur : la synchronisation est refusée. Vos saisies restent enregistrées ici.</span></div>
+        }
+        @if (gate.visible() && !gate.online()) {
+          <div class="strip" role="status"><span>Vous travaillez hors connexion : les déclarations sont enregistrées sur cet appareil et seront envoyées au retour de la connexion.</span></div>
+        }
+        @if (gate.updateReady()) {
+          <div class="strip info" role="status"><span>Une nouvelle version de Wakara est prête.</span>
+            <button type="button" class="btn btn-sm" (click)="reload()">Recharger</button></div>
+        }
         <main class="content"><router-outlet /></main>
       </div>
-    </div>`,
+    </div>
+    @if (blocked()) {
+      <wk-confirm title="Déconnexion impossible pour le moment" [confirmLabel]="blockedLabel()"
+        (cancel)="blocked.set(false)" (confirm)="resolveBlocked()">
+        {{ gate.unsynced() }} opération(s) enregistrée(s) sur cet appareil ne sont pas encore sur le serveur
+        @if (gate.problems()) { (dont {{ gate.problems() }} à corriger) }. Se déconnecter les effacerait : synchronisez d'abord.
+        Pour laisser l'appareil sans rien perdre, utilisez « Verrouiller l'appareil ».
+      </wk-confirm>
+    }
+    @if (reauth()) { <wk-reauth (done)="reauth.set(false)" /> }`,
   styles: [`
     .shell{display:grid;grid-template-columns:var(--sidebar-w) minmax(0,1fr);min-height:100vh}
     /* header and footer stay visible; only the menu itself scrolls on short screens */
@@ -131,6 +167,9 @@ const NAV: NavItem[] = [
     .dropdown a:hover,.dropdown .item:hover{background:var(--wk-sky-50)}
     .pad{padding:8px 10px}
     .backdrop{display:none}
+    .strip{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:9px 24px;background:var(--wk-warning-bg);color:#7a4700;font-size:13px;border-bottom:1px solid #f3d39b}
+    .strip.danger{background:var(--wk-danger-bg);color:#8f1f2b;border-bottom-color:#f3b6bd}
+    .strip.info{background:var(--wk-info-bg);color:var(--wk-royal);border-bottom-color:#c6d8fb}
     @media (max-width:960px){
       .shell{grid-template-columns:minmax(0,1fr)}
       .sidebar{position:fixed;left:0;top:0;bottom:0;width:min(var(--sidebar-w),86vw);transform:translateX(-100%);visibility:hidden;transition:transform .2s,visibility 0s .2s;z-index:400}
@@ -156,7 +195,11 @@ export class ShellComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
   private refresh = inject(AutoRefreshService);
   private toast = inject(ToastService);
+  gate = inject(OfflineGate);
 
+  /** Sign-out refused: operations of this device are not on the server yet. */
+  blocked = signal(false);
+  reauth = signal(false);
   navOpen = signal(false);
   open = signal<'' | 'inbox' | 'account'>('');
   inbox = signal<Inbox | null>(null);
@@ -194,7 +237,20 @@ export class ShellComponent implements OnInit {
   @HostListener('document:keydown.escape') onEscape() { this.open.set(''); this.navOpen.set(false); }
   @HostListener('window:resize') onResize() { if (window.innerWidth > 960) this.navOpen.set(false); }
 
-  logout() { this.open.set(''); this.navOpen.set(false); this.auth.logout(); }
+  logout() {
+    this.open.set(''); this.navOpen.set(false);
+    // refused by AuthService itself while this device holds operations the server has not confirmed
+    if (!this.auth.logout()) { void this.gate.refreshCounts(); this.blocked.set(true); }
+  }
+  async resolveBlocked() {
+    this.blocked.set(false);
+    if (!this.gate.online()) { this.gate.lock(); return; }
+    await this.gate.syncNow();
+    if (this.gate.unsynced()) { this.toast.error(this.gate.message() || 'Des opérations restent à corriger avant de pouvoir vous déconnecter.'); void this.router.navigate(['/synchronisation']); }
+    else this.toast.success('Tout est synchronisé : vous pouvez vous déconnecter.');
+  }
+  reload() { window.location.reload(); }
+  blockedLabel() { return this.gate.online() ? 'Synchroniser maintenant' : "Verrouiller l'appareil"; }
 
   inboxLink(status: string): string {
     return status === 'PENDING_VALIDATION' ? '/validation' : '/declarations';

@@ -21,3 +21,7 @@ frontend/out-tsc/
 .idea/
 .vscode/
 .karma-profile/
+
+# End-to-end tests
+frontend/test-results/
+frontend/playwright-report/

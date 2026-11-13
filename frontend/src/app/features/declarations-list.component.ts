@@ -1,12 +1,14 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, effect, inject, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService, Query, errorMessage } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { AutoRefreshService } from '../core/auto-refresh.service';
 import { DeclarationListItem, Hospital, Page, STATUS_LABELS, Status } from '../core/models';
+import { OfflineGate } from '../core/offline/offline-gate.service';
 import { ToastService } from '../core/toast.service';
+import { SyncChipComponent } from '../shared/sync-ui';
 import { IconComponent, PageHeaderComponent, PaginationComponent, StatusBadgeComponent } from '../shared/ui';
 
 type Mode = 'all' | 'validation';
@@ -21,7 +23,7 @@ const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Statu
 
 @Component({
   selector: 'wk-declarations-list', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, PaginationComponent, StatusBadgeComponent],
+  imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, PaginationComponent, StatusBadgeComponent, SyncChipComponent],
   template: `
     <div class="page">
       <wk-page-header [title]="text.title" [subtitle]="subtitle()">
@@ -76,11 +78,12 @@ const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Statu
               <th class="sortable" (click)="sort('birth_date')">Naissance {{ arrow('birth_date') }}</th>
               <th class="sortable" (click)="sort('received_at')">Reçue le {{ arrow('received_at') }}</th>
               <th>Responsable</th><th>Statut</th>
+              @if (gate.visible()) { <th title="Le dossier est-il sur le serveur ou encore sur cet appareil ?">Synchronisation</th> }
               <th class="sortable" (click)="sort('updated_at')">Modifiée {{ arrow('updated_at') }}</th>
               <th><span class="sr-only">Actions</span></th>
             </tr></thead>
             <tbody>
-              @if (loading()) { @for (i of [1,2,3,4,5]; track i) { <tr><td colspan="9"><div class="skeleton" style="height:20px"></div></td></tr> } }
+              @if (loading()) { @for (i of [1,2,3,4,5]; track i) { <tr><td colspan="10"><div class="skeleton" style="height:20px"></div></td></tr> } }
               @else {
                 @for (d of rows(); track d.uuid) {
                   <tr class="clickable" (click)="open(d.uuid)" tabindex="0" (keyup.enter)="open(d.uuid)">
@@ -88,11 +91,12 @@ const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Statu
                     <td class="uc">{{ d.child_name || '—' }}</td><td class="uc">{{ d.hospital_name || 'Non renseigné' }}</td>
                     <td class="mono">{{ d.birth_date | date: 'dd/MM/yyyy' }}</td><td class="mono">{{ d.received_at | date: 'dd/MM/yyyy' }}</td>
                     <td>{{ d.assigned_to_name || '—' }}</td><td><wk-status [status]="d.status" /></td>
+                    @if (gate.visible()) { <td><wk-sync [state]="$any(d).sync_state" /></td> }
                     <td class="mono">{{ d.updated_at | date: 'dd/MM/yyyy HH:mm' }}</td>
                     <td class="act">@if (d.can_edit) { <a class="edit-btn" [routerLink]="['/declarations', d.uuid, 'edit']" (click)="$event.stopPropagation()" (keyup.enter)="$event.stopPropagation()" title="Modifier" [attr.aria-label]="'Modifier la déclaration ' + d.reference"><wk-icon name="edit" [size]="16" /></a> }</td>
                   </tr>
                 } @empty {
-                  <tr><td colspan="9"><div class="empty"><strong>Aucun dossier</strong>{{ hasFilters() ? 'Aucun résultat pour ces filtres.' : 'Rien à afficher pour le moment.' }}</div></td></tr>
+                  <tr><td colspan="10"><div class="empty"><strong>Aucun dossier</strong>{{ hasFilters() ? 'Aucun résultat pour ces filtres.' : 'Rien à afficher pour le moment.' }}</div></td></tr>
                 }
               }
             </tbody>
@@ -130,6 +134,12 @@ export class DeclarationsListComponent implements OnInit {
   private autoRefresh = inject(AutoRefreshService);
   private lastQuery: Query | null = null;
   auth = inject(AuthService);
+  gate = inject(OfflineGate);
+
+  constructor() {
+    // offline mode: a dossier queued, sent or refused on this device changes its indicator at once
+    effect(() => { if (this.gate.revision() && this.gate.visible()) untracked(() => this.silentReload()); });
+  }
 
   mode: Mode = 'all';
   text = MODE_TEXT.all;

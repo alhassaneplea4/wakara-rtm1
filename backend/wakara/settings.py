@@ -125,7 +125,8 @@ elif DB_ENGINE == 'django.db.backends.sqlite3':
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+            # SQLITE_PATH: another file than the development database (end-to-end tests use a temporary one)
+            'NAME': config('SQLITE_PATH', default=str(BASE_DIR / 'db.sqlite3')),
         }
     }
 else:

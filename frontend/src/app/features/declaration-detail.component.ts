@@ -1,5 +1,5 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, effect, inject, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
@@ -7,7 +7,9 @@ import { ApiService, errorMessage } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { AutoRefreshService } from '../core/auto-refresh.service';
 import { Acte, AuditEntry, AvailableTransition, DeclarationDetail, Page, STATUS_LABELS, Status, SupportingDocument } from '../core/models';
+import { OfflineGate } from '../core/offline/offline-gate.service';
 import { ToastService } from '../core/toast.service';
+import { SyncBannerComponent, SyncChipComponent } from '../shared/sync-ui';
 import { DateLettersPipe } from '../shared/date-letters.pipe';
 import { maritalLabel } from '../shared/marital';
 import { PaperFormComponent } from '../shared/paper-form.component';
@@ -48,12 +50,14 @@ const STEP_TEXT: Record<string, { title: string; help: string; icon: string; ton
 
 @Component({
   selector: 'wk-declaration-detail', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, StatusBadgeComponent, ConfirmComponent, PaperFormComponent, DateLettersPipe],
+  imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, StatusBadgeComponent, ConfirmComponent, PaperFormComponent, DateLettersPipe,
+    SyncChipComponent, SyncBannerComponent],
   template: `
     @if (d(); as d) {
       <div class="page">
         <wk-page-header [upper]="true" [title]="d.reference" [back]="['/declarations']" backLabel="Retour aux déclarations" [subtitle]="(d.child_name || 'Enfant non nommé') + ' · ' + (d.hospital_name || 'Établissement non identifié')">
           <wk-status [status]="d.status" />
+          @if (gate.visible()) { <wk-sync [state]="$any(d).sync_state" /> }
           @if (d.can_edit) { <a class="btn" [routerLink]="['/declarations', d.uuid, 'edit']"><wk-icon name="edit" [size]="16" /> Modifier</a> }
           @if (d.acte_uuid && auth.can('acte.view')) {
             <a class="btn" [routerLink]="['/actes', d.acte_uuid, 'document']"><wk-icon name="eye" [size]="16" /> Aperçu de l'acte</a>
@@ -61,6 +65,9 @@ const STEP_TEXT: Record<string, { title: string; help: string; icon: string; ton
         </wk-page-header>
 
         @if (error()) { <div class="alert alert-danger" role="alert" style="margin-bottom:16px">{{ error() }}</div> }
+        @if (gate.visible()) {
+          <wk-sync-banner [state]="$any(d).sync_state" [error]="$any(d).sync_error" [uuid]="d.uuid" [localOnly]="d.reference.startsWith('LOCAL-')" (changed)="onSyncChange($event, d)" />
+        }
         @if (d.last_decision_reason && ['TO_CORRECT_COLLECTION','TO_CORRECT_SECRETARIAT','REJECTED'].includes(d.status)) {
           <div class="alert alert-warning" style="margin-bottom:16px"><strong>Motif du retour / rejet :</strong> {{ d.last_decision_reason }}</div>
         }
@@ -267,6 +274,21 @@ export class DeclarationDetailComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
   private autoRefresh = inject(AutoRefreshService);
   auth = inject(AuthService);
+  gate = inject(OfflineGate);
+
+  constructor() {
+    // offline mode: the page follows what happens to this dossier on the device (sent, refused, conflict…)
+    effect(() => {
+      if (this.gate.revision() && this.gate.visible()) untracked(() => { if (this.d() && !this.pending() && !this.busy() && !this.leaving) this.load(); });
+    });
+  }
+  private leaving = false;
+
+  /** The agent gave up local changes: a dossier that only existed on this device no longer exists. */
+  onSyncChange(what: 'discarded' | 'retried', d: DeclarationDetail) {
+    if (what === 'discarded' && d.reference.startsWith('LOCAL-')) { this.leaving = true; this.router.navigate(['/declarations']); return; }
+    this.load();
+  }
 
   d = signal<DeclarationDetail | null>(null);
   acte = signal<Acte | null>(null);
@@ -391,7 +413,13 @@ export class DeclarationDetailComponent implements OnInit {
       body.registre = this.num.registre; body.feuillet = this.num.feuillet; body.numero_acte = this.num.numero_acte;
     }
     this.api.post<DeclarationDetail>(`/declarations/${this.uuid()}/transition/`, body).subscribe({
-      next: d => { this.busy.set(false); this.pending.set(null); this.incomplete.set(null); this.d.set(d); this.toast.success(`Statut : ${this.label(d.status)}`); this.load(); },
+      next: d => {
+        this.busy.set(false); this.pending.set(null); this.incomplete.set(null); this.d.set(d);
+        const state = (d as any).sync_state;
+        if (state && state !== 'synced') this.toast.info(this.gate.online() ? 'Transmission enregistrée : envoi au serveur en cours.' : 'Transmission enregistrée sur cet appareil : elle partira au retour de la connexion.');
+        else this.toast.success(`Statut : ${this.label(d.status)}`);
+        this.load();
+      },
       error: e => {
         this.busy.set(false); this.pending.set(null);
         // final validation with expected fields still empty: the validator is warned and may confirm
