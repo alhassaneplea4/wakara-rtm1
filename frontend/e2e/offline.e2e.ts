@@ -118,7 +118,7 @@ test('saisie hors connexion, redémarrage sans réseau, puis synchronisation au 
   expect(rows[0].status).toBe('DRAFT');
 });
 
-test('transmission et photo de la fiche préparées hors connexion', async ({ page, context, request }) => {
+test('transmission et photo de la fiche préparées hors connexion', async ({ page, context, request, browser }) => {
   await setUpDevice(page);
   await waitForOfflineShell(page);
   await goOffline(context, page);
@@ -143,6 +143,28 @@ test('transmission et photo de la fiche préparées hors connexion', async ({ pa
   const docs = await (await request.get('/api/documents/', { headers, params: { declaration: rows[0].uuid } })).json();
   expect(docs.count).toBe(1);
   expect(docs.results[0].size).toBe(jpeg.length);
+
+  // the administrator can tell that this dossier was transmitted from a device (statistics + filtered list)
+  const adminLogin = await request.post('/api/auth/login/', { data: { username: 'admin.e2e', password: PASSWORD } });
+  const adminHeaders = { Authorization: `Bearer ${(await adminLogin.json()).access}` };
+  const stats = await (await request.get('/api/stats/dashboard/', { headers: adminHeaders })).json();
+  expect(stats.offline.transmitted).toBeGreaterThanOrEqual(1);
+  const offlineList = await (await request.get('/api/declarations/', { headers: adminHeaders, params: { transmitted_offline: 'true' } })).json();
+  expect(offlineList.results.map((r: { uuid: string }) => r.uuid)).toContain(rows[0].uuid);
+
+  // ...and sees it on screen: card of the dashboard, then the list narrowed to these dossiers (own browser: own session)
+  const staff = await browser.newContext();
+  const admin = await staff.newPage();
+  await signIn(admin, 'admin.e2e');
+  await expect(admin).toHaveURL(/\/dashboard/);
+  const card = admin.locator('section.offline');
+  await expect(card).toContainText('Dossiers transmis hors ligne');
+  await expect(card.locator('.o-figs dd').first()).not.toHaveText('0');
+  await card.getByRole('link', { name: /transmis hors ligne/i }).click();
+  await expect(admin).toHaveURL(/offline=transmitted/);
+  await expect(admin.locator('tbody tr', { hasText: 'Transmise' }).locator('.chip-off')).toHaveText('Hors ligne');
+  if (process.env['E2E_SHOTS']) { await admin.screenshot({ path: `${process.env['E2E_SHOTS']}/liste.png` }); await admin.goto('/dashboard'); await expect(card).toBeVisible(); await admin.screenshot({ path: `${process.env['E2E_SHOTS']}/tableau.png` }); }
+  await staff.close();
 });
 
 test('conflit : le dossier a changé sur le serveur, rien n\'est écrasé', async ({ page, context, request }) => {

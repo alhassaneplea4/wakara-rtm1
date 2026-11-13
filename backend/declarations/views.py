@@ -31,6 +31,9 @@ class DeclarationFilter(filters.FilterSet):
     received_to = filters.DateFilter(field_name='received_at', lookup_expr='lte')
     assigned_to = filters.UUIDFilter(field_name='assigned_to__uuid')
     updated_since = filters.IsoDateTimeFilter(field_name='updated_at', lookup_expr='gt')
+    # offline mode: how the dossier reached the server (see docs/hors-ligne/architecture.md)
+    transmitted_offline = filters.BooleanFilter(field_name='device_transmitted_at', lookup_expr='isnull', exclude=True)
+    entered_offline = filters.BooleanFilter(field_name='device_created_at', lookup_expr='isnull', exclude=True)
 
     class Meta:
         model = Declaration

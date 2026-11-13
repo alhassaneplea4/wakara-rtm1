@@ -10,6 +10,9 @@ Definitions (to be confirmed, see docs/business-decisions.md):
   validated             validated definitively (VALIDATED + DELIVERED)
   rejected              closed as rejected
   delivered             acts handed over
+  offline.transmitted   declarations whose last transmission was made from an agent's device without network
+  offline.entered       declarations entered on a device (offline mode), transmitted or not
+  origin (filter)       transmitted_offline | entered_offline: narrows every figure to those declarations
 The period filters on the reception date of the declaration.
 """
 import datetime
@@ -60,6 +63,12 @@ class DashboardView(APIView):
             qs = qs.filter(status__in=params['status'].split(','))
         if params.get('agent'):
             qs = qs.filter(assigned_to__uuid=params['agent'])
+        # offline mode: the figures of the "Origine" filter and of the offline card are counted on the same selection
+        selection = qs
+        if params.get('origin') == 'transmitted_offline':
+            qs = qs.filter(device_transmitted_at__isnull=False)
+        elif params.get('origin') == 'entered_offline':
+            qs = qs.filter(device_created_at__isnull=False)
 
         received = qs.exclude(status=Status.DRAFT)
         validated_statuses = (Status.VALIDATED, Status.DELIVERED)
@@ -109,9 +118,19 @@ class DashboardView(APIView):
             avg=Avg(ExpressionWrapper(F('validated_at') - F('transmitted_at'), output_field=DurationField())))
         avg_days = round(delay['avg'].total_seconds() / 86400, 1) if delay['avg'] else None
 
+        sent = selection.exclude(status=Status.DRAFT)
+        offline = {
+            'transmitted': sent.filter(device_transmitted_at__isnull=False).count(),
+            'entered': selection.filter(device_created_at__isnull=False).count(),
+            'received': sent.count(),
+            'latest_device_transmission': sent.filter(device_transmitted_at__isnull=False)
+                                              .order_by('-device_transmitted_at').values_list('device_transmitted_at', flat=True).first(),
+        }
+
         return Response({
             'period': {'year': year, 'date_from': date_from, 'date_to': date_to},
             'kpis': kpis,
+            'offline': offline,
             'monthly': monthly,
             'by_hospital': by_hospital,
             'by_status': by_status,

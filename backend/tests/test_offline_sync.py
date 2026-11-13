@@ -533,3 +533,59 @@ class PullAndHistoryTests(SyncTestCase):
         self.pushed()
         with self.assertRaises(HardDeleteForbidden):
             SyncOperation.objects.get().delete()
+
+
+class OfflineStatisticsTests(SyncTestCase):
+    """The secretariat and the administrator can tell which dossiers were transmitted from an agent's device."""
+
+    def offline_transmitted(self):
+        op, _created = self.pushed()
+        self.push(self.agent, [self.op('transmit', entity=op['entity_uuid'])])
+        return op['entity_uuid']
+
+    def test_a_dossier_transmitted_offline_is_counted_and_filterable(self):
+        offline = self.offline_transmitted()
+        online = self.create_declaration()['uuid']
+        self.assertEqual(self.transition(self.agent, online, 'TRANSMITTED').status_code, 200)
+        entered_only, _ = self.pushed()      # entered offline, still a draft
+        c = self.client_for(self.secretary)
+
+        stats = c.get('/api/stats/dashboard/').data
+        self.assertEqual(stats['offline']['transmitted'], 1)
+        self.assertEqual(stats['offline']['received'], 2)
+        self.assertIsNotNone(stats['offline']['latest_device_transmission'])
+        self.assertEqual(stats['kpis']['declarations_received'], 2)
+
+        narrowed = c.get('/api/stats/dashboard/?origin=transmitted_offline').data
+        self.assertEqual(narrowed['kpis']['declarations_received'], 1)
+        self.assertEqual(narrowed['offline']['transmitted'], 1)
+
+        listing = c.get('/api/declarations/?transmitted_offline=true').data['results']
+        self.assertEqual([r['uuid'] for r in listing], [offline])
+        self.assertTrue(listing[0]['transmitted_offline'] and listing[0]['entered_offline'])
+        online_rows = c.get('/api/declarations/?transmitted_offline=false').data['results']
+        self.assertEqual([r['uuid'] for r in online_rows], [online])
+        self.assertFalse(online_rows[0]['transmitted_offline'])
+
+    def test_a_dossier_created_offline_but_transmitted_online_is_not_a_device_transmission(self):
+        op, _created = self.pushed()
+        self.assertEqual(self.transition(self.agent, op['entity_uuid'], 'TRANSMITTED').status_code, 200)
+        d = Declaration.objects.get(uuid=op['entity_uuid'])
+        self.assertIsNone(d.device_transmitted_at)
+        self.assertIsNotNone(d.device_created_at)
+        self.assertEqual(self.client_for(self.admin).get('/api/stats/dashboard/').data['offline'],
+                         {'transmitted': 0, 'entered': 1, 'received': 1, 'latest_device_transmission': None})
+
+    def test_a_retransmission_made_online_clears_the_device_mark(self):
+        uid = self.offline_transmitted()
+        Declaration.objects.filter(uuid=uid).update(status='TO_CORRECT_COLLECTION')   # sent back to the agent
+        self.assertEqual(self.transition(self.agent, uid, 'TRANSMITTED').status_code, 200)
+        self.assertIsNone(Declaration.objects.get(uuid=uid).device_transmitted_at)
+
+    def test_an_account_created_by_the_administrator_works_offline(self):
+        """No special setup: the role « Agent de collecte » is enough (the permissions decide, not the account)."""
+        from accounts.models import CustomUser, Role, UserRole
+        user = CustomUser.objects.create_user(username='nouvel.agent', password='Un-Mot-De-Passe-1!')
+        UserRole.objects.create(user=user, role=Role.objects.get(codename='collection_agent'))
+        r = self.push(user, [self.create_op()])
+        self.assertEqual((r.status_code, r.data['results'][0]['status']), (200, 'applied'))

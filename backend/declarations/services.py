@@ -339,8 +339,8 @@ def transition_status(declaration_pk, target: str, user, reason: str = '', paylo
         # Offline transmission: the date that counts is the moment the agent transmitted on the device;
         # the server time of the synchronisation stays in the status history (changed_at).
         declaration.transmitted_at = device_time or now
-        if device_time is not None:
-            declaration.device_transmitted_at = device_time
+        # device_transmitted_at tells HOW the last transmission was made: from the device (offline queue) or online
+        declaration.device_transmitted_at = device_time
     elif target == Status.VALIDATED:
         declaration.validated_at = now
         declaration.validated_by = user
