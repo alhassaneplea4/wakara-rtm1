@@ -40,6 +40,15 @@ class PreviewIsolationTests(SimpleTestCase):
         result = settings_with(VERCEL='1', VERCEL_ENV='preview', DATABASE_URL=self.PROD, PREVIEW_DATABASE_DATABASE_URL=self.PREVIEW)
         self.assertTrue(result.stdout.startswith('preview-host.example '), result.stdout + result.stderr)
 
+    def test_short_preview_alias_is_an_allowed_host_in_preview_only(self):
+        probe = "from django.conf import settings; print('wakara-hl.vercel.app' in settings.ALLOWED_HOSTS)"
+        def hosts(**env):
+            clean = {k: v for k, v in os.environ.items() if k not in ('DATABASE_URL', 'PREVIEW_DATABASE_URL', 'PREVIEW_DATABASE_DATABASE_URL', 'VERCEL', 'VERCEL_ENV', 'SECRET_KEY', 'DEBUG', 'ALLOWED_HOSTS')}
+            clean.update(DEBUG='True', DJANGO_SETTINGS_MODULE='wakara.settings', **env)
+            return subprocess.run([sys.executable, '-c', probe], cwd=BACKEND, env=clean, capture_output=True, text=True).stdout.strip()
+        self.assertEqual(hosts(VERCEL='1', VERCEL_ENV='preview', DATABASE_URL=self.PROD, PREVIEW_DATABASE_URL=self.PREVIEW), 'True')
+        self.assertEqual(hosts(VERCEL='1', VERCEL_ENV='production', DATABASE_URL=self.PROD, SECRET_KEY='x' * 40), 'False')
+
     def test_the_preview_variable_is_ignored_outside_preview(self):
         result = settings_with(VERCEL='1', VERCEL_ENV='production', DATABASE_URL=self.PROD, PREVIEW_DATABASE_URL=self.PREVIEW)
         self.assertTrue(result.stdout.startswith('prod-host.example '), result.stdout)

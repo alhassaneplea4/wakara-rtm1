@@ -43,6 +43,10 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv(
 # Vercel injects the deployment hostnames: allow them automatically (no wildcard).
 VERCEL_HOSTS = [h for h in (os.environ.get(k, '') for k in (
     'VERCEL_URL', 'VERCEL_BRANCH_URL', 'VERCEL_PROJECT_PRODUCTION_URL')) if h]
+# Short alias of the offline-mode preview (project domain bound to the wakara-hors-ligne branch). Vercel does not
+# put a domain alias in VERCEL_URL, so it is listed here: preview deployments ONLY, never production.
+PREVIEW_ALIAS_HOSTS = config('PREVIEW_ALIAS_HOSTS', default='wakara-hl.vercel.app', cast=Csv()) if VERCEL_ENV == 'preview' else []
+VERCEL_HOSTS += PREVIEW_ALIAS_HOSTS
 ALLOWED_HOSTS += VERCEL_HOSTS
 # Number of trusted reverse proxies in front of Django. It decides which X-Forwarded-For entry is the client
 # address (audit log AND login throttling). 0 = ignore X-Forwarded-For (a client can send anything in it);
