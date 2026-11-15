@@ -68,6 +68,16 @@ const STEP_TEXT: Record<string, { title: string; help: string; icon: string; ton
         @if (gate.visible()) {
           <wk-sync-banner [state]="$any(d).sync_state" [error]="$any(d).sync_error" [uuid]="d.uuid" [localOnly]="d.reference.startsWith('LOCAL-')" (changed)="onSyncChange($event, d)" />
         }
+        @if (d.duplicate_alert?.blocked) {
+          <div class="alert alert-warning" role="alert" style="margin-bottom:16px">
+            <strong>Contrôle de doublon en cours.</strong>
+            @if (d.duplicate_alert!.designated_duplicate.length) { Ce dossier a été identifié comme une saisie redondante d'un autre dossier : aucun acte officiel ne peut être établi pour lui. }
+            @else { Une ressemblance avec une autre déclaration a été détectée : l'attribution du numéro officiel est suspendue jusqu'à la décision d'un responsable habilité. Le reste du circuit n'est pas interrompu. }
+            @for (c of d.duplicate_alert!.open_cases; track $index) {
+              @if (c.uuid && auth.can('duplicate.view')) { <a [routerLink]="['/duplicates/cases', c.uuid]" class="mono">{{ c.reference }}</a>{{ ' ' }} }
+            }
+          </div>
+        }
         @if (d.last_decision_reason && ['TO_CORRECT_COLLECTION','TO_CORRECT_SECRETARIAT','REJECTED'].includes(d.status)) {
           <div class="alert alert-warning" style="margin-bottom:16px"><strong>Motif du retour / rejet :</strong> {{ d.last_decision_reason }}</div>
         }

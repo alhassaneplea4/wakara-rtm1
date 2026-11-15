@@ -102,6 +102,11 @@ def assign_official_number(acte: Acte, user, *, annee=None, registre=None, feuil
     if acte.numero_assigned_at:
         return acte  # already confirmed at a validation: never overwritten
 
+    # No second official act for the same birth: a dossier under duplicate suspicion (or designated as the
+    # redundant entry) cannot get an official number until a responsible person has ruled.
+    from duplicates.services.cases import DuplicateCaseService
+    DuplicateCaseService.assert_official_validation_allowed(acte.declaration, user)
+
     if annee is not None:
         acte.annee = annee
     if registre is not None:

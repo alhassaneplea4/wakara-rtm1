@@ -44,6 +44,9 @@ PERMISSION_CATALOG = [
     ('data.export', 'Exporter les données', 'Statistiques'),
     ('audit.view', "Consulter les journaux d'audit", 'Audit'),
     ('settings.manage', 'Gérer les paramètres', 'Administration'),
+    ('duplicate.view', 'Consulter le Centre de contrôle des doublons', 'Contrôle des doublons'),
+    ('duplicate.investigate', 'Investiguer un dossier suspect (observations, vérifications)', 'Contrôle des doublons'),
+    ('duplicate.decide', "Décider du sort d'un dossier suspect", 'Contrôle des doublons'),
 ]
 ALL_PERMISSION_CODES = [c for c, _, _ in PERMISSION_CATALOG]
 
@@ -65,6 +68,7 @@ DEFAULT_ROLES = {
             'document.view', 'document.upload',
             'hospital.view', 'hospital.create', 'hospital.update', 'hospital.archive',
             'stats.view',
+            'duplicate.view', 'duplicate.investigate',
         ],
         'is_system': False,
     },

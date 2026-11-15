@@ -17,6 +17,7 @@ from django.utils import timezone
 
 from accounts.models import Role, UserRole
 from actes.services import assign_official_number
+from django.core.exceptions import ValidationError
 from core.workflow import Status
 from declarations import services
 from declarations.models import Declaration
@@ -133,13 +134,29 @@ class Command(BaseCommand):
                 services.transition_status(d.pk, Status.REJECTED, admin, 'Doublon (démo)')
                 continue
             number += 1
-            services.transition_status(d.pk, Status.VALIDATED, admin, payload={
-                'annee': today.year, 'registre': 'DEMO', 'numero_acte': str(number),
-                'accept_incomplete': True})
+            try:
+                services.transition_status(d.pk, Status.VALIDATED, admin, payload={
+                    'annee': today.year, 'registre': 'DEMO', 'numero_acte': str(number),
+                    'accept_incomplete': True})
+            except ValidationError as exc:
+                if getattr(exc, 'code', None) != 'duplicate_block':
+                    raise
+                number -= 1   # held by the duplicate control (random fictional names that look alike)
+                continue
             if target == Status.DELIVERED:
                 from actes.services import record_delivery
                 record_delivery(Declaration.objects.get(pk=d.pk).acte, secretary, {
                     'recipient_name': 'Démo Parent', 'recipient_relationship': 'Parent'})
+        # a fictional suspect pair (same birth entered twice, spelling variants) to show the duplicate control
+        born = today - datetime.timedelta(days=4)
+        for who, mother, child, ref in ((agent, ('Fatoumata', 'Kamara'), ('Mamadou', 'Camara'), 'DEMO-DUP-1'),
+                                        (secretary, ('Fatoumata', 'Camara'), ('Mamadu', 'Kamara'), '')):
+            services.create_declaration(who, {
+                'hospital': random.choice(hospitals), 'birth_date': born, 'birth_time': datetime.time(9, 15),
+                'hospital_document_ref': ref, 'birth_place': 'Ratoma', 'doctor_name': 'Dr Démo',
+                'child': {'first_names': child[0], 'last_name': child[1], 'gender': 'M'},
+                'mother': {'first_names': mother[0], 'last_name': mother[1], 'address': 'Ratoma, Conakry'},
+            })
         self.stdout.write(self.style.SUCCESS(
             f"{options['count']} dossiers fictifs créés. Comptes : secretaire / agent.collecte "
             "(mot de passe = DEMO_USER_PASSWORD du .env)."))

@@ -27,9 +27,12 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
+        new_permissions = []
         for codename, name, category in PERMISSION_CATALOG:
-            Permission.objects.update_or_create(
+            _, created = Permission.objects.update_or_create(
                 codename=codename, defaults={'name': name, 'category': category})
+            if created:
+                new_permissions.append(codename)
         self.stdout.write(f"Permissions : {len(PERMISSION_CATALOG)}")
 
         for codename, spec in DEFAULT_ROLES.items():
@@ -41,7 +44,14 @@ class Command(BaseCommand):
                 for perm_code in spec['permissions']:
                     RolePermission.objects.create(
                         role=role, permission=Permission.objects.get(codename=perm_code))
-            elif codename == 'admin':
+            else:
+                # a permission introduced by an upgrade is offered to the default roles that list it, once
+                # (the administrator may remove it afterwards: it is only attached when first created)
+                for perm_code in spec['permissions']:
+                    if perm_code in new_permissions:
+                        RolePermission.objects.get_or_create(
+                            role=role, permission=Permission.objects.get(codename=perm_code))
+            if not created and codename == 'admin':
                 # the admin role always owns every catalogue permission (new ones included)
                 for perm in Permission.objects.exclude(role_permissions__role=role):
                     RolePermission.objects.create(role=role, permission=perm)

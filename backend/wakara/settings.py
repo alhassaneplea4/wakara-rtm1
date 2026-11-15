@@ -78,6 +78,7 @@ INSTALLED_APPS = [
     'actes.apps.ActesConfig',
     'documents.apps.DocumentsConfig',
     'audit.apps.AuditConfig',
+    'duplicates.apps.DuplicatesConfig',
     'stats.apps.StatsConfig',
     'sync.apps.SyncConfig',
 ]
@@ -315,6 +316,18 @@ VALIDATION_EXPECTED_FIELDS = config(
 # Official act number: manual entry by default. Automatic sequential numbering per
 # (year, registry) is only available when explicitly enabled.
 ACTE_AUTO_NUMBERING = config('ACTE_AUTO_NUMBERING', default=False, cast=bool)
+# Duplicate prevention (Centre de contrôle des doublons). Initial values to be calibrated on real cases;
+# an administrator can override them in the database (SiteSetting "duplicates.config").
+DUPLICATE_WEIGHTS = {
+    'mother': 30, 'birth_date': 25, 'birth_place': 15, 'birth_time': 10, 'father': 10, 'complementary': 10,
+}
+DUPLICATE_THRESHOLDS = {'high': 85, 'medium': 60}
+# Minimum share (%) of the 100 points that must be comparable for a HIGH risk to be retained.
+DUPLICATE_MIN_QUALITY_FOR_HIGH = config('DUPLICATE_MIN_QUALITY_FOR_HIGH', default=50, cast=int)
+# Risk levels for which an unresolved case blocks the OFFICIAL validation (never the normal circuit).
+DUPLICATE_BLOCKING_LEVELS = config('DUPLICATE_BLOCKING_LEVELS', default='HIGH,MEDIUM', cast=Csv())
+# Search window (days) around the birth date when looking for candidates.
+DUPLICATE_DATE_WINDOW_DAYS = config('DUPLICATE_DATE_WINDOW_DAYS', default=3, cast=int)
 STATS_SHOW_GENDER = config('STATS_SHOW_GENDER', default=True, cast=bool)
 
 # ──────────────────────────────────────────────

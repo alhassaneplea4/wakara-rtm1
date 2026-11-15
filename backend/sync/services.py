@@ -289,6 +289,8 @@ def _answer(record, user, request, *, duplicate=False):
     }
     if record.op_type == OpType.DOCUMENT_UPLOAD and record.status == OpStatus.APPLIED:
         answer['document'] = record.result
+    elif record.status == OpStatus.APPLIED and (record.result or {}).get('duplicate_cases'):
+        answer['duplicate_cases'] = record.result['duplicate_cases']
     return answer
 
 
@@ -343,6 +345,12 @@ def process_operation(user, device, op, sent_at, request):
                 else:
                     record.result = {'reference': obj.reference, 'status': obj.status,
                                      'sync_version': obj.sync_version}
+                    # duplicate control: the declaration is kept; a case for a human is opened if it looks like another
+                    from duplicates.services.cases import DuplicateCaseService
+                    cases = DuplicateCaseService.status_for(obj)['open_cases']
+                    if cases:
+                        record.result['duplicate_cases'] = [
+                            {'reference': c['reference'], 'risk_level': c['risk_level']} for c in cases]
         record.save()
         if record.status == OpStatus.APPLIED:
             Device.objects.filter(pk=device.pk).update(last_sync_at=now)

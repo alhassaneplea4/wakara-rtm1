@@ -55,6 +55,14 @@ export interface DeclarationDetail extends DeclarationListItem {
   father: Person | null; declarant: Declarant | null; acte_uuid: string | null;
   status_history: StatusHistoryEntry[]; created_by_name: string;
   available_transitions: AvailableTransition[]; can_edit: boolean;
+  duplicate_alert?: DuplicateAlert;
+}
+
+/** Duplicate-control status of a dossier (the case itself is only detailed for the control centre). */
+export interface DuplicateAlert {
+  blocked: boolean;
+  open_cases: { uuid?: string; reference?: string; risk_level: RiskLevel; status: CaseStatus; score?: number }[];
+  designated_duplicate: { uuid?: string; reference?: string; principal_reference?: string }[];
 }
 
 export interface Hospital {
@@ -160,3 +168,78 @@ export interface HistoryDetail {
 }
 
 export interface HistorySummary { events_today: number; dossiers_today: number; users_today: number; changes_today: number; deliveries_today: number; }
+/* ── Duplicate control ───────────────────────────── */
+export type RiskLevel = 'HIGH' | 'MEDIUM' | 'LOW';
+export type CaseStatus = 'OPEN' | 'IN_REVIEW' | 'AWAITING_INFO' | 'RESOLVED';
+export type DecisionCode = 'CONFIRMED_DUPLICATE' | 'DISTINCT_CHILDREN' | 'MULTIPLE_BIRTH' | 'DATA_ENTRY_ERROR' | 'INSUFFICIENT_INFO' | 'FURTHER_VERIFICATION';
+
+export const RISK_TONE: Record<RiskLevel, 'danger' | 'warning' | 'neutral'> = { HIGH: 'danger', MEDIUM: 'warning', LOW: 'neutral' };
+export const RISK_LABELS: Record<RiskLevel, string> = { HIGH: 'Risque élevé', MEDIUM: 'Risque moyen', LOW: 'Risque faible' };
+export const CASE_STATUS_TONE: Record<CaseStatus, 'danger' | 'info' | 'warning' | 'success'> = { OPEN: 'danger', IN_REVIEW: 'info', AWAITING_INFO: 'warning', RESOLVED: 'success' };
+
+export interface DeclarationBrief {
+  uuid: string; reference: string; status: Status; status_label: string; child_name: string; birth_date: string;
+  mother_name: string; agent_name: string; hospital_name: string; official_number: string | null;
+  is_archived: boolean; is_synced: boolean; created_at: string;
+}
+
+export interface DuplicateCase {
+  uuid: string; reference: string; status: CaseStatus; status_label: string; risk_level: RiskLevel; risk_label: string;
+  score: number; data_quality: number; anomaly_type: string; anomaly_label: string; detected_at: string;
+  resolved_at: string | null; final_decision: DecisionCode | ''; decision_label: string;
+  declaration: DeclarationBrief; other_declaration: DeclarationBrief; assigned_to_name: string; twin_suspected: boolean;
+}
+
+export interface CriterionPart { label: string; weight: number; similarity: number | null; detail: string; }
+export interface Criterion {
+  key: string; label: string; weight: number; comparable: boolean; similarity: number | null; points: number;
+  exact: boolean; detail: string; parts: CriterionPart[];
+}
+export interface MatchFlags {
+  twin_suspected?: boolean; distinguishing?: string[]; corroboration?: string[]; risk_caps?: string[];
+  raw_risk?: RiskLevel; comparable_points?: number; raw_points?: number;
+  official_act?: { declaration: boolean; candidate: boolean };
+}
+export interface CaseEvidence { uuid: string; kind: string; kind_label: string; title: string; content: string; document: string | null; declaration: string; added_by_name: string; added_at: string; }
+export interface CaseDecision { uuid: string; decision: DecisionCode; decision_label: string; reason: string; decided_by_name: string; decided_at: string; principal: string; duplicate: string; resulting_status: CaseStatus; }
+export interface CaseHistoryEntry { id: number; action: string; action_label: string; actor_name: string; at: string; note: string; detail: Record<string, unknown>; }
+
+export interface DuplicateCaseDetail extends DuplicateCase {
+  criteria: Record<string, Criterion>; flags: MatchFlags; evidence: CaseEvidence[]; decisions: CaseDecision[];
+  history: CaseHistoryEntry[]; principal: string; duplicate: string; match_uuid: string;
+  permissions: { investigate: boolean; decide: boolean; documents: boolean };
+  warnings?: string[];
+}
+
+export interface CompareRow { label: string; a: string; b: string; status: 'same' | 'similar' | 'different' | 'missing'; }
+export interface CompareSummary { uuid: string; reference: string; status: Status; status_label: string; child_name: string; birth_date: string; official_number: string | null; created_by_name: string; created_at: string; is_archived: boolean; }
+export interface DuplicateComparison {
+  a: CompareSummary; b: CompareSummary; sections: { key: string; title: string; rows: CompareRow[] }[];
+  counts: Record<string, number>; documents: { a: CompareDoc[]; b: CompareDoc[] }; documents_visible: boolean;
+  criteria?: Record<string, Criterion>; score?: number; risk_level?: RiskLevel; flags?: MatchFlags; data_quality?: number;
+}
+export interface CompareDoc { uuid: string; kind: string; kind_label: string; original_name: string; size: number; created_at: string; }
+
+export interface DuplicateSummary {
+  total: number; high: number; medium: number; low: number; in_review: number; awaiting_decision: number; resolved: number;
+  confirmed_duplicates: number; distinct: number; multiple_birth: number; data_entry_error: number; unresolved: number;
+  by_anomaly: Record<string, number>;
+}
+
+export interface DuplicateMatchRow {
+  uuid: string; score: number; risk_level: RiskLevel; risk_label: string; data_quality: number; criteria: Record<string, Criterion>;
+  flags: MatchFlags; detected_at: string; declaration: DeclarationBrief; candidate: DeclarationBrief;
+  case: { uuid: string; reference: string; status: CaseStatus } | null;
+}
+
+export interface DuplicateFilterOptions {
+  agents: { uuid: string; name: string }[]; investigators: { uuid: string; name: string }[];
+  risk_levels: { value: string; label: string }[]; statuses: { value: string; label: string }[];
+  anomaly_types: { value: string; label: string }[];
+  decisions: { value: DecisionCode; label: string; final: boolean; designates_duplicate: boolean }[];
+}
+
+export interface DuplicateConfig {
+  weights: Record<string, number>; thresholds: { high: number; medium: number }; min_quality_for_high: number;
+  blocking_levels: string[]; date_window_days: number; min_recorded_score: number;
+}

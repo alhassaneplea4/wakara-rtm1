@@ -102,4 +102,12 @@ class InboxView(APIView):
             to_fill += qs.filter(status__in=Status.SECRETARIAT_DATA_EDITABLE).count()
         badge('/declarations', to_fill, True)
         badge('/actes', qs.filter(status=Status.VALIDATED).count(), has('acte.deliver'))
+        # duplicate control: unresolved cases waiting for the people allowed to look at them
+        if has('duplicate.view'):
+            from duplicates.models import CaseStatus, DuplicateCase
+            open_cases = DuplicateCase.objects.exclude(status=CaseStatus.RESOLVED).count()
+            if open_cases:
+                items.append({'code': 'duplicates', 'label': 'Dossiers suspects (doublons)',
+                              'count': open_cases, 'status': 'DUPLICATES'})
+                badges['/duplicates'] = open_cases
         return Response({'total': sum(i['count'] for i in items), 'items': items, 'badges': badges})

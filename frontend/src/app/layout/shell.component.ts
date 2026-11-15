@@ -19,6 +19,7 @@ const NAV: NavItem[] = [
   { label: 'Tableau de bord', icon: 'dashboard', link: '/dashboard', perms: ['stats.view'] },
   { label: 'Déclarations', icon: 'file', link: '/declarations', perms: ['declaration.view'] },
   { label: 'File de validation', icon: 'shield', link: '/validation', perms: ['dossier.validate'] },
+  { label: 'Contrôle des doublons', icon: 'copy', link: '/duplicates', perms: ['duplicate.view'] },
   { label: 'Actes de naissance', icon: 'certificate', link: '/actes', perms: ['acte.view'] },
   { label: 'Délivrances', icon: 'download', link: '/deliveries', perms: ['acte.view'] },
   { label: 'Hôpitaux et maternités', icon: 'hospital', link: '/hospitals', perms: ['hospital.view'] },

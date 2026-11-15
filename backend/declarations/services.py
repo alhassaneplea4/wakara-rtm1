@@ -179,6 +179,12 @@ def create_declaration(user, data: dict, *, uuid=None, device_created_at=None, h
                                  changed_by=user, reason=history_note)
     audit.log(AuditAction.CREATE, user=user, obj=declaration,
               changes={'reference': declaration.reference, 'status': declaration.status})
+    # Duplicate control: every new declaration, entered online or received by synchronisation, is compared with
+    # the whole mairie. Best effort — the engine can never lose a declaration; the official validation re-runs
+    # the analysis (and cannot pass without it).
+    from duplicates.services.detection import DuplicateDetectionService
+    DuplicateDetectionService.analyze_safely(
+        declaration, trigger='SYNC' if device_created_at is not None else 'CREATE', user=user)
     return declaration
 
 
@@ -225,6 +231,8 @@ def update_declaration(user, declaration: Declaration, data: dict, *, expected_v
     changes = audit.diff(before, _full_snapshot(declaration))
     if changes:
         audit.log(AuditAction.UPDATE, user=user, obj=declaration, changes=changes)
+        from duplicates.services.detection import DuplicateDetectionService
+        DuplicateDetectionService.on_declaration_changed(declaration, user, changes)
     return declaration
 
 

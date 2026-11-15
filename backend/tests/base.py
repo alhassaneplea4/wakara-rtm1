@@ -46,15 +46,28 @@ class WakaraTestCase(APITestCase):
         c.force_authenticate(user)
         return c
 
+    # Distinct, unrelated people: the fixtures must not look like the same birth entered twice, otherwise
+    # the duplicate control (rightly) holds the official validation back.
+    _PEOPLE = [
+        ('Aminata', 'Diallo', 'Fatoumata', 'Bah'), ('Ibrahima', 'Sylla', 'Kadiatou', 'Soumah'),
+        ('Moussa', 'Camara', 'Hawa', 'Touré'), ('Mariama', 'Keita', 'Nanténin', 'Condé'),
+        ('Sekou', 'Bangoura', 'Djénabou', 'Barry'), ('Alpha', 'Sow', 'Aïssatou', 'Baldé'),
+        ('Mohamed', 'Traoré', 'Salimatou', 'Kourouma'), ('Fanta', 'Cissé', 'Binta', 'Doumbouya'),
+        ('Lansana', 'Fofana', 'Mamata', 'Sidibé'), ('Kadiatou', 'Yansané', 'Oumou', 'Magassouba'),
+    ]
     def declaration_payload(self, **overrides):
+        # the first payload of a test is the historical one (Aminata Diallo…); the next ones are unrelated people
+        self._payload_n = getattr(self, '_payload_n', 0) + 1
+        n = self._payload_n
+        first, last, m_first, m_last = self._PEOPLE[(n - 1) % len(self._PEOPLE)]
         data = {
             'hospital': str(self.hospital.uuid),
-            'hospital_document_ref': 'H-0001',
+            'hospital_document_ref': f'H-{n:04d}',
             'doctor_name': 'Dr Test', 'midwife_name': 'Sage Test',
-            'birth_date': (datetime.date.today() - datetime.timedelta(days=3)).isoformat(),
-            'birth_time': '08:30', 'birth_place': 'Ratoma',
-            'child': {'first_names': 'Aminata', 'last_name': 'Diallo', 'gender': 'F'},
-            'mother': {'first_names': 'Fatoumata', 'last_name': 'Bah', 'age': 28},
+            'birth_date': (datetime.date.today() - datetime.timedelta(days=3 + ((n - 1) * 37) % 300)).isoformat(),
+            'birth_time': '08:30' if n == 1 else f'{(n * 7) % 24:02d}:{(n * 13) % 60:02d}', 'birth_place': 'Ratoma',
+            'child': {'first_names': first, 'last_name': last, 'gender': 'F' if n % 2 else 'M'},
+            'mother': {'first_names': m_first, 'last_name': m_last, 'age': 28},
         }
         data.update(overrides)
         return data

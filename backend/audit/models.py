@@ -38,6 +38,9 @@ class AuditAction:
     DEVICE_REGISTERED = 'device_registered'
     DEVICE_REVOKED = 'device_revoked'
     DEVICE_RESTORED = 'device_restored'
+    DUPLICATE_CHECK = 'duplicate_check'
+    DUPLICATE_VIEWED = 'duplicate_viewed'
+    DUPLICATE_DECISION = 'duplicate_decision'
 
     CHOICES = [(v, v) for k, v in vars().items() if k.isupper()]
 

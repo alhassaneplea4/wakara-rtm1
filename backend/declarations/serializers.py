@@ -114,13 +114,14 @@ class DeclarationDetailSerializer(DeclarationListSerializer):
     created_by_name = serializers.SerializerMethodField()
     validated_by_name = serializers.SerializerMethodField()
     available_transitions = serializers.SerializerMethodField()
+    duplicate_alert = serializers.SerializerMethodField()
 
     class Meta(DeclarationListSerializer.Meta):
         fields = DeclarationListSerializer.Meta.fields + [
             'hospital_document_ref', 'doctor_name', 'midwife_name', 'birth_time', 'birth_place',
             'notes', 'last_decision_reason', 'transmitted_at', 'validated_at',
             'validated_by_name', 'child', 'mother', 'father', 'declarant', 'acte_uuid',
-            'status_history', 'created_by_name', 'available_transitions',
+            'status_history', 'created_by_name', 'available_transitions', 'duplicate_alert',
         ]
 
     def get_child(self, obj):
@@ -152,6 +153,22 @@ class DeclarationDetailSerializer(DeclarationListSerializer):
 
     def get_validated_by_name(self, obj):
         return _full_name(obj.validated_by)
+
+    def get_duplicate_alert(self, obj):
+        """
+        Is the dossier held by a duplicate control? Everybody who sees the dossier learns that it is held
+        (and at which level); the case itself (uuid, score, other dossier) is for the control centre only.
+        """
+        from core.permissions import user_has_perm
+        from duplicates.services.cases import DuplicateCaseService
+        info = DuplicateCaseService.status_for(obj)
+        if user_has_perm(self.context['request'].user, 'duplicate.view'):
+            return info
+        return {
+            'blocked': info['blocked'],
+            'open_cases': [{'risk_level': c['risk_level'], 'status': c['status']} for c in info['open_cases']],
+            'designated_duplicate': [{} for _ in info['designated_duplicate']],
+        }
 
     def get_available_transitions(self, obj):
         user = self.context['request'].user

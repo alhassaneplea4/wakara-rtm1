@@ -18,6 +18,7 @@ urlpatterns = [
     path('api/documents/', include('documents.urls')),
     path('api/audit/', include('audit.urls')),
     path('api/history/', include('audit.urls_history')),
+    path('api/duplicates/', include('duplicates.urls')),
     path('api/stats/', include('stats.urls')),
     path('api/sync/', include('sync.urls')),
     path('api/public/settings/', PublicSettingsView.as_view(), name='public-settings'),
