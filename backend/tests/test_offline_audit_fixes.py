@@ -118,3 +118,24 @@ class AccessLostTests(RoleSyncCase):
             self.assertEqual((r.status_code, r.data['code']), (403, 'access_lost'), url)
         r = self.push(self.secretary, [self.op('update', entity=str(uuidlib.uuid4()), base_version=1, payload={})])
         self.assertEqual((r.status_code, r.data['code']), (403, 'access_lost'))
+
+
+class PullSettleWindowTests(RoleSyncCase):
+    """A dossier written a moment ago waits for the next pull: a late commit can never be skipped by the cursor."""
+
+    @override_settings(SYNC_PULL_SETTLE_SECONDS=30)
+    def test_a_dossier_changed_a_moment_ago_comes_with_the_next_pull(self):
+        old = self.create_declaration()['uuid']
+        Declaration.objects.filter(uuid=old).update(updated_at=timezone.now() - datetime.timedelta(minutes=5))
+        fresh = self.create_declaration()['uuid']
+        rows = {d['uuid'] for d in self.client_for(self.agent).get('/api/sync/pull/').data['declarations']}
+        self.assertIn(old, rows)
+        self.assertNotIn(fresh, rows)
+        Declaration.objects.filter(uuid=fresh).update(updated_at=timezone.now() - datetime.timedelta(minutes=1))
+        rows = {d['uuid'] for d in self.client_for(self.agent).get('/api/sync/pull/').data['declarations']}
+        self.assertIn(fresh, rows)
+
+    def test_without_the_window_everything_is_returned_at_once(self):
+        fresh = self.create_declaration()['uuid']
+        rows = {d['uuid'] for d in self.client_for(self.agent).get('/api/sync/pull/').data['declarations']}
+        self.assertIn(fresh, rows)

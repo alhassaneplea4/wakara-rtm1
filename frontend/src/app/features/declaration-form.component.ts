@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, ViewChild, inject, signal } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit, ViewChild, effect, inject, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService, errorMessage, fieldErrors } from '../core/api.service';
@@ -54,6 +54,13 @@ const SUBMISSION_KEYS: string[] = [
       </wk-page-header>
 
       @if (error()) { <div class="alert alert-danger" role="alert" style="margin-bottom:16px">{{ error() }}</div> }
+      @if (draftOffer(); as offer) {
+        <div class="alert alert-warning" role="status" style="margin-bottom:16px">
+          Une saisie non enregistrée du {{ offer.at | date: 'dd/MM/yyyy à HH:mm' }} a été retrouvée sur cet appareil.
+          <button type="button" class="btn btn-sm" style="margin-left:8px" (click)="resumeDraft()">Reprendre cette saisie</button>
+          <button type="button" class="btn btn-sm btn-ghost" (click)="dropDraft()">Ignorer</button>
+        </div>
+      }
 
       @if (loaded()) {
         <form (ngSubmit)="save('draft')" class="stack uc-form" [class.sec]="sec" #f="ngForm" novalidate>
@@ -246,7 +253,7 @@ const SUBMISSION_KEYS: string[] = [
   `,
     styles: ['.geo{display:grid;gap:14px}.pick{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}.pick .input{flex:1 1 220px;min-width:0}.pick .opt{display:inline-flex;align-items:center;gap:6px;font-weight:500;color:var(--wk-text);cursor:pointer}.pick .de{font-weight:600;color:var(--wk-text-soft)}.sec .need>label:not(.req)::after{content:" *";color:var(--wk-danger)}.field.missing .input{border-color:var(--wk-danger);background:#fff7f7}.who.missing{outline:2px solid var(--wk-danger);outline-offset:6px;border-radius:12px}.hint{color:var(--wk-text-mute);font-size:12px}.letters{display:block;margin-top:4px;color:var(--wk-royal);font-weight:600;font-size:13px}.who{border:0;margin:0 0 14px;padding:0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}.who legend{float:left;margin-right:12px;font-weight:600;padding:0}.choice{display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border:1px solid var(--wk-border);border-radius:999px;cursor:pointer;background:#fff}.choice.on{border-color:var(--wk-royal);background:var(--wk-info-bg);color:var(--wk-royal);font-weight:600}.loaded{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:12px;background:var(--wk-info-bg);margin-bottom:14px;font-size:14px}.loaded .warn{color:var(--wk-warning)}.stack{display:flex;flex-direction:column;gap:16px}.actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end;position:sticky;bottom:0;padding:12px 0;background:linear-gradient(transparent,var(--wk-bg) 30%)}']
 })
-export class DeclarationFormComponent implements OnInit {
+export class DeclarationFormComponent implements OnInit, OnDestroy {
   private api = inject(ApiService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -258,6 +265,53 @@ export class DeclarationFormComponent implements OnInit {
   private onDevice(d: DeclarationDetail) { const s = (d as any).sync_state; return !!s && s !== 'synced'; }
 
   @ViewChild(PaperFormComponent) paper?: PaperFormComponent;
+
+  /* ── automatic draft: what is typed and not saved survives a lock, a reload or a closed tab (encrypted, on this device) ── */
+  draftOffer = signal<{ at: string; data: { m: any; hasFather: boolean; declarantMode: string } } | null>(null);
+  private baseline = '';
+  private lastDraft = '';
+  private draftTimer: ReturnType<typeof setInterval> | null = null;
+
+  constructor() {
+    // the form as loaded is the reference: only what differs from it is worth keeping
+    effect(() => { if (this.loaded()) untracked(() => void this.startDraft()); });
+  }
+
+  private draftKey() { return this.uuid || 'new'; }
+  private snapshot() { return JSON.stringify({ m: this.m, hasFather: this.hasFather, declarantMode: this.declarantMode }); }
+
+  private async startDraft() {
+    this.baseline = this.lastDraft = this.snapshot();
+    const draft = await this.gate.draftLoad<{ m: any; hasFather: boolean; declarantMode: string }>(this.draftKey());
+    if (draft && JSON.stringify(draft.data) !== this.baseline) this.draftOffer.set(draft);
+    if (!this.draftTimer) this.draftTimer = setInterval(() => void this.saveDraftNow(), 15_000);
+  }
+
+  @HostListener('document:visibilitychange') onHidden() { if (document.hidden) void this.saveDraftNow(); }
+  @HostListener('window:pagehide') onPageHide() { void this.saveDraftNow(); }
+
+  /** Writes the draft when the form changed since the last time (and is not what it was when opened). */
+  async saveDraftNow() {
+    if (!this.loaded() || this.busy() || this.draftOffer()) return;
+    const now = this.snapshot();
+    if (now === this.lastDraft || now === this.baseline) return;
+    this.lastDraft = now;
+    try { await this.gate.draftSave(this.draftKey(), JSON.parse(now)); } catch { /* device locked meanwhile: nothing kept */ }
+  }
+
+  resumeDraft() {
+    const offer = this.draftOffer();
+    if (!offer) return;
+    Object.assign(this.m, offer.data.m);
+    this.hasFather = offer.data.hasFather;
+    this.declarantMode = offer.data.declarantMode as typeof this.declarantMode;
+    this.draftOffer.set(null);
+    this.lastDraft = this.snapshot();
+  }
+
+  dropDraft() { this.draftOffer.set(null); void this.gate.draftClear(this.draftKey()); }
+
+  ngOnDestroy() { if (this.draftTimer) clearInterval(this.draftTimer); }
 
   uuid = '';
   ref = '';
@@ -465,9 +519,11 @@ export class DeclarationFormComponent implements OnInit {
       }
     }
     this.busy.set(true); this.action = action;
+    const draftKey = this.draftKey();
     const req = this.uuid ? this.api.patch<DeclarationDetail>(`/declarations/${this.uuid}/`, this.payload()) : this.api.post<DeclarationDetail>('/declarations/', this.payload());
     req.subscribe({
       next: async d => {
+        void this.gate.draftClear(draftKey);
         // New dossier: the photos taken before saving are attached now that the dossier exists.
         const failed = this.uuid ? 0 : (await this.paper?.uploadPending(d.uuid)) ?? 0;
         if (failed) this.toast.error(`${failed} fichier(s) de la fiche n'ont pas pu être joints : rouvrez le dossier pour les ajouter à nouveau.`);

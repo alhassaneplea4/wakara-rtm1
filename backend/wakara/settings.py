@@ -360,6 +360,10 @@ SYNC_LATE_ENTRY_DAYS = config('SYNC_LATE_ENTRY_DAYS', default=7, cast=int)
 # in an area without network for weeks keeps the date of his entries (flagged 'late_entry' after SYNC_LATE_ENTRY_DAYS);
 # the legal deadline of the mairie is 6 months.
 SYNC_MAX_DEVICE_AGE_DAYS = config('SYNC_MAX_DEVICE_AGE_DAYS', default=120, cast=int)
+# A dossier changed less than this many seconds ago is sent at the NEXT pull: a transaction that commits late could
+# otherwise carry an older timestamp than a pull that already moved the cursor, and the device would never receive it.
+# (0 while the tests run, which pull right after writing.)
+SYNC_PULL_SETTLE_SECONDS = 0 if 'test' in sys.argv[1:2] else config('SYNC_PULL_SETTLE_SECONDS', default=15, cast=int)
 # Dossiers sent to the device per pull, and how far back the first pull goes.
 SYNC_PULL_PAGE_SIZE = config('SYNC_PULL_PAGE_SIZE', default=50, cast=int)
 SYNC_PULL_INITIAL_DAYS = config('SYNC_PULL_INITIAL_DAYS', default=90, cast=int)

@@ -76,6 +76,7 @@ export class SyncEngine {
     this.host.syncing(true);
     try {
       await this.store.resetSending();
+      this.batchLimit = null;   // a batch refused earlier does not slow down the next cycles
       // facilities and rules first: the forms must work offline even if the rest of the cycle fails
       await this.reference();
       const sent = await this.push();

@@ -3,21 +3,24 @@
  * photos waiting to be sent and the reference data. Every content goes through the data key of the vault.
  */
 import { DeclarationDetail } from '../models';
-import { decryptBytes, decryptJson, encryptBytes, encryptJson, sha256Hex, uuid as newUuid } from './crypto';
+import { decryptBytes, decryptJson, encryptBytes, encryptJson, sha256Hex, toBase64, uuid as newUuid } from './crypto';
 import { OfflineDb, oldestUnsynced } from './db';
 import { ViewContext, materialize } from './materialize';
 import {
-  DEFAULT_RULES, FileMeta, FileRow, HospitalRef, LocalDeclaration, LogRow, Op, OpRow, OpSecret, OpType, SyncRules,
+  DEFAULT_RULES, FileMeta, FileRow, HospitalRef, LocalDeclaration, LogRow, Op, OpRow, OpSecret, OpType, RecordRow, SyncRules,
 } from './types';
 
 /** Applied operations stay in the history this long, then are removed (their content is dropped at once). */
 export const RETENTION_DAYS = 7;
 /** Shape of what is kept on the device (see ``migrate``). */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
+/** A page kept for offline reading older than this is no longer served (it would be shown as if it were current). */
+export const CACHE_MAX_AGE_DAYS = 7;
 /** Pages kept for offline reading, the oldest consulted ones go first. */
 export const CACHE_LIMIT = 250;
 const CACHE_MAX_BYTES = 1_500_000;
 const LOG_LIMIT = 200;
+const MEMO_LIMIT = 3000;
 
 export interface StoredFile { id: string; entity: string; kind: string; size: number; createdAt: string; name: string; mime: string; sha256: string; }
 
@@ -45,13 +48,36 @@ export class OfflineStore {
   async migrate() {
     if ((await this.clear<number>('schema', 1)) >= SCHEMA_VERSION) return;
     await this.db.kv.delete('cursor');
+    await this.db.cache.clear();   // pages kept before the exclusions (audit, accounts) and the age limit existed
     await this.setClear('schema', SCHEMA_VERSION);
   }
 
   /* ── dossiers received from the server ── */
+  /**
+   * Decrypted dossiers kept in memory while the device is unlocked (never written anywhere): reading a list or the
+   * counters of the dashboard would otherwise decrypt EVERY dossier again each time. An entry is only used while the
+   * stored row is the very one it was made from (each write uses a new random IV), so another tab cannot make it stale.
+   */
+  private memo = new Map<string, { iv: string; value: DeclarationDetail }>();
+  /** How many dossiers were really decrypted (tests, performance checks). */
+  decryptions = 0;
+  private forget(uuid?: string) { if (uuid) this.memo.delete(uuid); else this.memo.clear(); }
+
+  private async decrypted(row: RecordRow): Promise<DeclarationDetail> {
+    const iv = toBase64(row.enc.iv);
+    const hit = this.memo.get(row.uuid);
+    if (hit && hit.iv === iv) return hit.value;
+    this.decryptions++;
+    const value = await decryptJson<DeclarationDetail>(this.key, row.enc);
+    this.memo.delete(row.uuid);
+    this.memo.set(row.uuid, { iv, value });
+    if (this.memo.size > MEMO_LIMIT) this.memo.delete(this.memo.keys().next().value as string);
+    return value;
+  }
+
   async server(uuid: string): Promise<DeclarationDetail | null> {
     const row = await this.db.declarations.get(uuid);
-    return row ? decryptJson<DeclarationDetail>(this.key, row.enc) : null;
+    return row ? this.decrypted(row) : null;
   }
   async putServer(detail: DeclarationDetail) {
     const clean = { ...(detail as any) };
@@ -62,7 +88,7 @@ export class OfflineStore {
     // the registry header is fetched by its own identifier: remember which dossier holds it (identifiers only)
     if (detail.acte_uuid) await this.db.kv.put({ key: `acte:${detail.acte_uuid}`, value: detail.uuid });
   }
-  dropServer(uuid: string) { return this.db.declarations.delete(uuid); }
+  dropServer(uuid: string) { this.forget(uuid); return this.db.declarations.delete(uuid); }
   /** The registry header just read online replaces the copy of the dossier that holds it. */
   async putActe(acteUuid: string, acte: unknown): Promise<void> {
     const declaration = await this.declarationOfActe(acteUuid);
@@ -79,13 +105,14 @@ export class OfflineStore {
     if (json.length > CACHE_MAX_BYTES) return;           // a huge answer (export, long journal) is not worth keeping
     const key = await sha256Hex(new TextEncoder().encode(address).buffer as ArrayBuffer);
     await this.db.cache.put({ key, at: new Date().toISOString(), enc: await encryptJson(this.key, { address, body }) });
+    await this.db.cache.where('at').below(new Date(Date.now() - CACHE_MAX_AGE_DAYS * 86_400_000).toISOString()).delete();
     const extra = (await this.db.cache.count()) - CACHE_LIMIT;
     if (extra > 0) await this.db.cache.orderBy('at').limit(extra).delete();
   }
   async cacheGet(address: string): Promise<{ body: unknown; at: string } | null> {
     const key = await sha256Hex(new TextEncoder().encode(address).buffer as ArrayBuffer);
     const row = await this.db.cache.get(key);
-    if (!row) return null;
+    if (!row || Date.parse(row.at) < Date.now() - CACHE_MAX_AGE_DAYS * 86_400_000) return null;
     try { return { body: (await decryptJson<{ body: unknown }>(this.key, row.enc)).body, at: row.at }; } catch { return null; }
   }
 
@@ -134,6 +161,15 @@ export class OfflineStore {
     if (extra > 0) await this.db.log.orderBy('id').limit(extra).delete();
   }
 
+  /* ── draft of the entry form (not saved yet): encrypted like everything else, forgotten after a week ── */
+  async saveDraft(key: string, data: unknown) { await this.setSecret(`draft:${key}`, { at: new Date().toISOString(), data }); }
+  async loadDraft<T>(key: string): Promise<{ at: string; data: T } | null> {
+    const draft = await this.secret<{ at: string; data: T } | null>(`draft:${key}`, null);
+    if (!draft || Date.parse(draft.at) < Date.now() - CACHE_MAX_AGE_DAYS * 86_400_000) return null;
+    return draft;
+  }
+  clearDraft(key: string) { return this.db.kv.delete(`enc:draft:${key}`); }
+
   /** When the facilities and rules were last received (reference data). */
   referenceAt() { return this.clear<string | null>('referenceAt', null); }
 
@@ -149,6 +185,7 @@ export class OfflineStore {
    * own work and can be sent again, or exported, once the access is restored.
    */
   async wipeCopies() {
+    this.forget();
     await this.db.declarations.clear();
     await this.db.cache.clear();
     for (const key of await this.db.kv.toCollection().primaryKeys()) {
@@ -202,10 +239,17 @@ export class OfflineStore {
     const ops = await this.ops();
     const byEntity = new Map<string, Op[]>();
     for (const op of ops) byEntity.set(op.entity, [...(byEntity.get(op.entity) ?? []), op]);
-    const uuids = new Set<string>([...(await this.db.declarations.toCollection().primaryKeys()), ...byEntity.keys()]);
+    const rows = await this.db.declarations.toArray();   // one read; only the rows not already decrypted cost a decryption
     const out: LocalDeclaration[] = [];
-    for (const uuid of uuids) {
-      const view = materialize(uuid, await this.server(uuid), byEntity.get(uuid) ?? [], ctx);
+    const seen = new Set<string>();
+    for (const row of rows) {
+      seen.add(row.uuid);
+      const view = materialize(row.uuid, await this.decrypted(row), byEntity.get(row.uuid) ?? [], ctx);
+      if (view) out.push(view);
+    }
+    for (const uuid of byEntity.keys()) {
+      if (seen.has(uuid)) continue;
+      const view = materialize(uuid, null, byEntity.get(uuid) ?? [], ctx);
       if (view) out.push(view);
     }
     return out;

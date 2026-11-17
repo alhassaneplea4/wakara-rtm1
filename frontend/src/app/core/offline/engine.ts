@@ -26,6 +26,8 @@ export interface EngineHost {
   accessLost(message: string): void;
   /** Did the browser agree to keep the data (storage.persist)? null = it could not be asked. */
   persisted?(value: boolean | null): void;
+  /** The page just shown comes from the copy kept on the device (its date) or from the server (null). */
+  cachedPage?(at: string | null): void;
   /** A collection agent works device-first; the other roles work on the server when it answers and queue otherwise. */
   collectionProfile?(): boolean;
   /** Tells the screens that what they show may have changed. */
@@ -61,6 +63,7 @@ export class OfflineEngine {
     }, { apiUrl: deps.apiUrl, deviceId: deps.deviceId, deviceLabel: deps.deviceLabel, userUuid });
     this.api = new LocalApi(this.store, conn, {
       apiUrl: deps.apiUrl, userName: () => auth.fullName(), sessionExpired: () => auth.sessionExpired(),
+      cachedPage: at => deps.host.cachedPage?.(at),
       can: permission => auth.can(permission), localFirst: () => deps.host.collectionProfile?.() ?? true,
       changed: sync => { void this.refresh(); if (sync) this.sync.kick(); },
     });
@@ -98,6 +101,10 @@ export class OfflineEngine {
     return saveVaultSession(this.key, { access: this.deps.auth.accessToken, refresh: this.deps.auth.refreshToken, me });
   }
   loadSession(): Promise<VaultSession | null> { return loadVaultSession(this.key); }
+
+  saveDraft(key: string, data: unknown) { return this.store.saveDraft(key, data); }
+  loadDraft<T>(key: string) { return this.store.loadDraft<T>(key); }
+  clearDraft(key: string) { return this.store.clearDraft(key); }
 
   /** The unsent work as a file kept elsewhere (see backup.ts). */
   exportBackup(): Promise<Blob> { return exportBackup(this.db); }

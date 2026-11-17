@@ -535,6 +535,8 @@ def pull_declarations(user, since, request):
     """
     from django.db.models import Q
     qs = declaration_services.visible_declarations(user, Declaration.all_objects.all())
+    if settings.SYNC_PULL_SETTLE_SECONDS:
+        qs = qs.filter(updated_at__lte=timezone.now() - datetime.timedelta(seconds=settings.SYNC_PULL_SETTLE_SECONDS))
     if since is not None:
         qs = qs.filter(updated_at__gt=since)
     else:

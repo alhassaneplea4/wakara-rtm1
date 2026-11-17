@@ -1,4 +1,5 @@
 
+import { DatePipe } from '@angular/common';
 import { Component, DestroyRef, HostListener, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
@@ -33,7 +34,7 @@ const NAV: NavItem[] = [
 
 @Component({
     selector: 'wk-shell',
-    imports: [FormsModule, RouterOutlet, RouterLink, RouterLinkActive, IconComponent, LogoComponent, ConnectionIndicatorComponent, ReauthComponent],
+    imports: [DatePipe, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, IconComponent, LogoComponent, ConnectionIndicatorComponent, ReauthComponent],
     template: `
     <div class="shell" [class.nav-open]="navOpen()">
       <aside class="sidebar" aria-label="Navigation principale" [attr.aria-hidden]="null">
@@ -118,6 +119,9 @@ const NAV: NavItem[] = [
         @if (gate.visible() && gate.staleQueue()) {
           <div class="strip danger" role="alert"><span>{{ gate.unsynced() }} saisie(s) n'ont pas été envoyées depuis plus de 24 heures. Dès que vous avez une connexion Internet, ouvrez la page Synchronisation et envoyez-les.</span>
             <a class="btn btn-sm" routerLink="/synchronisation">Ouvrir</a></div>
+        }
+        @if (gate.visible() && gate.cachedAt(); as at) {
+          <div class="strip" role="status"><span>Cette page vient de la copie gardée sur cet appareil le {{ at | date: 'dd/MM/yyyy à HH:mm' }} : elle peut ne plus être à jour. Elle se remet à jour dès le retour de la connexion.</span></div>
         }
         @if (gate.visible() && gate.storageAtRisk()) {
           <div class="strip" role="status"><span>Le navigateur peut effacer les données de cet appareil sans prévenir. Installez Wakara sur l'écran d'accueil et faites une sauvegarde de secours.</span>

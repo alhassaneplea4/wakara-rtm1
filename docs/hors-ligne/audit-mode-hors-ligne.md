@@ -116,7 +116,7 @@ action nécessite la connexion ». *Solution* : router par la garde « nécessit
 
 ## Corrections apportées (17/11/2026)
 
-Les six premières anomalies (A1 à A3, B1 à B3) sont corrigées et testées. Restent ouvertes les anomalies B4 et C1 à C5.
+Toutes les anomalies sont corrigées et testées (A1 à A3, B1 à B3, B4, C1 à C5), sauf la synchronisation page fermée, impossible sans affaiblir le chiffrement (voir B2), et le point C2, à mesurer sur de vrais volumes.
 
 | # | Correction | Vérification |
 |---|---|---|
@@ -125,6 +125,12 @@ Les six premières anomalies (A1 à A3, B1 à B3) sont corrigées et testées. R
 | A3 | `SYNC_MAX_DEVICE_AGE_DAYS` passe de 30 à 120 jours : la date est conservée et marquée « saisie ancienne » dès 7 jours. | idem (2) |
 | B1 | Code `access_lost` (droits retirés) et appareil révoqué : l'appareil efface les copies de dossiers et le cache, **garde** les saisies non envoyées et l'explique par des bandeaux. | idem (1 + 2) |
 | B2 | À l'auto-verrouillage ou au verrouillage manuel, la file prête est envoyée avant l'oubli de la clé (10 minutes au plus) ; bandeau rouge et message à l'écran de code au-delà de 24 h d'attente. La synchronisation en arrière-plan page fermée n'est **pas** possible : la file est chiffrée, la clé n'existe qu'en mémoire (c'est ce qui la protège). | `offline.spec.ts` (ancienneté), essai réel à faire |
+| B4 | Le formulaire de saisie enregistre un brouillon chiffré toutes les 15 s, à chaque changement d'onglet et à la fermeture de la page ; il le propose à la réouverture (« Reprendre cette saisie ») et l'efface une fois le dossier enregistré (7 jours au plus). Les photos non enregistrées n'en font pas partie. | `offline.spec.ts` |
+| C1 | Une page lue depuis la copie de l'appareil s'affiche avec sa date (bandeau « peut ne plus être à jour ») ; plus servie au-delà de 7 jours ; l'audit, les utilisateurs, les rôles, les droits et les appareils ne sont plus gardés (message « nécessite la connexion »). Le cache existant est vidé une fois. | idem |
+| C2 | Les dossiers déchiffrés sont gardés en mémoire pendant la session : une liste ou un compteur ne déchiffre que les dossiers nouveaux ou modifiés (3 000 au plus en mémoire). **À mesurer** sur un jeu réaliste et sur un téléphone d'entrée de gamme. | idem |
+| C3 | Un dossier modifié depuis moins de 15 s (`SYNC_PULL_SETTLE_SECONDS`) est envoyé à la lecture suivante : une validation tardive ne peut plus être sautée par le curseur. | `tests/test_offline_audit_fixes.py` |
+| C4 | La taille des lots d'envoi est remise à la normale à chaque cycle. | `offline.spec.ts` |
+| C5 | Retirer hors ligne une pièce déjà envoyée affiche « nécessite la connexion au serveur ». | idem |
 | B3 | Le refus de stockage protégé et l'iPhone hors application installée sont signalés ; « Sauvegarde de secours » exporte la file et les photos (toujours chiffrées) avec l'en-tête du coffre ; « Restaurer une sauvegarde » sur l'écran de code les remet après effacement des données. | `offline.spec.ts` (3) |
 
 ## Plan de correction proposé

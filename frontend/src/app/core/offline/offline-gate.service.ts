@@ -1,6 +1,6 @@
 import { HttpClient, HttpEvent, HttpHandlerFn, HttpRequest } from '@angular/common/http';
 import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
-import { Router, UrlTree } from '@angular/router';
+import { NavigationStart, Router, UrlTree } from '@angular/router';
 import { Observable, firstValueFrom } from 'rxjs';
 import { environment } from '@env/environment';
 import { AuthService } from '../auth.service';
@@ -52,6 +52,8 @@ export class OfflineGate {
   /** Did the browser agree to keep the data of this device? null = unknown. */
   readonly persisted = signal<boolean | null>(null);
   private draining = false;
+  /** Date of the copy kept on this device that the page on screen was built from (null: the page comes from the server). */
+  readonly cachedAt = signal<string | null>(null);
   private now = signal(Date.now());
   /** Incremented whenever what the screens show may have changed on the device. */
   readonly revision = signal(0);
@@ -93,6 +95,7 @@ export class OfflineGate {
     // Session rules of the offline mode, enforced by AuthService itself (whoever calls it).
     // Signing out never loses anything: the vault, the local data and the waiting operations stay on the device
     // (encrypted) until the same agent signs in again, unlocks with the code chosen once, and synchronises.
+    this.router.events.subscribe(e => { if (e instanceof NavigationStart) this.cachedAt.set(null); });   // the date belongs to the page on screen
     this.auth.holdOnExpire = () => this.active();
     this.auth.onLoggedOut = uuid => { if (uuid && this.header()?.user.uuid === uuid) void this.keepForNextSignIn(); };
     this.auth.tokens$.subscribe(() => void this.engine?.saveSession());
@@ -112,6 +115,7 @@ export class OfflineGate {
     },
     accessLost: (message: string) => { this.accessLost.set(true); this.message.set(message); },
     persisted: (value: boolean | null) => this.persisted.set(value),
+    cachedPage: (at: string | null) => this.cachedAt.set(at),
     syncing: (v: boolean) => this.syncing.set(v),
     synced: (at: string | null) => { this.lastSync.set(at); if (at) { this.message.set(''); this.revoked.set(false); this.limited.set(false); this.accessLost.set(false); } },
     failed: (m: string) => this.message.set(m),
@@ -276,6 +280,11 @@ export class OfflineGate {
   current(): OfflineEngine | null { return this.engine; }
 
   async syncNow() { this.message.set(''); await this.engine?.sync.run(true); }
+
+  /** Draft of a form being filled (encrypted on the device); nothing is kept when the device is not unlocked. */
+  async draftSave(key: string, data: unknown): Promise<void> { if (this.active()) await this.engine?.saveDraft(key, data); }
+  async draftLoad<T>(key: string): Promise<{ at: string; data: T } | null> { return this.active() && this.engine ? this.engine.loadDraft<T>(key) : null; }
+  async draftClear(key: string): Promise<void> { if (this.engine) await this.engine.clearDraft(key); }
 
   /** The unsent work as a file to keep elsewhere (the device must be unlocked). */
   async exportBackup(): Promise<{ blob: Blob; name: string }> {

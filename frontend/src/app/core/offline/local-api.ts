@@ -15,7 +15,9 @@
  *   every other page consulted online (statistics, lists of actes, deliveries, history, duplicate cases,
  *          users, roles…) is kept, encrypted, and read again from the device when the server is out of reach.
  *          Anything that is not a dossier operation (managing users and roles, settings, duplicate decisions,
- *          deliveries…) is never queued: it needs the server and says so.
+ *          deliveries…) is never queued: it needs the server and says so. The journal of the audit and the accounts
+ *          (users, roles, devices) are never kept on the device. A page kept for more than a week is no longer served,
+ *          and one served from the device is shown with its date.
  */
 import { HttpErrorResponse, HttpEvent, HttpHandlerFn, HttpRequest, HttpResponse } from '@angular/common/http';
 import { Observable, catchError, defer, from, of, switchMap, throwError } from 'rxjs';
@@ -32,6 +34,8 @@ const ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png'];
 const PAGE_SIZE = 20;
 const NOT_CONSULTED = "Cette page n'a pas encore été consultée sur cet appareil : elle sera lisible hors connexion après une première consultation en ligne.";
 const NEEDS_SERVER = 'Cette action nécessite la connexion au serveur.';
+/** Pages never kept on the device: the journal of the audit, the accounts and their rights (useless offline, and sensitive). */
+const NOT_KEPT = /^\/(audit|users|roles|permissions|devices)\//;
 
 export interface ApiHost {
   apiUrl: string;
@@ -41,6 +45,8 @@ export interface ApiHost {
   changed(sync?: boolean): void;
   /** Permissions of the signed-in user. Without it: the collection agent's rights. */
   can?(permission: string): boolean;
+  /** A page was answered from the copy kept on the device (its date), or from the server (null): the user is told how old it is. */
+  cachedPage?(at: string | null): void;
   /** Collection agent (device first) or any other role (server first, queue when it does not answer). Default: agent. */
   localFirst?(): boolean;
 }
@@ -150,7 +156,8 @@ export class LocalApi {
   /** A GET of the API worth keeping for offline reading (dossier operations have their own, richer handlers). */
   private readable(path: string, req: HttpRequest<unknown>): boolean {
     if (req.method !== 'GET' || req.responseType !== 'json') return false;
-    return !/^\/(auth|sync|public)\//.test(path) && !/\/(download|export)\/?$/.test(path);
+    // never kept on the device: the journal of the audit, the accounts and their rights (useless offline, and sensitive)
+    return !/^\/(auth|sync|public)\//.test(path) && !NOT_KEPT.test(path) && !/\/(download|export)\/?$/.test(path);
   }
 
   private address(req: HttpRequest<unknown>): string {
@@ -166,21 +173,25 @@ export class LocalApi {
   private cached(req: HttpRequest<unknown>, next: HttpHandlerFn, fallback?: () => Promise<HttpResponse<unknown>>): Observable<HttpEvent<unknown>> {
     const address = this.address(req);
     const fromDevice = () => defer(() => from(this.store.cacheGet(address))).pipe(switchMap(hit => {
-      if (hit) return of(ok(hit.body));
+      if (hit) { this.host.cachedPage?.(hit.at); return of(ok(hit.body)); }
       if (fallback) return this.run(fallback);
       return throwError(() => fail(503, { detail: NOT_CONSULTED }));
     }));
     if (!this.netOk()) return fromDevice();
     return next(req).pipe(
       switchMap(ev => (ev instanceof HttpResponse && ev.status === 200 && ev.body !== null && typeof ev.body === 'object'
-        ? from(this.store.cachePut(address, ev.body).catch(() => undefined).then(() => ev)) : of(ev))),
+        ? from(this.store.cachePut(address, ev.body).catch(() => undefined).then(() => { this.host.cachedPage?.(null); return ev; })) : of(ev))),
       catchError(e => (this.unreachable(e) ? fromDevice() : throwError(() => e))),
     );
   }
 
   /** Writes the device cannot queue (users, roles, settings, duplicate decisions…): refused with a clear reason. */
   private offlineGuard(req: HttpRequest<unknown>, next: HttpHandlerFn): Observable<HttpEvent<unknown>> {
-    if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next(req);
+    if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+      const path = req.url.slice(this.host.apiUrl.length).split('?')[0];
+      if (!this.netOk() && NOT_KEPT.test(path)) return throwError(() => fail(503, { detail: NEEDS_SERVER }));
+      return next(req);
+    }
     if (!this.conn.online() && !this.host.sessionExpired()) return throwError(() => fail(503, { detail: NEEDS_SERVER }));
     return next(req);
   }
@@ -433,7 +444,7 @@ export class LocalApi {
 
   private async removeDocument(id: string): Promise<HttpResponse<unknown> | null> {
     const file = await this.store.file(id);
-    if (!file) return null;  // a document already on the server: usual API
+    if (!file) return this.netOk() ? null : Promise.reject(fail(503, { detail: NEEDS_SERVER }));  // already on the server: usual API, which needs the connection
     const op = (await this.store.liveOps(file.entity)).find(o => o.fileId === id);
     if (op?.status === 'sending') return Promise.reject(fail(409, { detail: 'Envoi en cours : réessayez dans un instant.' }));
     if (op) await this.store.removeOp(op.seq);

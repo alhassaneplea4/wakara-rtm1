@@ -254,6 +254,7 @@ describe('Offline queue and synchronisation', () => {
   let host: { messages: string[]; revoked: boolean; signIn: number; lost: string };
   const conn: any = { online, offlineEnabled: signal(true), changes: new Subject<boolean>(), check: async () => online(), reportFailure: () => online.set(false), start: () => undefined };
   const offlineNext = () => throwError(() => new HttpErrorResponse({ status: 0 }));
+  let cachedAt: string | null = null;
 
   const call = async <T = any>(method: string, path: string, body: any = null, params: Record<string, any> = {}, next: any = offlineNext) => {
     const req = new HttpRequest<any>(method as any, API + path, body, { params: new HttpParams({ fromObject: params }) });
@@ -274,7 +275,8 @@ describe('Offline queue and synchronisation', () => {
       syncing: () => undefined, synced: () => undefined, failed: m => host.messages.push(m), deviceRevoked: () => { host.revoked = true; }, deviceLimit: () => undefined, accessLost: m => { host.lost = m; }, signInRequired: () => { host.signIn++; },
       changed: () => undefined, sessionExpired: () => expired(),
     }, { apiUrl: API, deviceId: 'device-1', deviceLabel: 'Test', userUuid });
-    api = new LocalApi(store, conn, { apiUrl: API, userName: () => 'Agent Test', sessionExpired: () => expired(), changed: () => undefined });
+    cachedAt = null;
+    api = new LocalApi(store, conn, { apiUrl: API, userName: () => 'Agent Test', sessionExpired: () => expired(), changed: () => undefined, cachedPage: at => { cachedAt = at; } });
   });
   afterEach(async () => { sync.stop(); db.close(); await deleteDb(userUuid); });
 
@@ -325,6 +327,72 @@ describe('Offline queue and synchronisation', () => {
     expect(oldest).toBe((await store.ops())[0].createdAt);
     expect((await countUnsynced(userUuid)).oldest).toBe(oldest);
     expect(first.sync_state).toBe('local');
+  });
+
+  it('a page served from the device comes with its date, and is not served any more after a week', async () => {
+    online.set(true);
+    await call('GET', '/stats/summary/', null, {}, () => of(new HttpResponse({ body: { total: 12 }, status: 200 })));
+    expect(cachedAt).toBeNull();                                   // answered by the server: nothing to say
+    online.set(false);
+    expect((await call('GET', '/stats/summary/')).body.total).toBe(12);
+    expect(Date.parse(cachedAt!)).toBeGreaterThan(Date.now() - 60_000);
+    const row = (await db.cache.toArray())[0];
+    await db.cache.put({ ...row, at: new Date(Date.now() - 8 * 86_400_000).toISOString() });
+    const old: any = await call('GET', '/stats/summary/').catch(e => e);
+    expect(old.status).toBe(503);                                  // too old: treated as never consulted
+  });
+
+  it('never keeps the audit, the accounts and their rights on the device', async () => {
+    online.set(true);
+    for (const path of ['/audit/', '/users/', '/roles/', '/permissions/', '/devices/']) {
+      await call('GET', path, null, {}, () => of(new HttpResponse({ body: { results: [{ username: 'secret' }] }, status: 200 })));
+    }
+    expect(await db.cache.count()).toBe(0);
+    online.set(false);
+    const res: any = await call('GET', '/users/').catch(e => e);
+    expect([res.status, res.error.detail]).toEqual([503, jasmine.stringContaining('connexion au serveur')]);
+  });
+
+  it('reads the dossiers again without decrypting them each time', async () => {
+    for (let i = 0; i < 5; i++) await store.putServer(serverRow({ uuid: `m${i}`, reference: `WKR-2026-000${i}` }) as any);
+    store.decryptions = 0;
+    expect((await call('GET', '/declarations/')).body.count).toBe(5);
+    expect(store.decryptions).toBe(5);
+    await call('GET', '/declarations/');
+    await call('GET', '/inbox/');
+    expect(store.decryptions).toBe(5);                              // the next reads cost nothing
+    await store.putServer(serverRow({ uuid: 'm0', notes: 'changé' }) as any);   // a new copy is decrypted again, the others are not
+    await call('GET', '/declarations/');
+    expect(store.decryptions).toBe(6);
+  });
+
+  it('a draft of the entry form is kept encrypted, forgotten after a week, and cleared once saved', async () => {
+    await store.saveDraft('new', { m: { notes: 'Observation confidentielle' } });
+    expect(JSON.stringify(await db.kv.toArray())).not.toContain('confidentielle');
+    expect((await store.loadDraft<any>('new'))!.data.m.notes).toBe('Observation confidentielle');
+    expect(await store.loadDraft('autre')).toBeNull();
+    await store.setSecret('draft:vieux', { at: new Date(Date.now() - 8 * 86_400_000).toISOString(), data: {} });
+    expect(await store.loadDraft('vieux')).toBeNull();
+    await store.clearDraft('new');
+    expect(await store.loadDraft('new')).toBeNull();
+  });
+
+  it('removing a page already on the server needs the connection and says so', async () => {
+    const res: any = await call('DELETE', '/documents/11111111-1111-4111-8111-111111111111/').catch(e => e);
+    expect([res.status, res.error.detail]).toEqual([503, jasmine.stringContaining('connexion au serveur')]);
+  });
+
+  it('a batch refused as a whole slows down that cycle only', async () => {
+    await create(); await create();
+    online.set(true);
+    const post = server.post;
+    server.post = (url: string, body: any) => body.operations?.length > 1 ? throwError(() => new HttpErrorResponse({ status: 400, error: { detail: 'trop' } })) : post(url, body);
+    await sync.run();
+    expect((await store.ops()).map(o => o.status)).toEqual(['applied', 'applied']);   // isolated one by one
+    server.post = post;
+    await create(); await create();
+    await sync.run(true);
+    expect(server.pushes[server.pushes.length - 1].operations.length).toBe(2);        // back to normal batches
   });
 
   it('creates and lists a declaration without any network', async () => {
@@ -536,12 +604,12 @@ describe('Offline queue and synchronisation', () => {
 
   it('leaves the other endpoints to the network, and keeps what they answered for offline reading', async () => {
     online.set(true);
-    const res = await call('GET', '/users/', null, {}, () => of(new HttpResponse({ body: { count: 1, results: ['réseau'] }, status: 200 })));
+    const res = await call('GET', '/stats/summary/', null, {}, () => of(new HttpResponse({ body: { count: 1, results: ['réseau'] }, status: 200 })));
     expect(res.body.results).toEqual(['réseau']);
     const validate = await call('POST', '/declarations/00000000-0000-0000-0000-000000000000/transition/', { status: 'VALIDATED' }, {}, () => of(new HttpResponse({ body: 'réseau', status: 200 })));
     expect(validate.body).toBe('réseau');
     online.set(false);
-    expect((await call('GET', '/users/')).body.results).toEqual(['réseau']);    // read again from the device
+    expect((await call('GET', '/stats/summary/')).body.results).toEqual(['réseau']);    // read again from the device
   });
 
   it('a revoked device is reported and keeps its queue', async () => {
@@ -596,7 +664,7 @@ describe('Offline queue and synchronisation', () => {
     online.set(false);
     expect((await call('GET', '/stats/summary/')).body.total).toBe(12);
     expect(JSON.stringify(await db.cache.toArray())).not.toContain('Confidentiel');
-    const never: any = await call('GET', '/audit/').catch(e => e);
+    const never: any = await call('GET', '/actes/').catch(e => e);
     expect([never.status, never.error.detail]).toEqual([503, jasmine.stringContaining('première consultation')]);
   });
 
