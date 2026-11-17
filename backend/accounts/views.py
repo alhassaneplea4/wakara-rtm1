@@ -23,9 +23,12 @@ from .tokens import tokens_for
 
 from audit import service as audit
 from audit.models import AuditAction
-from core.permissions import ALL_PERMISSION_CODES, PROTECTED_ADMIN_PERMISSIONS, HasWakaraPermission
+from audit.middleware import client_ip
+from core.permissions import (
+    ALL_PERMISSION_CODES, PROTECTED_ADMIN_PERMISSIONS, HasWakaraPermission, get_user_permissions, permissions_of,
+)
 
-from .models import Permission, Role, RolePermission, UserPermission, UserRole
+from .models import LoginAttempt, Permission, Role, RolePermission, UserPermission, UserRole
 from .serializers import (
     ChangePasswordSerializer, LoginSerializer, MeSerializer, PermissionSerializer,
     RoleSerializer, UserCreateSerializer, UserDetailSerializer, UserListSerializer,
@@ -35,6 +38,14 @@ from .serializers import (
 User = get_user_model()
 
 INVALID_CREDENTIALS = {"detail": "Identifiant ou mot de passe incorrect."}
+
+
+def _as_int(value):
+    """A role identifier sent by the client, or None when it is not a number (never an error 500)."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def revoke_user_tokens(user):
@@ -81,25 +92,19 @@ class LoginView(APIView):
                       object_type='User', reason='Identifiant inconnu')
             return Response(INVALID_CREDENTIALS, status=status.HTTP_401_UNAUTHORIZED)
 
-        if user.is_locked:
+        # Lockout per (account, address): a stranger guessing passwords locks HIS address out, not the owner of the
+        # account. The account itself is locked only while several addresses are locked together (distributed attack).
+        ip = client_ip(request) or ''
+        attempt = LoginAttempt.objects.filter(user=user, ip_address=ip).first()
+        if user.is_locked or (attempt is not None and attempt.is_locked):
             audit.log(AuditAction.LOGIN_FAILED, user=user, obj=user, reason='Compte verrouillé')
             return Response(
-                {"detail": "Compte temporairement verrouillé après plusieurs échecs. Réessayez plus tard."},
+                {"detail": "Trop de tentatives depuis cette adresse ou sur ce compte. Réessayez plus tard."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
         if not user.check_password(password):
-            # The counter is updated on the locked row: parallel wrong guesses are serialised, so none is lost
-            # and the lockout cannot be outrun by sending the attempts at the same time.
-            with transaction.atomic():
-                row = User.objects.select_for_update().get(pk=user.pk)
-                row.failed_login_count += 1
-                update = ['failed_login_count']
-                if row.failed_login_count >= settings.LOGIN_MAX_FAILED_ATTEMPTS:
-                    row.locked_until = timezone.now() + timedelta(minutes=settings.LOGIN_LOCKOUT_MINUTES)
-                    row.failed_login_count = 0
-                    update.append('locked_until')
-                row.save(update_fields=update)
+            self._record_failure(user, ip)
             audit.log(AuditAction.LOGIN_FAILED, user=user, obj=user, reason='Mot de passe incorrect')
             return Response(INVALID_CREDENTIALS, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -113,6 +118,7 @@ class LoginView(APIView):
             return Response({'code': 'device_revoked', 'detail': DEVICE_REVOKED_MESSAGE + " Contactez l'administrateur."},
                             status=status.HTTP_403_FORBIDDEN)
 
+        LoginAttempt.objects.filter(user=user, ip_address=ip).delete()
         user.failed_login_count = 0
         user.locked_until = None
         user.last_login = timezone.now()
@@ -125,6 +131,30 @@ class LoginView(APIView):
             'refresh': str(refresh),
             'user': MeSerializer(user).data,
         })
+
+
+    @staticmethod
+    def _record_failure(user, ip):
+        """
+        One more wrong password of ``user`` from ``ip``. The row is locked while it is counted: parallel guesses are
+        serialised, so none is lost and the lockout cannot be outrun by sending the attempts at the same time.
+        """
+        now = timezone.now()
+        window = timedelta(minutes=settings.LOGIN_LOCKOUT_MINUTES)
+        with transaction.atomic():
+            LoginAttempt.objects.get_or_create(user=user, ip_address=ip)
+            row = LoginAttempt.objects.select_for_update().get(user=user, ip_address=ip)
+            if row.updated_at < now - window:
+                row.failed_count = 0                      # old mistakes are forgotten
+            row.failed_count += 1
+            if row.failed_count >= settings.LOGIN_MAX_FAILED_ATTEMPTS:
+                row.locked_until, row.failed_count = now + window, 0
+            row.save()
+            User.objects.filter(pk=user.pk).update(failed_login_count=row.failed_count)
+            # several addresses locked at once on the same account: it is being attacked from many places
+            sources = LoginAttempt.objects.filter(user=user, locked_until__gt=now).count()
+            if sources >= settings.LOGIN_LOCKED_SOURCES_BEFORE_ACCOUNT_LOCK:
+                User.objects.filter(pk=user.pk).update(locked_until=now + window, failed_login_count=0)
 
 
 class LogoutView(APIView):
@@ -231,6 +261,7 @@ class UserViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.Upd
 
     def partial_update(self, request, *args, **kwargs):
         user = self.get_object()
+        self._forbid_superior(request, user, "Modification impossible")
         before = audit.snapshot(user, USER_AUDIT_FIELDS)
         serializer = self.get_serializer(user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -245,13 +276,31 @@ class UserViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.Upd
         if user.pk == request.user.pk:
             raise PermissionDenied(f"Action impossible sur votre propre compte : {what}.")
 
+    @staticmethod
+    def _require_own(request, codes, what):
+        """Nobody hands out a right he does not hold himself (no way up through the administration screens)."""
+        missing = set(codes) - get_user_permissions(request.user)
+        if missing:
+            raise PermissionDenied(f"{what} : vous ne détenez pas vous-même {', '.join(sorted(missing))}.")
+
+    @classmethod
+    def _forbid_superior(cls, request, user, what):
+        """
+        Nobody acts on an account that holds rights he does not have: resetting the password of an administrator,
+        changing his e-mail, his roles or his status would be a way to take his account over.
+        """
+        if user.pk != request.user.pk and permissions_of(user) - get_user_permissions(request.user):
+            raise PermissionDenied(f"{what} : ce compte a des droits que vous n'avez pas.")
+
     @action(detail=True, methods=['post'])
     def activate(self, request, uuid=None):
         user = self.get_object()
+        self._forbid_superior(request, user, "Activation impossible")
         user.is_active = True
         user.failed_login_count = 0
         user.locked_until = None
         user.save(update_fields=['is_active', 'failed_login_count', 'locked_until', 'updated_at'])
+        LoginAttempt.objects.filter(user=user).delete()
         audit.log(AuditAction.ACCOUNT_ACTIVATED, user=request.user, obj=user)
         return Response(UserDetailSerializer(user).data)
 
@@ -259,6 +308,7 @@ class UserViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.Upd
     def deactivate(self, request, uuid=None):
         user = self.get_object()
         self._forbid_self(request, user, "désactivation")
+        self._forbid_superior(request, user, "Désactivation impossible")
         user.is_active = False
         user.save(update_fields=['is_active', 'updated_at'])
         revoke_user_tokens(user)
@@ -272,9 +322,11 @@ class UserViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.Upd
         if request.method == 'GET':
             return Response(UserRoleSerializer(UserRole.objects.filter(user=user), many=True).data)
         self._forbid_self(request, user, "modification des rôles")
-        role = Role.objects.filter(pk=request.data.get('role'), is_active=True).first()
+        role = Role.objects.filter(pk=_as_int(request.data.get('role')), is_active=True).first()
         if role is None:
             raise ValidationError({'role': "Rôle introuvable ou inactif."})
+        self._forbid_superior(request, user, "Attribution impossible")
+        self._require_own(request, role_permission_codes(role), "Attribution impossible")
         ur, created = UserRole.objects.get_or_create(
             user=user, role=role, defaults={'assigned_by': request.user})
         if not created:
@@ -292,8 +344,9 @@ class UserViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.Upd
     def remove_role(self, request, uuid=None):
         user = self.get_object()
         self._forbid_self(request, user, "modification des rôles")
+        self._forbid_superior(request, user, "Retrait impossible")
         ur = UserRole.objects.filter(
-            user=user, role_id=request.data.get('role'), is_active=True).select_related('role').first()
+            user=user, role_id=_as_int(request.data.get('role')), is_active=True).select_related('role').first()
         if ur is None:
             raise ValidationError({'role': "Attribution introuvable."})
         ur.is_active = False
@@ -309,9 +362,13 @@ class UserViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.Upd
         if request.method == 'GET':
             return Response(UserPermissionSerializer(user.permission_overrides.all(), many=True).data)
         self._forbid_self(request, user, "modification des permissions")
-        perm = Permission.objects.filter(codename=request.data.get('codename')).first()
+        self._forbid_superior(request, user, "Modification impossible")
+        codename = request.data.get('codename')
+        perm = Permission.objects.filter(codename=codename).first() if isinstance(codename, str) else None
         if perm is None:
             raise ValidationError({'codename': "Permission inconnue."})
+        # granting a right, or lifting a refusal, both need the right itself
+        self._require_own(request, [perm.codename], "Modification impossible")
         if request.method == 'POST':
             granted = request.data.get('granted', True) in (True, 'true', 'True', 1, '1')
             UserPermission.objects.update_or_create(
@@ -330,6 +387,7 @@ class UserViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.Upd
         """Sets a temporary password (returned once) and forces a change at next login."""
         user = self.get_object()
         self._forbid_self(request, user, "réinitialisation du mot de passe")
+        self._forbid_superior(request, user, "Réinitialisation impossible")
         alphabet = string.ascii_letters + string.digits
         temp = ''.join(secrets.choice(alphabet) for _ in range(12)) + '!1'
         user.set_password(temp)
@@ -338,6 +396,7 @@ class UserViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.Upd
         user.locked_until = None
         user.save(update_fields=['password', 'must_change_password', 'failed_login_count',
                                  'locked_until', 'updated_at'])
+        LoginAttempt.objects.filter(user=user).delete()
         revoke_user_tokens(user)
         audit.log(AuditAction.PASSWORD_RESET, user=request.user, obj=user)
         return Response({'temporary_password': temp})
@@ -382,7 +441,7 @@ class RoleViewSet(viewsets.ModelViewSet):
         """PUT {permissions: [codename, ...], reason} — replaces the role's permission set."""
         role = self.get_object()
         wanted = request.data.get('permissions')
-        if not isinstance(wanted, list):
+        if not isinstance(wanted, list) or not all(isinstance(code, str) for code in wanted):
             raise ValidationError({'permissions': "Une liste de codes est attendue."})
         unknown = set(wanted) - set(ALL_PERMISSION_CODES)
         if unknown:
@@ -398,6 +457,11 @@ class RoleViewSet(viewsets.ModelViewSet):
         # Nobody can strip permissions from a role that grants them their own access.
         if role.user_roles.filter(user=request.user, is_active=True).exists() and current - wanted:
             raise PermissionDenied("Vous ne pouvez pas retirer des permissions à votre propre rôle.")
+        # ... nor add to any role (his own included) a right he does not hold: no way up through role.manage
+        beyond = (wanted - current) - get_user_permissions(request.user)
+        if beyond:
+            raise PermissionDenied(
+                "Vous ne pouvez pas accorder un droit que vous ne détenez pas : " + ', '.join(sorted(beyond)))
 
         for codename in current - wanted:
             RolePermission.objects.filter(role=role, permission__codename=codename).delete()

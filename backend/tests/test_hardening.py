@@ -119,4 +119,6 @@ class LockoutCounterTests(WakaraTestCase):
         c.post('/api/auth/login/', {'username': 'agent', 'password': 'bad'}, format='json')
         u = CustomUser.objects.get(username='agent')
         self.assertEqual(u.failed_login_count, 0)
-        self.assertTrue(u.is_locked)
+        # the lockout is per (account, address): this address is locked, the account is not (tests/test_audit_fixes.py)
+        self.assertFalse(u.is_locked)
+        self.assertTrue(u.login_attempts.get().is_locked)

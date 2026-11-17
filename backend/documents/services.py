@@ -47,6 +47,9 @@ def store_document(user, declaration, upload, *, kind, description='', uuid=None
         raise PermissionDenied("Dossier inaccessible.")
     if declaration.status in Status.FROZEN:
         raise PermissionDenied("Le dossier est figé : impossible d'ajouter une pièce.")
+    # six-month rule: a dossier past the deadline is blocked for everything, its documents included
+    from core.deadline import assert_not_locked
+    assert_not_locked(user, declaration)
     sha256 = SupportingDocument.compute_sha256(upload)
     if expected_sha256 and expected_sha256.lower() != sha256:
         raise ValidationError(

@@ -42,6 +42,8 @@ class SettingsView(APIView):
 
     def patch(self, request):
         known = {k: (d, p, v) for k, v, d, p in DEFAULT_SETTINGS}
+        if not isinstance(request.data, dict):
+            return Response({'detail': "Un objet {clé: valeur} est attendu."}, status=status.HTTP_400_BAD_REQUEST)
         changes = {}
         for key, value in request.data.items():
             if key not in known:

@@ -283,6 +283,9 @@ SIMPLE_JWT = {
 # ──────────────────────────────────────────────
 LOGIN_MAX_FAILED_ATTEMPTS = config('LOGIN_MAX_FAILED_ATTEMPTS', default=5, cast=int)
 LOGIN_LOCKOUT_MINUTES = config('LOGIN_LOCKOUT_MINUTES', default=15, cast=int)
+# The lockout is per (account, address). The account itself is locked for everybody only while this many
+# different addresses are locked on it at the same time (distributed attack).
+LOGIN_LOCKED_SOURCES_BEFORE_ACCOUNT_LOCK = config('LOGIN_LOCKED_SOURCES_BEFORE_ACCOUNT_LOCK', default=5, cast=int)
 
 # ──────────────────────────────────────────────
 # Business settings — HYPOTHESES awaiting validation by the mairie

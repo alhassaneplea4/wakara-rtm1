@@ -37,7 +37,7 @@ class AuthenticationTests(WakaraTestCase):
             self.login('agent', 'bad')
         r = self.login('agent', PASSWORD)  # correct password, but locked
         self.assertEqual(r.status_code, 403)
-        self.assertIn('verrouillé', r.data['detail'])
+        self.assertIn('Trop de tentatives', r.data['detail'])
 
     def test_inactive_account_cannot_login_nor_use_existing_token(self):
         token = self.login('agent').data['access']

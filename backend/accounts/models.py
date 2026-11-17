@@ -54,6 +54,28 @@ class CustomUser(NoHardDeleteMixin, AbstractUser):
         return user_has_perm(self, codename)
 
 
+class LoginAttempt(models.Model):
+    """
+    Wrong passwords of ONE account from ONE address. The lockout is per (account, address): somebody guessing
+    passwords locks himself out, not the owner of the account who signs in from elsewhere. The account itself is
+    only locked when several addresses are locked at the same time (a distributed attack): see accounts.views.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='login_attempts')
+    ip_address = models.CharField("Adresse", max_length=45, blank=True, default='')
+    failed_count = models.PositiveIntegerField("Échecs", default=0)
+    locked_until = models.DateTimeField("Verrouillé jusqu'à", null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Tentatives de connexion"
+        verbose_name_plural = "Tentatives de connexion"
+        constraints = [models.UniqueConstraint(fields=['user', 'ip_address'], name='uniq_login_attempt')]
+
+    @property
+    def is_locked(self) -> bool:
+        return bool(self.locked_until and self.locked_until > timezone.now())
+
+
 class Role(NoHardDeleteMixin, TimeStampedMixin):
     """Application-level role (distinct from Django groups)."""
     codename = models.CharField("Code", max_length=50, unique=True)

@@ -71,6 +71,9 @@ class DocumentViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Ret
     def perform_destroy(self, instance):
         if instance.declaration.status in Status.FROZEN:
             raise PermissionDenied("Le dossier est figé : impossible d'archiver cette pièce.")
+        from core.deadline import deadline_info, is_locked_for
+        if is_locked_for(self.request.user, instance.declaration):   # six-month rule
+            raise PermissionDenied(deadline_info(instance.declaration)['message'])
         instance.archive(user=self.request.user)
         audit.log(AuditAction.ARCHIVE, user=self.request.user, obj=instance)
 

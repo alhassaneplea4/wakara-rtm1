@@ -114,7 +114,15 @@ def get_user_permissions(user) -> set:
     cached = getattr(user, '_wk_perms', None)
     if cached is not None:
         return cached
+    user._wk_perms = permissions_of(user)
+    return user._wk_perms
 
+
+def permissions_of(user) -> set:
+    """
+    The permissions the roles and overrides of ``user`` give, whether the account is active or not (not cached).
+    Used to compare two accounts: a deactivated administrator is still an administrator's account.
+    """
     from accounts.models import RolePermission, UserPermission, UserRole
 
     role_ids = UserRole.objects.filter(
@@ -129,7 +137,6 @@ def get_user_permissions(user) -> set:
             perms.add(override.permission.codename)
         else:
             perms.discard(override.permission.codename)
-    user._wk_perms = perms
     return perms
 
 
