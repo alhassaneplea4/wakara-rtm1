@@ -356,8 +356,10 @@ SYNC_CLOCK_TOLERANCE_SECONDS = config('SYNC_CLOCK_TOLERANCE_SECONDS', default=30
 SYNC_MAX_CLOCK_SKEW_HOURS = config('SYNC_MAX_CLOCK_SKEW_HOURS', default=48, cast=int)
 # An entry older than this (days) keeps the date of the device but is flagged for the secretariat to check.
 SYNC_LATE_ENTRY_DAYS = config('SYNC_LATE_ENTRY_DAYS', default=7, cast=int)
-# A device date older than this is not trusted: the server date is used and the anomaly is recorded.
-SYNC_MAX_DEVICE_AGE_DAYS = config('SYNC_MAX_DEVICE_AGE_DAYS', default=30, cast=int)
+# A device date older than this is not trusted: the server date is used and the anomaly is recorded. 120 days: an agent
+# in an area without network for weeks keeps the date of his entries (flagged 'late_entry' after SYNC_LATE_ENTRY_DAYS);
+# the legal deadline of the mairie is 6 months.
+SYNC_MAX_DEVICE_AGE_DAYS = config('SYNC_MAX_DEVICE_AGE_DAYS', default=120, cast=int)
 # Dossiers sent to the device per pull, and how far back the first pull goes.
 SYNC_PULL_PAGE_SIZE = config('SYNC_PULL_PAGE_SIZE', default=50, cast=int)
 SYNC_PULL_INITIAL_DAYS = config('SYNC_PULL_INITIAL_DAYS', default=90, cast=int)

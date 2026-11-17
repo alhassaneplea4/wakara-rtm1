@@ -1,6 +1,7 @@
 import { HttpErrorResponse, HttpParams, HttpRequest, HttpResponse } from '@angular/common/http';
 import { signal } from '@angular/core';
 import { Subject, firstValueFrom, of, throwError } from 'rxjs';
+import { BackupError, backupFileName, exportBackup, restoreBackup } from './backup';
 import { decryptJson, encryptJson, sha256Hex } from './crypto';
 import { OfflineDb, countUnsynced, deleteDb } from './db';
 import { LocalApi } from './local-api';
@@ -193,6 +194,8 @@ class FakeServer {
   pushes: any[] = [];
   documents: { uuid: string; declaration: string; sha256: string; bytes: number }[] = [];
   fail: 'network' | 'lost-answer' | null = null;
+  after = new Map<string, number>();
+  refuseGet: HttpErrorResponse | null = null;
   reject: ((o: any) => { status: 'rejected' | 'conflict'; code: string; detail: string } | null) | null = null;
   private counter = 0;
 
@@ -204,7 +207,7 @@ class FakeServer {
     if (this.fail === 'lost-answer') { this.fail = null; return throwError(() => new HttpErrorResponse({ status: 0 })); }
     return of({ server_time: new Date().toISOString(), results });
   };
-  get = (_url: string, _options?: any) => of({
+  get = (_url: string, _options?: any) => this.refuseGet ? throwError(() => this.refuseGet) : of({
     server_time: new Date().toISOString(), offline_enabled: true, cursor: '2026-11-12T00:00:00+00:00', has_more: false,
     declarations: [], hospitals: [{ uuid: 'h1', code: 'CMC', name: 'Clinique' }],
     rules: { required_for_transmission: ['birth_date', 'birth_time', 'birth_place', 'child.gender'], max_upload_size: 4194304, max_batch: 20 },
@@ -218,13 +221,14 @@ class FakeServer {
     let row = this.rows.get(o.entity_uuid);
     let result: PushResult;
     if (refusal) result = { ...base, status: refusal.status, error: { code: refusal.code, detail: refusal.detail }, declaration: row ?? null };
-    else if (o.type === 'declaration.update' && row && o.base_version !== row.sync_version) {
+    else if (o.type === 'declaration.update' && row && (o.base_version ?? this.after.get(o.after_op)) !== row.sync_version) {
       result = { ...base, status: 'conflict', error: { code: 'version_conflict', detail: 'Le dossier a changé.' }, declaration: row };
     } else {
       if (o.type === 'declaration.create' && !row) row = serverRow({ uuid: o.entity_uuid, reference: `WKR-2026-${String(++this.counter).padStart(4, '0')}`, ...o.payload });
       else if (o.type === 'declaration.update') row = { ...row, ...o.payload, child: { ...row.child, ...(o.payload.child ?? {}) }, sync_version: row.sync_version + 1 };
       else if (o.type === 'declaration.transmit') row = { ...row, status: 'TRANSMITTED', status_label: 'Transmis au secrétariat', sync_version: row.sync_version + 1 };
       this.rows.set(o.entity_uuid, row);
+      this.after.set(o.op_id, row.sync_version);
       result = { ...base, status: 'applied', error: null, declaration: row };
     }
     this.seen.set(o.op_id, result);
@@ -247,7 +251,7 @@ describe('Offline queue and synchronisation', () => {
   let userUuid: string;
   const online = signal(false);
   const expired = signal(false);
-  let host: { messages: string[]; revoked: boolean; signIn: number };
+  let host: { messages: string[]; revoked: boolean; signIn: number; lost: string };
   const conn: any = { online, offlineEnabled: signal(true), changes: new Subject<boolean>(), check: async () => online(), reportFailure: () => online.set(false), start: () => undefined };
   const offlineNext = () => throwError(() => new HttpErrorResponse({ status: 0 }));
 
@@ -265,14 +269,63 @@ describe('Offline queue and synchronisation', () => {
     store = new OfflineStore(db, key, () => ({ userName: 'Agent Test', canUpdate: true, canTransmit: true }));
     await store.setSecret('hospitals', ctx.hospitals);
     server = new FakeServer();
-    host = { messages: [], revoked: false, signIn: 0 };
+    host = { messages: [], revoked: false, signIn: 0, lost: '' };
     sync = new SyncEngine(store, server as any, conn, {
-      syncing: () => undefined, synced: () => undefined, failed: m => host.messages.push(m), deviceRevoked: () => { host.revoked = true; }, deviceLimit: () => undefined, signInRequired: () => { host.signIn++; },
+      syncing: () => undefined, synced: () => undefined, failed: m => host.messages.push(m), deviceRevoked: () => { host.revoked = true; }, deviceLimit: () => undefined, accessLost: m => { host.lost = m; }, signInRequired: () => { host.signIn++; },
       changed: () => undefined, sessionExpired: () => expired(),
     }, { apiUrl: API, deviceId: 'device-1', deviceLabel: 'Test', userUuid });
     api = new LocalApi(store, conn, { apiUrl: API, userName: () => 'Agent Test', sessionExpired: () => expired(), changed: () => undefined });
   });
   afterEach(async () => { sync.stop(); db.close(); await deleteDb(userUuid); });
+
+  it('an edit stacked on an earlier operation of the dossier travels with that operation, not with a version', async () => {
+    const row = serverRow({ uuid: 'd9', sync_version: 3 });
+    server.rows.set('d9', row); await store.putServer(row as any);
+    const first = await store.addOp('d9', 'declaration.update', { payload: { notes: 'a' }, baseVersion: 3 });
+    const second = await store.addOp('d9', 'declaration.update', { payload: { notes: 'b' }, baseVersion: null });
+    online.set(true);
+    await sync.run(true);
+    const [one, two] = server.pushes[0].operations;
+    expect([one.base_version, one.after_op]).toEqual([3, null]);
+    expect([two.base_version, two.after_op]).toEqual([null, first.opId]);
+    expect((await store.ops()).map(o => o.status)).toEqual(['applied', 'applied']);
+    expect(second.opId).not.toBe(first.opId);
+  });
+
+  it('rights withdrawn: the copies of the dossiers are erased, the unsent work stays', async () => {
+    await store.putServer(serverRow({ uuid: 'other' }) as any);
+    await store.cachePut('/stats/', { total: 1 });
+    const mine = await create();
+    online.set(true);
+    server.refuseGet = new HttpErrorResponse({ status: 403, error: { code: 'access_lost', detail: 'Vos droits ont changé.' } });
+    await sync.run();
+    expect(host.lost).toContain('droits');
+    expect(await store.server('other')).toBeNull();
+    expect(await store.cacheGet('/stats/')).toBeNull();
+    expect(await store.counts()).toEqual(jasmine.objectContaining({ waiting: 1, problems: 0 }));
+    expect((await store.view(mine.uuid))?.sync_state).toBe('local');
+  });
+
+  it('a revoked device also forgets the copies of the dossiers and keeps its queue', async () => {
+    await store.putServer(serverRow({ uuid: 'other' }) as any);
+    await create();
+    online.set(true);
+    server.post = () => throwError(() => new HttpErrorResponse({ status: 403, error: { code: 'device_revoked' } }));
+    await sync.run();
+    expect(host.revoked).toBeTrue();
+    expect(await store.server('other')).toBeNull();
+    expect(await store.counts()).toEqual(jasmine.objectContaining({ waiting: 1 }));
+  });
+
+  it('knows how long the oldest unsent operation has been waiting', async () => {
+    expect((await store.counts()).oldest).toBeNull();
+    const first = await create();
+    await create();
+    const oldest = (await store.counts()).oldest;
+    expect(oldest).toBe((await store.ops())[0].createdAt);
+    expect((await countUnsynced(userUuid)).oldest).toBe(oldest);
+    expect(first.sync_state).toBe('local');
+  });
 
   it('creates and lists a declaration without any network', async () => {
     const d = await create();
@@ -282,8 +335,8 @@ describe('Offline queue and synchronisation', () => {
     expect(page.count).toBe(1);
     expect(page.results[0].sync_state).toBe('local');
     expect((await call('GET', `/declarations/${d.uuid}/`)).body.child.first_names).toBe('Aminata');
-    expect(await store.counts()).toEqual({ waiting: 1, problems: 0 });
-    expect(await countUnsynced(userUuid)).toEqual({ waiting: 1, problems: 0 });  // readable without the key (locked device)
+    expect(await store.counts()).toEqual(jasmine.objectContaining({ waiting: 1, problems: 0 }));
+    expect(await countUnsynced(userUuid)).toEqual(jasmine.objectContaining({ waiting: 1, problems: 0 }));  // readable without the key (locked device)
   });
 
   it('stores nothing readable on the device', async () => {
@@ -311,7 +364,7 @@ describe('Offline queue and synchronisation', () => {
     await sync.run();
     const view = (await store.view(d.uuid))!;
     expect([view.sync_state, view.reference, view.status]).toEqual(['synced', 'WKR-2026-0001', 'TRANSMITTED']);
-    expect(await store.counts()).toEqual({ waiting: 0, problems: 0 });
+    expect(await store.counts()).toEqual(jasmine.objectContaining({ waiting: 0, problems: 0 }));
     expect(server.pushes[0].operations.map((o: any) => o.type)).toEqual(['declaration.create', 'declaration.transmit']);
     expect(server.pushes[0].device.id).toBe('device-1');
     expect(server.pushes[0].user).toBe(userUuid);
@@ -351,7 +404,7 @@ describe('Offline queue and synchronisation', () => {
     online.set(true); expired.set(true);
     await sync.run(true);
     expect(server.pushes.length).toBe(0);
-    expect(await store.counts()).toEqual({ waiting: 1, problems: 0 });
+    expect(await store.counts()).toEqual(jasmine.objectContaining({ waiting: 1, problems: 0 }));
   });
 
   it('a network failure in the middle keeps everything pending', async () => {
@@ -359,7 +412,7 @@ describe('Offline queue and synchronisation', () => {
     online.set(true);
     server.fail = 'network';
     await sync.run();
-    expect(await store.counts()).toEqual({ waiting: 1, problems: 0 });
+    expect(await store.counts()).toEqual(jasmine.objectContaining({ waiting: 1, problems: 0 }));
     expect((await store.ops())[0].status).toBe('pending');
     expect(online()).toBeFalse();
   });
@@ -371,7 +424,7 @@ describe('Offline queue and synchronisation', () => {
     await sync.run();
     let view = (await store.view(d.uuid))!;
     expect([view.sync_state, view.sync_error!.detail, view.can_edit]).toEqual(['error', 'Le lieu de naissance est requis.', true]);
-    expect(await store.counts()).toEqual({ waiting: 0, problems: 1 });
+    expect(await store.counts()).toEqual(jasmine.objectContaining({ waiting: 0, problems: 1 }));
     await call('PATCH', `/declarations/${d.uuid}/`, { birth_place: 'Ratoma' });
     expect((await store.ops()).length).toBe(1);
     await sync.run();
@@ -497,7 +550,7 @@ describe('Offline queue and synchronisation', () => {
     server.post = () => throwError(() => new HttpErrorResponse({ status: 403, error: { code: 'device_revoked' } }));
     await sync.run();
     expect(host.revoked).toBeTrue();
-    expect(await store.counts()).toEqual({ waiting: 1, problems: 0 });
+    expect(await store.counts()).toEqual(jasmine.objectContaining({ waiting: 1, problems: 0 }));
   });
 
   it('receives the facilities and the rules first, even when the dossiers cannot be pulled', async () => {
@@ -560,7 +613,7 @@ describe('Offline queue and synchronisation', () => {
       await sync.run();
       expect(host.signIn).toBe(1);
       expect(host.messages.at(-1)).toContain('Reconnectez-vous');
-      expect(await store.counts()).toEqual({ waiting: 1, problems: 0 });
+      expect(await store.counts()).toEqual(jasmine.objectContaining({ waiting: 1, problems: 0 }));
     });
   }
 });
@@ -599,7 +652,7 @@ describe('Offline mode for the other roles', () => {
     online.set(false); perms = [...BACK_OFFICE];
     const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
     db = new OfflineDb(userUuid);
-    store = new OfflineStore(db, key, () => ({ userName: 'Secrétaire Test', canUpdate: false, canTransmit: false, can: (p: string) => perms.includes(p), today: '2026-11-17' }));
+    store = new OfflineStore(db, key, () => ({ userName: 'Secrétaire Test', userUuid: 'me-user', canUpdate: false, canTransmit: false, can: (p: string) => perms.includes(p), today: '2026-11-17' }));
     await store.setSecret('hospitals', ctx.hospitals);
     await store.setSecret('rules', { required_for_transmission: ['birth_date'], required_for_submission: ['declarant.first_names', 'acte.registre'], expected_for_validation: ['child.nationality'], max_upload_size: 4194304, max_batch: 20 });
     api = new LocalApi(store, conn, {
@@ -608,6 +661,31 @@ describe('Offline mode for the other roles', () => {
     });
   });
   afterEach(async () => { db.close(); await deleteDb(userUuid); });
+
+  it('separation of duties: whoever sent the dossier to validation cannot validate it, on the device either', async () => {
+    await store.setSecret('rules', { required_for_transmission: ['birth_date'], required_for_submission: [], expected_for_validation: [], max_upload_size: 4194304, max_batch: 20, separate_submit_and_validate: true });
+    await seed({ status: 'PENDING_VALIDATION', status_history: [{ from_status: 'TRANSMITTED', to_status: 'PENDING_VALIDATION', changed_by: 'me-user', changed_by_name: 'Moi', changed_at: '2026-11-16T10:00:00Z', reason: '' }] });
+    const view = (await call('GET', `/declarations/${D1}/`)).body;
+    expect(view.available_transitions.map((t: any) => t.target)).not.toContain('VALIDATED');
+    const error = await refused('POST', `/declarations/${D1}/transition/`, { status: 'VALIDATED', annee: 2026, numero_acte: '12' });
+    expect(error.status).toBe(403);
+    expect(error.error.detail).toContain('Séparation des tâches');
+    expect(await store.liveOps(D1)).toEqual([]);
+    // somebody else sent it: the validation is offered
+    await seed({ status: 'PENDING_VALIDATION', status_history: [{ from_status: 'TRANSMITTED', to_status: 'PENDING_VALIDATION', changed_by: 'someone-else', changed_by_name: 'Autre', changed_at: '2026-11-16T10:00:00Z', reason: '' }] });
+    expect((await call('GET', `/declarations/${D1}/`)).body.available_transitions.map((t: any) => t.target)).toContain('VALIDATED');
+  });
+
+  it('separation of duties: a step taken on the device counts as submitted by this user, and the rule can be off', async () => {
+    await store.setSecret('rules', { required_for_transmission: ['birth_date'], required_for_submission: [], expected_for_validation: [], max_upload_size: 4194304, max_batch: 20, separate_submit_and_validate: true });
+    await seed({ status: 'TRANSMITTED' });
+    await call('POST', `/declarations/${D1}/transition/`, { status: 'PENDING_VALIDATION' });
+    const view = (await call('GET', `/declarations/${D1}/`)).body;
+    expect(view.status).toBe('PENDING_VALIDATION');
+    expect(view.available_transitions.map((t: any) => t.target)).not.toContain('VALIDATED');
+    await store.setSecret('rules', { required_for_transmission: ['birth_date'], required_for_submission: [], expected_for_validation: [], max_upload_size: 4194304, max_batch: 20, separate_submit_and_validate: false });
+    expect((await call('GET', `/declarations/${D1}/`)).body.available_transitions.map((t: any) => t.target)).toContain('VALIDATED');
+  });
 
   it('mirrors the workflow of the server: each role sees the steps it could take online', () => {
     const can = (list: string[]) => (p: string) => list.includes(p);
@@ -757,5 +835,70 @@ describe('Offline mode for the other roles', () => {
     const res = await call('POST', '/documents/', fd);
     expect(res.status).toBe(201);
     expect((await store.ops()).map(o => o.type)).toEqual(['document.upload']);
+  });
+});
+
+
+/* ───────────────────────── emergency backup ───────────────────────── */
+
+describe('Emergency backup of the unsent work', () => {
+  const U = { uuid: 'backup-user', username: 'agent', name: 'Agent Test' };
+  let key: CryptoKey, db: OfflineDb, store: OfflineStore;
+
+  beforeEach(async () => {
+    writeVaultHeader(null);
+    await deleteDb(U.uuid);
+    key = await createVault('482915aB', U, FAST);
+    db = new OfflineDb(U.uuid);
+    store = new OfflineStore(db, key, () => ({ userName: 'Agent Test', canUpdate: true, canTransmit: true }));
+  });
+  afterEach(async () => { db.close(); await deleteDb(U.uuid); writeVaultHeader(null); });
+
+  const makeBackup = async () => {
+    await store.addOp('dossier-1', 'declaration.create', { payload: payload({ notes: 'Observation confidentielle' }) });
+    const stored = await store.putFile('dossier-1', 'PAPER_FORM', new Blob([new Uint8Array([0xff, 0xd8, 0xff, 9, 9])], { type: 'image/jpeg' }), 'fiche.jpg');
+    await store.addOp('dossier-1', 'document.upload', { fileId: stored.id, payload: { kind: 'PAPER_FORM' } });
+    const done = await store.addOp('dossier-0', 'declaration.create', { payload: payload() });
+    await store.saveOp({ ...done, status: 'applied' });
+    return { blob: await exportBackup(db), fileId: stored.id };
+  };
+
+  it('keeps only what is not sent yet, still encrypted', async () => {
+    const { blob } = await makeBackup();
+    const text = await blob.text();
+    for (const secret of ['Aminata', 'Diallo', 'confidentielle', 'fiche.jpg']) expect(text).not.toContain(secret);
+    const body = JSON.parse(text);
+    expect(body.operations.length).toBe(2);                     // the applied one is not part of it
+    expect(body.files.length).toBe(1);
+    expect(body.header.user.uuid).toBe(U.uuid);
+    expect(backupFileName(new Date(2026, 10, 7))).toBe('wakara-sauvegarde-2026-11-07.wkr');
+  });
+
+  it('brings the work back after the browser data were erased, opened by the original code only', async () => {
+    const { blob, fileId } = await makeBackup();
+    const text = await blob.text();
+    db.close(); await deleteDb(U.uuid); writeVaultHeader(null);          // « clear site data »
+    expect((await countUnsynced(U.uuid)).waiting).toBe(0);
+
+    await restoreBackup(text);
+    expect(readVaultHeader()!.user.uuid).toBe(U.uuid);
+    expect(await countUnsynced(U.uuid)).toEqual(jasmine.objectContaining({ waiting: 2, problems: 0 }));
+    await expectAsync(openVault('mauvais code 1')).toBeRejected();
+    const restoredKey = await openVault('482915aB');
+    db = new OfflineDb(U.uuid);
+    store = new OfflineStore(db, restoredKey, () => ({ userName: 'Agent Test', canUpdate: true, canTransmit: true }));
+    const ops = await store.ops();
+    expect(ops.map(o => o.type)).toEqual(['declaration.create', 'document.upload']);
+    expect(ops[0].payload!['notes']).toBe('Observation confidentielle');
+    const file = await store.file(fileId);
+    expect(file?.name).toBe('fiche.jpg');
+    expect(new Uint8Array(await (await store.fileBlob(fileId))!.arrayBuffer())).toEqual(new Uint8Array([0xff, 0xd8, 0xff, 9, 9]));
+  });
+
+  it('refuses a file that is not a backup, and a device that already has a code', async () => {
+    const { blob } = await makeBackup();
+    await expectAsync(restoreBackup('pas une sauvegarde')).toBeRejectedWithError(BackupError, /pas une sauvegarde/);
+    await expectAsync(restoreBackup(JSON.stringify({ kind: 'autre', v: 1 }))).toBeRejectedWithError(BackupError, /pas une sauvegarde/);
+    await expectAsync(restoreBackup(await blob.text())).toBeRejectedWithError(BackupError, /déjà protégé/);   // the vault of this device is still there
   });
 });

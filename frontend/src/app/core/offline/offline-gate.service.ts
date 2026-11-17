@@ -10,6 +10,10 @@ import { SKIP_KEY, VaultHeader, deviceId, offlineSupported, readVaultHeader } fr
 
 /** Inactivity after which the device locks itself (the PIN is asked again; nothing is lost). */
 export const AUTO_LOCK_MS = 15 * 60_000;
+/** After locking, the device keeps sending what waits (up to this long) before it forgets the key. */
+export const DRAIN_MS = 10 * 60_000;
+/** An unsent operation older than this is reported to the user (they may be leaving the covered area). */
+export const STALE_QUEUE_MS = 24 * 3_600_000;
 
 export type ConnectionStatus = 'offline' | 'expired' | 'syncing' | 'attention' | 'pending' | 'online';
 
@@ -41,6 +45,14 @@ export class OfflineGate {
   readonly revoked = signal(false);
   /** The account already has its maximum number of offline devices: this one is refused by the server. */
   readonly limited = signal(false);
+  /** The rights were withdrawn: the copies of the dossiers were erased from this device (unsent work kept). */
+  readonly accessLost = signal(false);
+  /** When the oldest operation not confirmed by the server was made. */
+  readonly oldestUnsynced = signal<string | null>(null);
+  /** Did the browser agree to keep the data of this device? null = unknown. */
+  readonly persisted = signal<boolean | null>(null);
+  private draining = false;
+  private now = signal(Date.now());
   /** Incremented whenever what the screens show may have changed on the device. */
   readonly revision = signal(0);
   readonly skipped = signal(readFlag(SKIP_KEY));
@@ -50,6 +62,13 @@ export class OfflineGate {
   readonly enabled = this.conn.offlineEnabled;
   readonly supported = offlineSupported();
   readonly unsynced = computed(() => this.waiting() + this.problems());
+  /** Work that has been waiting on this device for more than 24 hours. */
+  readonly staleQueue = computed(() => {
+    const oldest = this.oldestUnsynced();
+    return this.unsynced() > 0 && !!oldest && this.now() - Date.parse(oldest) > STALE_QUEUE_MS;
+  });
+  /** The browser may erase this device's data without warning: refused persistence, or an iPhone outside the installed app. */
+  readonly storageAtRisk = computed(() => this.persisted() === false || (isIos() && !isInstalled()));
   /**
    * Every account that works on the dossiers can protect a device and work offline: the collection agent, the
    * secretariat, the validators, the administrator. (Managing users, roles and settings still needs the server.)
@@ -88,9 +107,13 @@ export class OfflineGate {
 
   /* ── engine host ── */
   private host = {
-    counts: (waiting: number, problems: number) => { this.waiting.set(waiting); this.problems.set(problems); },
+    counts: (waiting: number, problems: number, oldest: string | null) => {
+      this.waiting.set(waiting); this.problems.set(problems); this.oldestUnsynced.set(oldest); this.now.set(Date.now());
+    },
+    accessLost: (message: string) => { this.accessLost.set(true); this.message.set(message); },
+    persisted: (value: boolean | null) => this.persisted.set(value),
     syncing: (v: boolean) => this.syncing.set(v),
-    synced: (at: string | null) => { this.lastSync.set(at); if (at) { this.message.set(''); this.revoked.set(false); this.limited.set(false); } },
+    synced: (at: string | null) => { this.lastSync.set(at); if (at) { this.message.set(''); this.revoked.set(false); this.limited.set(false); this.accessLost.set(false); } },
     failed: (m: string) => this.message.set(m),
     deviceRevoked: () => this.revoked.set(true),
     deviceLimit: () => this.limited.set(true),
@@ -101,11 +124,11 @@ export class OfflineGate {
   /** Number of unconfirmed operations of the vault owner, readable while the device is locked. */
   async refreshCounts(): Promise<number> {
     const h = this.header();
-    if (!h) { this.waiting.set(0); this.problems.set(0); return 0; }
+    if (!h) { this.waiting.set(0); this.problems.set(0); this.oldestUnsynced.set(null); return 0; }
     if (this.engine) { await this.engine.refresh(); return this.unsynced(); }
     try {
-      const { waiting, problems } = await (await this.module()).storage.countUnsynced(h.user.uuid);
-      this.waiting.set(waiting); this.problems.set(problems);
+      const { waiting, problems, oldest } = await (await this.module()).storage.countUnsynced(h.user.uuid);
+      this.waiting.set(waiting); this.problems.set(problems); this.oldestUnsynced.set(oldest); this.now.set(Date.now());
     } catch { /* database not created yet */ }
     return this.unsynced();
   }
@@ -156,6 +179,7 @@ export class OfflineGate {
   private async openEngine(key: CryptoKey) {
     const m = await this.module();
     const header = this.header()!;
+    this.draining = false;   // a device unlocked again takes over from the one finishing its last sends
     this.engine?.close();
     const engine = new m.OfflineEngine({
       http: this.injector.get(HttpClient), conn: this.conn, auth: this.auth, host: this.host,
@@ -170,11 +194,27 @@ export class OfflineGate {
 
   /** Forgets the key (and the tokens) in memory; the data and the queue stay on the device, encrypted. */
   lock(redirect = true) {
-    this.engine?.close();
-    this.engine = null;
-    this.unlocked.set(false);
-    this.auth.clearForLock();
+    const engine = this.engine;
+    this.unlocked.set(false);            // the screens are protected at once
     if (redirect) void this.router.navigate(['/verrouillage']);
+    if (engine && this.waiting() > 0 && this.online() && !this.auth.sessionExpired()) {
+      // what is ready to leave is sent first: the key and the session are forgotten when the queue is empty,
+      // or after DRAIN_MS at the latest. Nothing can be opened meanwhile (the guard sends back to the PIN screen).
+      this.draining = true;
+      const finish = () => {
+        clearTimeout(limit); clearInterval(watch);
+        if (!this.draining || this.engine !== engine) return;   // unlocked again meanwhile
+        this.draining = false;
+        engine.close(); this.engine = null; this.auth.clearForLock();
+      };
+      const limit = setTimeout(finish, DRAIN_MS);
+      const watch = setInterval(() => { if (this.waiting() === 0 && !this.syncing()) finish(); }, 2000);
+      engine.sync.kick(0);
+      return;
+    }
+    engine?.close();
+    this.engine = null;
+    this.auth.clearForLock();
   }
 
   /**
@@ -202,7 +242,7 @@ export class OfflineGate {
       m.vault.destroy();
     } catch { /* ignore */ }
     this.header.set(readVaultHeader());
-    this.waiting.set(0); this.problems.set(0); this.lastSync.set(null); this.message.set(''); this.revoked.set(false); this.limited.set(false);
+    this.waiting.set(0); this.problems.set(0); this.oldestUnsynced.set(null); this.lastSync.set(null); this.message.set(''); this.revoked.set(false); this.limited.set(false); this.accessLost.set(false);
   }
 
   skip() { writeFlag(SKIP_KEY); this.skipped.set(true); }
@@ -237,6 +277,20 @@ export class OfflineGate {
 
   async syncNow() { this.message.set(''); await this.engine?.sync.run(true); }
 
+  /** The unsent work as a file to keep elsewhere (the device must be unlocked). */
+  async exportBackup(): Promise<{ blob: Blob; name: string }> {
+    if (!this.engine) throw new Error("Déverrouillez l'appareil pour créer une sauvegarde.");
+    const m = await this.module();
+    return { blob: await this.engine.exportBackup(), name: m.backupFileName() };
+  }
+
+  /** Puts a backup file back on a device whose data were erased; the owner then signs in and unlocks with the original code. */
+  async restoreBackup(text: string) {
+    await (await this.module()).backup.restore(text);
+    this.header.set(readVaultHeader());
+    await this.refreshCounts();
+  }
+
   /** New sign-in of the SAME agent after the session expired; the queue then resumes. */
   async reauthenticate(password: string) {
     const h = this.header();
@@ -253,8 +307,18 @@ export class OfflineGate {
     this.watching = true;
     const touch = () => { this.lastActivity = Date.now(); };
     for (const ev of ['pointerdown', 'keydown', 'touchstart']) window.addEventListener(ev, touch, { passive: true });
-    setInterval(() => { if (this.unlocked() && Date.now() - this.lastActivity > AUTO_LOCK_MS) this.lock(); }, 30_000);
+    setInterval(() => {
+      this.now.set(Date.now());
+      if (this.unlocked() && Date.now() - this.lastActivity > AUTO_LOCK_MS) this.lock();
+    }, 30_000);
   }
+}
+
+function isIos(): boolean { return typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent); }
+/** The application runs from the home screen (installed), not in a browser tab. */
+function isInstalled(): boolean {
+  try { return (typeof matchMedia !== 'undefined' && matchMedia('(display-mode: standalone)').matches) || (navigator as any).standalone === true; }
+  catch { return false; }
 }
 
 function readFlag(key: string): boolean { try { return sessionStorage.getItem(key) === '1'; } catch { return false; } }

@@ -4,6 +4,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -18,6 +19,22 @@ from . import services
 from .models import Device, SyncOperation
 
 OpType = SyncOperation.Type
+
+
+class AccessLostMixin:
+    """
+    A signed-in, active user who is refused only because he no longer holds the right (role withdrawn…) gets the code
+    ``access_lost``: the device then forgets the copies of the dossiers it holds (it keeps what is still to be sent).
+    A refusal for another reason (password to change, not signed in) keeps the usual answer and wipes nothing.
+    """
+
+    def permission_denied(self, request, message=None, code=None):
+        user = request.user
+        if user and user.is_authenticated and user.is_active and not getattr(user, 'must_change_password', False):
+            raise PermissionDenied({
+                'code': 'access_lost',
+                'detail': "Vos droits ne permettent plus de travailler sur cet appareil : les copies de dossiers vont être effacées."})
+        super().permission_denied(request, message=message, code=code)
 
 
 class SyncRateThrottle(UserRateThrottle):
@@ -59,6 +76,8 @@ class OperationSerializer(serializers.Serializer):
     entity_uuid = serializers.UUIDField()
     device_time = serializers.DateTimeField(required=False, allow_null=True, default=None)
     base_version = serializers.IntegerField(required=False, allow_null=True, min_value=1, default=None)
+    # operation of the same dossier this one was stacked on: the version to expect is the one it produced
+    after_op = serializers.UUIDField(required=False, allow_null=True, default=None)
     payload = serializers.JSONField(required=False, default=dict)
 
     def validate_payload(self, value):
@@ -124,7 +143,7 @@ def _device_or_refusal(request, device_id, label):
                               status=status.HTTP_403_FORBIDDEN)
 
 
-class PushView(APIView):
+class PushView(AccessLostMixin, APIView):
     """
     POST /api/sync/push/ — a small batch of operations prepared on a device.
 
@@ -175,7 +194,7 @@ class DocumentPushSerializer(serializers.Serializer):
         return value or 'PAPER_FORM'
 
 
-class DocumentPushView(APIView):
+class DocumentPushView(AccessLostMixin, APIView):
     """POST /api/sync/documents/ — one photo / scan prepared offline (multipart), idempotent on ``op_id``."""
     permission_classes = [HasWakaraPermission]
     required_permission = 'document.upload'
@@ -203,7 +222,7 @@ class DocumentPushView(APIView):
 
 # ── Pull ──────────────────────────────────────────
 
-class PullView(APIView):
+class PullView(AccessLostMixin, APIView):
     """
     GET /api/sync/pull/?since=<cursor> — what the device keeps to work without connection: the agent's own
     dossiers, the active health facilities and the rules it must mirror. The server stays the authority.
@@ -233,7 +252,7 @@ class PullView(APIView):
         return response
 
 
-class ReferenceView(APIView):
+class ReferenceView(AccessLostMixin, APIView):
     """
     GET /api/sync/reference/ — health facilities and rules, without any dossier. The device asks for it first at
     every synchronisation: the forms must work offline even when the rest of the synchronisation could not run.

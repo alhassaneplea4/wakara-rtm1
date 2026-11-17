@@ -4,7 +4,7 @@
  */
 import { DeclarationDetail } from '../models';
 import { decryptBytes, decryptJson, encryptBytes, encryptJson, sha256Hex, uuid as newUuid } from './crypto';
-import { OfflineDb } from './db';
+import { OfflineDb, oldestUnsynced } from './db';
 import { ViewContext, materialize } from './materialize';
 import {
   DEFAULT_RULES, FileMeta, FileRow, HospitalRef, LocalDeclaration, LogRow, Op, OpRow, OpSecret, OpType, SyncRules,
@@ -22,7 +22,7 @@ const LOG_LIMIT = 200;
 export interface StoredFile { id: string; entity: string; kind: string; size: number; createdAt: string; name: string; mime: string; sha256: string; }
 
 export class OfflineStore {
-  constructor(readonly db: OfflineDb, private key: CryptoKey, private context: () => Omit<ViewContext, 'hospitals'>) {}
+  constructor(readonly db: OfflineDb, private key: CryptoKey, private context: () => Omit<ViewContext, 'hospitals' | 'separateDuties'>) {}
 
   /* ── key / value ── */
   async clear<T>(key: string, fallback: T): Promise<T> { return ((await this.db.kv.get(key))?.value as T) ?? fallback; }
@@ -137,10 +137,23 @@ export class OfflineStore {
   /** When the facilities and rules were last received (reference data). */
   referenceAt() { return this.clear<string | null>('referenceAt', null); }
 
-  async counts(): Promise<{ waiting: number; problems: number }> {
+  async counts(): Promise<{ waiting: number; problems: number; oldest: string | null }> {
     const waiting = await this.db.operations.where('status').anyOf('pending', 'sending').count();
     const problems = await this.db.operations.where('status').anyOf('rejected', 'conflict').count();
-    return { waiting, problems };
+    return { waiting, problems, oldest: await oldestUnsynced(this.db) };
+  }
+
+  /**
+   * The user lost the right to work on these dossiers (role withdrawn, device revoked): the copies of the dossiers
+   * and the pages kept for reading are erased. What is still to be sent (operations, photos) stays: it is the user's
+   * own work and can be sent again, or exported, once the access is restored.
+   */
+  async wipeCopies() {
+    await this.db.declarations.clear();
+    await this.db.cache.clear();
+    for (const key of await this.db.kv.toCollection().primaryKeys()) {
+      if (key === 'cursor' || (typeof key === 'string' && key.startsWith('acte:'))) await this.db.kv.delete(key);
+    }
   }
 
   /* ── photos and documents waiting to be sent ── */
@@ -175,7 +188,9 @@ export class OfflineStore {
   removeFile(id: string) { return this.db.files.delete(id); }
 
   /* ── what the agent sees ── */
-  private async ctx(): Promise<ViewContext> { return { ...this.context(), hospitals: await this.hospitals() }; }
+  private async ctx(): Promise<ViewContext> {
+    return { ...this.context(), hospitals: await this.hospitals(), separateDuties: !!(await this.rules()).separate_submit_and_validate };
+  }
 
   async view(uuid: string): Promise<LocalDeclaration | null> {
     return materialize(uuid, await this.server(uuid), await this.ops(uuid), await this.ctx());

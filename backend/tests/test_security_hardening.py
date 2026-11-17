@@ -307,7 +307,7 @@ class DeviceClockRules(SimpleTestCase):
         self.assertEqual(self.r(entered, self.NOW), (entered, 0, ''))
 
     def test_too_old_and_future_dates_fall_back_to_the_server_time(self):
-        self.assertEqual(self.r(self.NOW - DAYS(31), self.NOW)[2], 'too_old')
+        self.assertEqual(self.r(self.NOW - DAYS(121), self.NOW)[2], 'too_old')
         self.assertEqual(self.r(self.NOW + DAYS(1), self.NOW)[2], 'future_date')
 
 

@@ -218,6 +218,29 @@ def _create(user, op, effective, now, anomaly):
         history_note=_offline_note('Saisie', effective, now, anomaly))
 
 
+def _expected_version(user, op):
+    """
+    The version of the dossier this operation was prepared against.
+      - an operation prepared on the version the device had read carries it (``base_version``);
+      - an operation stacked on an earlier one of the same dossier (``after_op``) expects the version THAT one
+        produced, so a change made by somebody else in between is still detected and the user's own earlier
+        operations never cause a conflict;
+      - None when there is nothing to compare with (no reference at all).
+    """
+    if op.get('base_version') is not None:
+        return op['base_version']
+    previous = op.get('after_op')
+    if not previous:
+        return None
+    record = SyncOperation.objects.filter(
+        op_id=previous, user=user, declaration_uuid=_declaration_uuid(op), status=OpStatus.APPLIED).first()
+    version = (record.result or {}).get('sync_version') if record else None
+    if not version:
+        raise OperationRefused(OpStatus.CONFLICT, 'blocked',
+                               "L'opération précédente de ce dossier n'est pas encore appliquée par le serveur.")
+    return version
+
+
 def _update(user, op, effective, now, anomaly):
     declaration = _reachable_declaration(user, op['entity_uuid'])
     if not declaration_services.can_edit_data(user, declaration):
@@ -225,7 +248,8 @@ def _update(user, op, effective, now, anomaly):
             OpStatus.CONFLICT, 'not_editable',
             f"Le dossier est maintenant « {declaration.get_status_display()} » : il ne peut plus être modifié "
             "depuis l'appareil.")
-    if op.get('base_version') is None:
+    expected = _expected_version(user, op)
+    if expected is None:
         raise OperationRefused(OpStatus.REJECTED, 'validation', "Version de référence manquante.")
     payload = dict(op.get('payload') or {})
     if not user_has_perm(user, 'acte.update'):
@@ -233,7 +257,7 @@ def _update(user, op, effective, now, anomaly):
     serializer = DeclarationWriteSerializer(declaration, data=payload, partial=True)
     serializer.is_valid(raise_exception=True)
     return declaration_services.update_declaration(
-        user, declaration, dict(serializer.validated_data), expected_version=op['base_version'])
+        user, declaration, dict(serializer.validated_data), expected_version=expected)
 
 
 # Decisions taken on what the device showed: refused when the dossier changed since (see _transition).
@@ -260,8 +284,9 @@ def _transition(user, op, effective, now, anomaly):
             OpStatus.CONFLICT, 'status_changed',
             f"Le dossier est passé de « {dict(Status.CHOICES).get(seen, seen)} » à « {declaration.get_status_display()} » "
             "sur le serveur depuis votre décision : elle n'est pas appliquée.")
-    if op.get('base_version') is not None and declaration.sync_version != op['base_version']:
-        raise VersionConflict(op['base_version'], declaration.sync_version)
+    expected = _expected_version(user, op)
+    if expected is not None and declaration.sync_version != expected:
+        raise VersionConflict(expected, declaration.sync_version)
     note = _offline_note('Décision prise' if data['status'] != Status.PENDING_VALIDATION else 'Soumission faite',
                          effective, now, anomaly)
     return declaration_services.transition_status(
@@ -456,8 +481,10 @@ def process_operation(user, device, op, sent_at, request):
                     record.result = {'uuid': str(obj.uuid), 'original_name': obj.original_name,
                                      'size': obj.size, 'sha256': obj.sha256}
                 else:
-                    record.result = {'reference': obj.reference, 'status': obj.status,
-                                     'sync_version': obj.sync_version}
+                    # the version AFTER the operation, read back: later operations of the dossier expect this one
+                    version = (Declaration.all_objects.filter(pk=obj.pk).values_list('sync_version', flat=True).first()
+                               or obj.sync_version)
+                    record.result = {'reference': obj.reference, 'status': obj.status, 'sync_version': version}
                     # duplicate control: the declaration is kept; a case for a human is opened if it looks like another
                     from duplicates.services.cases import DuplicateCaseService
                     cases = DuplicateCaseService.status_for(obj)['open_cases']
@@ -550,6 +577,7 @@ def reference_data(user):
             'expected_for_validation': list(settings.VALIDATION_EXPECTED_FIELDS),
             'deadline_months': settings.DOSSIER_DEADLINE_MONTHS,
             'auto_numbering': bool(settings.ACTE_AUTO_NUMBERING),
+            'separate_submit_and_validate': bool(settings.DOSSIER_SEPARATE_SUBMIT_AND_VALIDATE),
             'max_upload_size': settings.MAX_UPLOAD_SIZE,
             'max_batch': settings.SYNC_MAX_BATCH,
         },

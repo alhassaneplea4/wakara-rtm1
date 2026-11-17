@@ -121,6 +121,21 @@ def can_edit_data(user, declaration) -> bool:
     return False
 
 
+SEPARATION_MESSAGE = ("Séparation des tâches : un dossier ne peut pas être validé par la personne qui l'a "
+                      "soumis à validation. Un autre responsable doit prendre la décision.")
+
+
+def submitted_by_id(declaration):
+    """Who last sent the dossier to validation (None when nobody did). Reads the prefetched history when there is one."""
+    entries = [h for h in declaration.status_history.all() if h.to_status == Status.PENDING_VALIDATION]
+    return max(entries, key=lambda h: (h.changed_at, h.id)).changed_by_id if entries else None
+
+
+def separation_blocks_validation(user, declaration) -> bool:
+    """Separation of duties: the person who submitted a dossier does not validate it (DOSSIER_SEPARATE_SUBMIT_AND_VALIDATE)."""
+    return bool(settings.DOSSIER_SEPARATE_SUBMIT_AND_VALIDATE and submitted_by_id(declaration) == user.id)
+
+
 def user_transitions(user, declaration):
     """Transitions the user can trigger right now (used by the API to drive the UI)."""
     from core.deadline import is_locked_for
@@ -132,6 +147,8 @@ def user_transitions(user, declaration):
             continue
         if t.target == Status.IN_COMPLETION:
             continue  # « Prendre en charge » is no longer offered: the secretariat edits the transmitted dossier directly
+        if t.target == Status.VALIDATED and separation_blocks_validation(user, declaration):
+            continue  # somebody else takes the final decision
         if t.source in (Status.DRAFT, Status.TO_CORRECT_COLLECTION):
             if not (user_has_perm(user, 'declaration.view_all') or declaration.created_by_id == user.id):
                 continue
@@ -375,12 +392,8 @@ def transition_status(declaration_pk, target: str, user, reason: str = '', paylo
     reason = (reason or '').strip()
     if t.reason_required and not reason:
         raise ValidationError({'reason': "Un motif est obligatoire pour cette décision."})
-    if target == Status.VALIDATED and settings.DOSSIER_SEPARATE_SUBMIT_AND_VALIDATE:
-        sender = (StatusHistory.objects.filter(declaration=declaration, to_status=Status.PENDING_VALIDATION)
-                  .order_by('-changed_at', '-id').values_list('changed_by_id', flat=True).first())
-        if sender is not None and sender == user.id:
-            raise PermissionDenied("Séparation des tâches : un dossier ne peut pas être validé par la personne qui l'a "
-                                   "soumis à validation. Un autre responsable doit prendre la décision.")
+    if target == Status.VALIDATED and separation_blocks_validation(user, declaration):
+        raise PermissionDenied(SEPARATION_MESSAGE)
 
     if target == Status.TRANSMITTED:
         missing = missing_fields(declaration, settings.DECLARATION_REQUIRED_FOR_TRANSMISSION)

@@ -24,6 +24,9 @@ export interface ViewContext {
   can?: CanFn;
   /** Today, yyyy-mm-dd (tests) — the six-month rule is judged on it. */
   today?: string;
+  /** Who is working, and whether the rules forbid validating one's own submission. */
+  userUuid?: string;
+  separateDuties?: boolean;
 }
 
 /**
@@ -43,6 +46,14 @@ export const WORKFLOW: WorkflowStep[] = [
   { source: 'TO_CORRECT_SECRETARIAT', target: 'PENDING_VALIDATION', permission: 'acte.submit', reason_required: false },
 ];
 // (TRANSMITTED → IN_COMPLETION « prendre en charge » is no longer offered; DELIVERED goes through a delivery)
+
+export const SEPARATION_MESSAGE = "Séparation des tâches : un dossier ne peut pas être validé par la personne qui l'a soumis à validation. Un autre responsable doit prendre la décision.";
+
+/** Who last sent the dossier to validation (the history is newest first). */
+export function submittedBy(d: any): string | null {
+  const entry = (d?.status_history ?? []).find((h: any) => h.to_status === 'PENDING_VALIDATION');
+  return entry?.changed_by ?? null;
+}
 
 /** The rights a context gives; the agent-only context (no permission list) is the collection agent. */
 export function canOf(ctx: ViewContext): CanFn {
@@ -189,7 +200,10 @@ export function materialize(uuid: string, server: DeclarationDetail | null, ops:
   const locked = isLockedByDeadline(d, can, today);
   d.overdue = !!d.deadline?.deadline_date && !isFrozenStatus(d.status) && today > d.deadline.deadline_date;
   d.can_edit = canEditData(d.status, can, locked) && state !== 'conflict';
-  d.available_transitions = state === 'conflict' ? [] : userTransitions(d.status, can, locked);
+  // separation of duties: whoever sent the dossier to validation does not validate it (the server checks it again)
+  const mustNotValidate = !!ctx.separateDuties && !!ctx.userUuid && d.status === 'PENDING_VALIDATION' && submittedBy(d) === ctx.userUuid;
+  d.validation_blocked = mustNotValidate;
+  d.available_transitions = state === 'conflict' ? [] : userTransitions(d.status, can, locked).filter(t => !(mustNotValidate && t.target === 'VALIDATED'));
   if (d.acte) d.acte.can_edit = canEditActe(d.status, can, locked) && state !== 'conflict';
   return d as LocalDeclaration;
 }
@@ -198,7 +212,7 @@ export function materialize(uuid: string, server: DeclarationDetail | null, ops:
 function stepTo(d: any, target: Status, op: Op, ctx: ViewContext) {
   const reason = (op.payload?.['reason'] as string | undefined)?.trim();
   const step: StatusHistoryEntry = {
-    from_status: d.status, to_status: target, changed_by_name: ctx.userName, changed_at: op.deviceTime,
+    from_status: d.status, to_status: target, changed_by: ctx.userUuid ?? null, changed_by_name: ctx.userName, changed_at: op.deviceTime,
     reason: reason || "En attente d'envoi au serveur.",
   };
   d.status_history = [step, ...(d.status_history ?? [])];

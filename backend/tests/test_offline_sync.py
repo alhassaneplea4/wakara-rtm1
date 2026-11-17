@@ -78,7 +78,7 @@ class DeviceClockTests(SimpleTestCase):
         self.assertEqual((effective, anomaly), (self.NOW, 'future_date'))
 
     def test_too_old_date_falls_back_to_the_server_time(self):
-        effective, _skew, anomaly = resolve_device_time(self.NOW - datetime.timedelta(days=45), self.NOW, self.NOW)
+        effective, _skew, anomaly = resolve_device_time(self.NOW - datetime.timedelta(days=130), self.NOW, self.NOW)
         self.assertEqual((effective, anomaly), (self.NOW, 'too_old'))
 
     def test_without_device_time_the_server_time_is_used(self):
@@ -191,7 +191,7 @@ class CreateTests(SyncTestCase):
         d = Declaration.objects.get(uuid=op['entity_uuid'])
         self.assertEqual(d.received_at, timezone.localdate())
         self.assertIn('date du serveur retenue', StatusHistory.objects.get(declaration=d).reason)
-        op, answer = self.pushed(device_time=iso(timezone.now() - datetime.timedelta(days=60)))
+        op, answer = self.pushed(device_time=iso(timezone.now() - datetime.timedelta(days=130)))
         self.assertEqual(answer['date_anomaly'], 'too_old')
         self.assertEqual(Declaration.objects.get(uuid=op['entity_uuid']).received_at, timezone.localdate())
         self.assertEqual(SyncOperation.objects.get(op_id=op['op_id']).date_anomaly, 'too_old')

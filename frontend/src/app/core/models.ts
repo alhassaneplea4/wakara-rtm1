@@ -47,7 +47,7 @@ export interface Declarant {
   first_names: string; last_name: string; relationship?: string; nationality?: string; npi?: string; marital_status?: string; profession?: string; phone?: string;
   address?: string;
 }
-export interface StatusHistoryEntry { from_status: string; to_status: string; changed_by_name: string; changed_at: string; reason: string; }
+export interface StatusHistoryEntry { from_status: string; to_status: string; changed_by?: string | null; changed_by_name: string; changed_at: string; reason: string; }
 export interface AvailableTransition { target: Status; reason_required: boolean; permission: string; }
 
 export interface DeclarationDetail extends DeclarationListItem {

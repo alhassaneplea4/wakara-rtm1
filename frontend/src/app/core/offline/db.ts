@@ -40,13 +40,20 @@ export function dbName(userUuid: string) { return `wakara-offline-${userUuid}`; 
 /** Operations the server has not confirmed yet — countable while the vault is locked. */
 export const UNSYNCED = ['pending', 'sending', 'rejected', 'conflict'];
 
-export async function countUnsynced(userUuid: string): Promise<{ waiting: number; problems: number }> {
-  if (!(await Dexie.exists(dbName(userUuid)))) return { waiting: 0, problems: 0 };
+export interface UnsyncedCounts { waiting: number; problems: number; /** when the oldest operation not confirmed by the server was made */ oldest: string | null; }
+
+export async function oldestUnsynced(db: OfflineDb): Promise<string | null> {
+  const rows = await db.operations.where('status').anyOf(...UNSYNCED).toArray();
+  return rows.reduce<string | null>((oldest, r) => (oldest === null || r.createdAt < oldest ? r.createdAt : oldest), null);
+}
+
+export async function countUnsynced(userUuid: string): Promise<UnsyncedCounts> {
+  if (!(await Dexie.exists(dbName(userUuid)))) return { waiting: 0, problems: 0, oldest: null };
   const db = new OfflineDb(userUuid);
   try {
     const waiting = await db.operations.where('status').anyOf('pending', 'sending').count();
     const problems = await db.operations.where('status').anyOf('rejected', 'conflict').count();
-    return { waiting, problems };
+    return { waiting, problems, oldest: await oldestUnsynced(db) };
   } finally { db.close(); }
 }
 

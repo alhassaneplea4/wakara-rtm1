@@ -15,6 +15,7 @@ const TONE: Record<OpStatus, string> = { pending: 'badge-warning', sending: 'bad
     template: `
     <div class="page">
       <wk-page-header title="Synchronisation" subtitle="Ce que cet appareil a envoyé au serveur et ce qui attend encore">
+        <button class="btn" type="button" (click)="backup()" title="Enregistre dans un fichier ce qui n'est pas encore envoyé"><wk-icon name="download" [size]="16" /> Sauvegarde de secours</button>
         <button class="btn" type="button" (click)="gate.lock()"><wk-icon name="lock" [size]="16" /> Verrouiller</button>
         <button class="btn btn-primary" type="button" [disabled]="gate.syncing()" (click)="sync()">
           <wk-icon name="refresh" [size]="16" /> {{ gate.syncing() ? 'Synchronisation…' : 'Synchroniser' }}</button>
@@ -25,6 +26,15 @@ const TONE: Record<OpStatus, string> = { pending: 'badge-warning', sending: 'bad
       }
       @if (gate.limited()) {
         <div class="alert alert-danger" role="alert">Ce compte utilise déjà le nombre maximum d'appareils en mode hors connexion (3) : le serveur refuse cet appareil. Vos déclarations restent enregistrées ici ; demandez à l'administrateur de révoquer un ancien appareil dans « Appareils ».</div>
+      }
+      @if (gate.accessLost()) {
+        <div class="alert alert-danger" role="alert">Vos droits ont changé : les copies de dossiers ont été effacées de cet appareil. Ce que vous aviez saisi sans l'envoyer est conservé (voir ci-dessous) ; contactez l'administrateur.</div>
+      }
+      @if (gate.staleQueue()) {
+        <div class="alert alert-danger" role="alert">{{ gate.unsynced() }} saisie(s) attendent depuis plus de 24 heures. Connectez cet appareil à Internet et appuyez sur « Synchroniser ». En cas de doute, faites d'abord une sauvegarde de secours.</div>
+      }
+      @if (gate.storageAtRisk()) {
+        <div class="alert alert-warning" role="status">Le navigateur peut effacer les données de cet appareil sans prévenir@if (gate.persisted() === false) { (il a refusé de les protéger) }. Installez Wakara sur l'écran d'accueil (menu du navigateur → « Ajouter à l'écran d'accueil ») et gardez une sauvegarde de secours à jour.</div>
       }
       @if (!gate.enabled()) {
         <div class="alert alert-warning" role="status">Le mode hors connexion a été désactivé par l'administrateur. Les opérations en attente restent synchronisables ; les nouvelles saisies se font en ligne.</div>
@@ -104,6 +114,18 @@ export class SyncCenterComponent {
   referenceAt = signal<string | null>(null);
   dropping = signal<OpView | null>(null);
   device = deviceLabel();
+
+  /** The unsent work as a file: kept elsewhere, it survives a wipe of the browser data (restored from the PIN screen). */
+  async backup() {
+    try {
+      const { blob, name } = await this.gate.exportBackup();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      this.toast.success('Sauvegarde créée. Gardez le fichier ailleurs que sur cet appareil.');
+    } catch (e: any) { this.toast.error(e?.message ?? 'Impossible de créer la sauvegarde.'); }
+  }
 
   constructor() {
     // reloads whenever something changes on the device (operation queued, sent, refused…)

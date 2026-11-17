@@ -27,6 +27,8 @@ export interface SyncHost {
   deviceRevoked(): void;
   /** The account already uses its maximum number of devices: this one is not accepted for offline use. */
   deviceLimit(): void;
+  /** The user no longer holds the right to work on these dossiers: the copies were erased from the device. */
+  accessLost(message: string): void;
   /** The server wants a new sign-in (session not bound to this device): same screen as an expired session. */
   signInRequired(): void;
   changed(): Promise<void> | void;
@@ -97,8 +99,18 @@ export class SyncEngine {
     const status = err?.status;
     if (status === 401) return;  // the session is handled by the auth interceptor (expired → the queue waits)
     if (status === 403 && err.error?.code === 'device_revoked') {
+      // the copies of the dossiers go (the data are no longer this device's to hold); the unsent work stays
+      await this.store.wipeCopies();
       this.host.deviceRevoked();
-      await this.store.log('error', "Appareil révoqué par l'administrateur : synchronisation refusée.");
+      await this.store.log('error', "Appareil révoqué par l'administrateur : synchronisation refusée, copies des dossiers effacées (les saisies non envoyées sont conservées).");
+      return;
+    }
+    if (status === 403 && err.error?.code === 'access_lost') {
+      await this.store.wipeCopies();
+      const message = err.error?.detail ?? 'Vos droits ont changé : les copies de dossiers ont été effacées de cet appareil.';
+      this.host.accessLost(message);
+      this.host.failed(message);
+      await this.store.log('error', 'Droits retirés : copies des dossiers effacées (les saisies non envoyées sont conservées).');
       return;
     }
     if (status === 403 && err.error?.code === 'device_limit') {
@@ -179,14 +191,24 @@ export class SyncEngine {
     return op.baseVersion ?? ((await this.store.server(op.entity)) as LocalDeclaration | null)?.sync_version ?? null;
   }
 
+  /** The operation of the same dossier made just before this one and not confirmed yet (photos do not change the version). */
+  private async stackedOn(op: Op): Promise<Op | null> {
+    const earlier = (await this.store.ops(op.entity)).filter(o => o.seq < op.seq && o.status !== 'applied' && o.type !== 'document.upload');
+    return earlier.length ? earlier[earlier.length - 1] : null;
+  }
+
   private async pushBatch(batch: Op[]): Promise<number> {
     if (!batch.length) return 0;
     await this.markSending(batch);
     const operations = [];
     for (const op of batch) {
+      // stacked on an earlier operation of the same dossier: the server compares with the version THAT one produced
+      // (its own earlier changes are never a conflict); otherwise with the version the device had read
+      const before = op.baseVersion == null ? await this.stackedOn(op) : null;
       operations.push({
         op_id: op.opId, type: op.type, entity_uuid: op.entity, device_time: op.deviceTime,
-        base_version: await this.baseVersion(op), payload: op.type === 'declaration.transmit' ? {} : (op.payload ?? {}),
+        base_version: before ? null : await this.baseVersion(op), after_op: before?.opId ?? null,
+        payload: op.type === 'declaration.transmit' ? {} : (op.payload ?? {}),
       });
     }
     let results: PushResult[];

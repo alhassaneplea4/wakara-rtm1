@@ -249,7 +249,8 @@ class StateRuleTests(WakaraTestCase):
         sec_t = self.client_for(self.secretary).get(f'/api/declarations/{d["uuid"]}/').data['available_transitions']
         self.assertEqual({t['target'] for t in admin_t},
                          {'VALIDATED', 'REJECTED', 'TO_CORRECT_COLLECTION', 'TO_CORRECT_SECRETARIAT'})
-        self.assertEqual({t['target'] for t in sec_t}, {t['target'] for t in admin_t})
+        # the secretary submitted the dossier: somebody else takes the final decision (separation of duties)
+        self.assertEqual({t['target'] for t in sec_t}, {t['target'] for t in admin_t} - {'VALIDATED'})
         agent_t = self.client_for(self.agent).get(f'/api/declarations/{d["uuid"]}/').data['available_transitions']
         self.assertEqual(agent_t, [])
 

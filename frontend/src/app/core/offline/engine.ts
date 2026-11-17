@@ -5,6 +5,7 @@
 import { HttpClient, HttpEvent, HttpHandlerFn, HttpRequest } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { AuthService } from '../auth.service';
+import { exportBackup, restoreBackup } from './backup';
 import { ConnectivityService } from './connectivity.service';
 import { OfflineDb, countUnsynced, deleteDb } from './db';
 import { LocalApi } from './local-api';
@@ -16,12 +17,15 @@ import { VaultSession, changeVaultPin, clearVaultSession, createVault, destroyVa
 export { PinError, pinProblem, PIN_MIN_LENGTH } from './vault';
 
 export interface EngineHost {
-  counts(waiting: number, problems: number): void;
+  counts(waiting: number, problems: number, oldest: string | null): void;
   syncing(value: boolean): void;
   synced(at: string | null): void;
   failed(message: string): void;
   deviceRevoked(): void;
   deviceLimit(): void;
+  accessLost(message: string): void;
+  /** Did the browser agree to keep the data (storage.persist)? null = it could not be asked. */
+  persisted?(value: boolean | null): void;
   /** A collection agent works device-first; the other roles work on the server when it answers and queue otherwise. */
   collectionProfile?(): boolean;
   /** Tells the screens that what they show may have changed. */
@@ -35,6 +39,8 @@ export interface EngineDeps {
 
 export const vault = { create: createVault, open: openVault, changePin: changeVaultPin, destroy: destroyVault, clearSession: clearVaultSession, pinProblem };
 export const storage = { countUnsynced, deleteDb };
+export const backup = { restore: restoreBackup };
+export { backupFileName, BackupError } from './backup';
 
 export class OfflineEngine {
   readonly store: OfflineStore;
@@ -46,12 +52,12 @@ export class OfflineEngine {
     const { auth, conn, host } = deps;
     this.db = new OfflineDb(userUuid);
     this.store = new OfflineStore(this.db, key, () => ({
-      userName: auth.fullName(), canUpdate: auth.can('declaration.update'), canTransmit: auth.can('declaration.transmit'),
+      userName: auth.fullName(), userUuid: userUuid, canUpdate: auth.can('declaration.update'), canTransmit: auth.can('declaration.transmit'),
       can: (permission: string) => auth.can(permission),
     }));
     this.sync = new SyncEngine(this.store, deps.http, conn, {
       syncing: v => host.syncing(v), synced: at => host.synced(at), failed: m => host.failed(m),
-      deviceRevoked: () => host.deviceRevoked(), deviceLimit: () => host.deviceLimit(), signInRequired: () => auth.expire(), changed: () => this.refresh(), sessionExpired: () => auth.sessionExpired(),
+      deviceRevoked: () => host.deviceRevoked(), deviceLimit: () => host.deviceLimit(), accessLost: m => host.accessLost(m), signInRequired: () => auth.expire(), changed: () => this.refresh(), sessionExpired: () => auth.sessionExpired(),
     }, { apiUrl: deps.apiUrl, deviceId: deps.deviceId, deviceLabel: deps.deviceLabel, userUuid });
     this.api = new LocalApi(this.store, conn, {
       apiUrl: deps.apiUrl, userName: () => auth.fullName(), sessionExpired: () => auth.sessionExpired(),
@@ -67,7 +73,11 @@ export class OfflineEngine {
     await this.store.resetSending();
     this.deps.host.synced(await this.store.clear<string | null>('lastSync', null));
     await this.refresh();
-    try { void navigator.storage?.persist?.(); } catch { /* best effort: ask the browser not to evict the data */ }
+    // ask the browser not to evict the data, and tell the user when it refuses (they could be erased without warning)
+    try {
+      const kept = navigator.storage?.persist ? (await navigator.storage.persisted?.()) || (await navigator.storage.persist()) : null;
+      this.deps.host.persisted?.(kept);
+    } catch { this.deps.host.persisted?.(null); }
   }
 
   close() { this.sync.stop(); this.db.close(); }
@@ -75,8 +85,8 @@ export class OfflineEngine {
   handle(req: HttpRequest<unknown>, next: HttpHandlerFn): Observable<HttpEvent<unknown>> { return this.api.handle(req, next); }
 
   async refresh() {
-    const { waiting, problems } = await this.store.counts();
-    this.deps.host.counts(waiting, problems);
+    const { waiting, problems, oldest } = await this.store.counts();
+    this.deps.host.counts(waiting, problems, oldest);
     this.deps.host.bump();
   }
 
@@ -88,6 +98,9 @@ export class OfflineEngine {
     return saveVaultSession(this.key, { access: this.deps.auth.accessToken, refresh: this.deps.auth.refreshToken, me });
   }
   loadSession(): Promise<VaultSession | null> { return loadVaultSession(this.key); }
+
+  /** The unsent work as a file kept elsewhere (see backup.ts). */
+  exportBackup(): Promise<Blob> { return exportBackup(this.db); }
 
   /* ── synchronisation screen ── */
 

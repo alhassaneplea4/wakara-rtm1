@@ -22,7 +22,7 @@ import { Observable, catchError, defer, from, of, switchMap, throwError } from '
 import { DeclarationDetail, DeclarationListItem, Page, SupportingDocument } from '../models';
 import { ConnectivityService } from './connectivity.service';
 import {
-  FIELD_LABELS, ListQuery, WORKFLOW, isLockedByDeadline, matchesQuery, mergeWrite, missingForTransmission, sortViews, toListItem,
+  FIELD_LABELS, ListQuery, SEPARATION_MESSAGE, WORKFLOW, isLockedByDeadline, matchesQuery, mergeWrite, missingForTransmission, sortViews, toListItem,
 } from './materialize';
 import { OfflineStore, StoredFile } from './store';
 import { LocalDeclaration, LocalDocument, Op, SyncState } from './types';
@@ -319,6 +319,7 @@ export class LocalApi {
     if (!view) return this.netOk() ? null : Promise.reject(fail(503, { detail: "Ce dossier n'est pas disponible sans connexion sur cet appareil." }));
     if (!this.writesLocal() && !live.length) return null;
     const target = String(body['status'] ?? '');
+    if (target === 'VALIDATED' && (view as any).validation_blocked) return Promise.reject(fail(403, { detail: SEPARATION_MESSAGE }));
     const step = WORKFLOW.find(t => t.target === target && t.source === view.status);
     if (!step || !view.available_transitions.some(t => t.target === target)) {
       return Promise.reject(fail(400, { code: 'invalid_transition', detail: view.deadline?.overdue ? view.deadline.message : 'Ce dossier ne peut pas passer à cette étape dans son état actuel.' }));

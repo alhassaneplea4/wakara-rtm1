@@ -82,7 +82,7 @@ Les écrans existants ne sont presque pas modifiés : un intercepteur HTTP (`cor
 | Type | Contenu | Remarque |
 |---|---|---|
 | `declaration.create` | données du formulaire | l'identifiant (UUID) du dossier est créé sur l'appareil |
-| `declaration.update` | champs modifiés + `base_version` | refusée en conflit si le serveur a une autre version |
+| `declaration.update` | champs modifiés + `base_version` **ou** `after_op` | refusée en conflit si le serveur a une autre version. Une modification empilée sur une opération précédente du même dossier envoie `after_op` (l'identifiant de celle-ci) : le serveur attend la version que **cette** opération a produite, donc ses propres changements ne sont jamais un conflit, mais le changement d'une autre personne entre-temps en reste un |
 | `declaration.transmit` | — | passage à « Transmis au secrétariat » |
 | `declaration.transition` | `status`, motif, numérotation (`annee`, `registre`, `feuillet`, `numero_acte`), `accept_incomplete`, `from_status` | toute autre étape du circuit (soumettre à la validation, valider, renvoyer, rejeter) ; mêmes règles que l'API en ligne |
 | `document.upload` | fichier + empreinte SHA-256 | envoi séparé, une pièce par requête |
@@ -118,7 +118,7 @@ Un dossier transmis, validé, rejeté, délivré ou archivé ne peut plus être 
 La date qui fait foi pour la réception et la transmission est celle de la saisie sur l'appareil (décision métier). L'horloge d'un téléphone n'étant pas fiable (`sync.services.resolve_device_time`) :
 
 - l'appareil envoie son heure au moment de l'envoi ; l'écart avec le serveur donne le décalage d'horloge. Au-delà de `SYNC_CLOCK_TOLERANCE_SECONDS` (5 min), l'heure est corrigée de ce décalage (`clock_corrected`) ;
-- une date encore dans le futur (`future_date`) ou plus ancienne que `SYNC_MAX_DEVICE_AGE_DAYS` (30 jours, `too_old`) n'est pas retenue : la date du serveur est utilisée ;
+- une date encore dans le futur (`future_date`) ou plus ancienne que `SYNC_MAX_DEVICE_AGE_DAYS` (120 jours, `too_old`) n'est pas retenue : la date du serveur est utilisée ;
 - la date reçue, la date retenue, le décalage et l'anomalie sont conservés dans `SyncOperation` ; l'historique du dossier porte la mention « Saisie hors connexion le … , synchronisée le … ».
 
 `received_at` et `transmitted_at` portent la date de l'appareil ; `created_at` et `StatusHistory.changed_at` restent l'heure du serveur.

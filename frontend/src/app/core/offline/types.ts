@@ -61,6 +61,8 @@ export interface SyncRules {
   deadline_months?: number;
   /** The server attributes the official number itself when none is typed (ACTE_AUTO_NUMBERING). */
   auto_numbering?: boolean;
+  /** Nobody validates the dossier he submitted himself (DOSSIER_SEPARATE_SUBMIT_AND_VALIDATE). */
+  separate_submit_and_validate?: boolean;
 }
 export const DEFAULT_RULES: SyncRules = {
   required_for_transmission: ['birth_date', 'birth_time', 'birth_place', 'child.gender'], max_upload_size: 4 * 1024 * 1024, max_batch: 20,

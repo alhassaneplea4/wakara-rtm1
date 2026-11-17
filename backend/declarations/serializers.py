@@ -47,10 +47,14 @@ class DeclarantSerializer(PhoneMixin, serializers.ModelSerializer):
 
 class StatusHistorySerializer(serializers.ModelSerializer):
     changed_by_name = serializers.SerializerMethodField()
+    changed_by = serializers.SerializerMethodField()
 
     class Meta:
         model = StatusHistory
-        fields = ['from_status', 'to_status', 'changed_by_name', 'changed_at', 'reason']
+        fields = ['from_status', 'to_status', 'changed_by', 'changed_by_name', 'changed_at', 'reason']
+
+    def get_changed_by(self, obj):
+        return str(obj.changed_by.uuid) if obj.changed_by_id else None
 
     def get_changed_by_name(self, obj):
         u = obj.changed_by

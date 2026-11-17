@@ -37,6 +37,9 @@ type Mode = 'setup' | 'unlock' | 'reset' | 'upgrade';
               @if (busy()) { <span class="spinner"></span> } Activer le mode hors connexion</button>
           </form>
           <button type="button" class="link" (click)="skip()">Continuer sans le mode hors connexion sur cet appareil</button>
+          <label class="link">Restaurer une sauvegarde de secours de cet appareil
+            <input type="file" accept=".wkr,application/json" hidden (change)="restore($event)" /></label>
+          @if (notice()) { <div class="alert alert-success" role="status">{{ notice() }}</div> }
         }
 
         @if (mode() === 'unlock') {
@@ -44,7 +47,11 @@ type Mode = 'setup' | 'unlock' | 'reset' | 'upgrade';
           <p class="soft">Session de <strong>{{ owner()?.name || owner()?.username }}</strong>. Saisissez votre code de verrouillage pour continuer. Vos déclarations enregistrées hors connexion sont conservées sur cet appareil, même après une déconnexion.</p>
           @if (gate.unsynced()) {
             <p class="count"><wk-icon name="phone" [size]="16" /> {{ gate.unsynced() }} opération(s) enregistrée(s) sur cet appareil, pas encore synchronisée(s).</p>
+            @if (gate.staleQueue()) {
+              <p class="warn strong"><wk-icon name="alert" [size]="16" /> Certaines attendent depuis plus de 24 heures : déverrouillez, connectez-vous à Internet et synchronisez.</p>
+            }
           }
+          @if (notice()) { <div class="alert alert-success" role="status">{{ notice() }}</div> }
           <form (ngSubmit)="unlock()" novalidate>
             <div class="field"><label for="code">Code de verrouillage</label>
               <input id="code" class="input code" type="password" name="code" autocomplete="off" [(ngModel)]="pin" autofocus /></div>
@@ -116,6 +123,7 @@ export class LockComponent implements OnInit {
   mode = signal<Mode>('unlock');
   busy = signal(false);
   error = signal('');
+  notice = signal('');
   pin = ''; confirm = ''; password = ''; ack = false; private oldPin = '';
 
   owner = () => this.gate.header()?.user ?? null;
@@ -173,6 +181,21 @@ export class LockComponent implements OnInit {
   }
 
   skip() { this.gate.skip(); this.leave(); }
+
+  /** A backup file brings back the unsent work of a device whose data were erased; the original code opens it. */
+  async restore(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    this.error.set(''); this.notice.set(''); this.busy.set(true);
+    try {
+      await this.gate.restoreBackup(await file.text());
+      this.go('unlock');
+      this.notice.set("Sauvegarde restaurée. Saisissez le code de l'appareil d'origine ; si la session est terminée, reconnectez-vous d'abord avec le mot de passe du compte.");
+    } catch (e: any) { this.error.set(e?.message ?? 'Impossible de restaurer cette sauvegarde.'); }
+    finally { this.busy.set(false); }
+  }
 
   async otherAccount() {
     if ((await this.gate.refreshCounts()) > 0) {
