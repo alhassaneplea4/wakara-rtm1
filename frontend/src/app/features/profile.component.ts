@@ -9,9 +9,9 @@ import { ToastService } from '../core/toast.service';
 import { PageHeaderComponent } from '../shared/ui';
 
 @Component({
-  selector: 'wk-profile', standalone: true,
-  imports: [CommonModule, FormsModule, DatePipe, PageHeaderComponent],
-  template: `
+    selector: 'wk-profile',
+    imports: [CommonModule, FormsModule, DatePipe, PageHeaderComponent],
+    template: `
     <div class="page">
       <wk-page-header title="Mon profil" [subtitle]="auth.roleLabel()" />
       @if (forced) { <div class="alert alert-warning" style="margin-bottom:16px" role="alert">Pour des raisons de sécurité, vous devez choisir un nouveau mot de passe avant de continuer.</div> }
@@ -46,7 +46,7 @@ import { PageHeaderComponent } from '../shared/ui';
       </div>
     </div>
   `,
-  styles: ['.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}'],
+    styles: ['.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}']
 })
 export class ProfileComponent implements OnInit {
   private api = inject(ApiService);

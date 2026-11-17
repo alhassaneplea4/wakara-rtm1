@@ -13,9 +13,9 @@ interface Device {
 
 /** Devices used by the collection agents to work offline. Revoking one makes the server refuse what it sends. */
 @Component({
-  selector: 'wk-devices', standalone: true,
-  imports: [CommonModule, DatePipe, IconComponent, PageHeaderComponent, PaginationComponent, ConfirmComponent],
-  template: `
+    selector: 'wk-devices',
+    imports: [CommonModule, DatePipe, IconComponent, PageHeaderComponent, PaginationComponent, ConfirmComponent],
+    template: `
     <div class="page">
       <wk-page-header title="Appareils hors connexion" subtitle="Téléphones et ordinateurs enregistrés par les agents de collecte pour travailler sans connexion" />
       @if (error()) { <div class="alert alert-danger" role="alert" style="margin-bottom:16px">{{ error() }}</div> }
@@ -54,7 +54,7 @@ interface Device {
         Le serveur refusera toutes les synchronisations de l'appareil « {{ d.label || 'Appareil' }} » de {{ d.user_name }}. Vous pourrez le rétablir à tout moment.
       </wk-confirm>
     }`,
-  styles: ['.act{text-align:right;white-space:nowrap}.note{margin-top:14px;max-width:820px}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}'],
+    styles: ['.act{text-align:right;white-space:nowrap}.note{margin-top:14px;max-width:820px}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}']
 })
 export class DevicesComponent implements OnInit {
   private api = inject(ApiService);

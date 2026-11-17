@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -10,9 +10,9 @@ import { DupCompareComponent, DupCriteriaComponent, DupTabsComponent, RiskBadgeC
 
 /** Free comparison of any two declarations (the score is computed on the fly; nothing is stored). */
 @Component({
-  selector: 'wk-duplicate-compare-page', standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent, PageHeaderComponent, DupCompareComponent, DupCriteriaComponent, DupTabsComponent, RiskBadgeComponent, ScoreComponent],
-  template: `
+    selector: 'wk-duplicate-compare-page',
+    imports: [FormsModule, IconComponent, PageHeaderComponent, DupCompareComponent, DupCriteriaComponent, DupTabsComponent, RiskBadgeComponent, ScoreComponent],
+    template: `
     <div class="page">
       <wk-page-header title="Comparer deux déclarations" subtitle="Mettez côte à côte deux dossiers pour repérer les ressemblances et les divergences" />
       <wk-dup-tabs />
@@ -37,13 +37,13 @@ import { DupCompareComponent, DupCriteriaComponent, DupTabsComponent, RiskBadgeC
         <wk-dup-compare [data]="d" (view)="open($event)" />
       }
     </div>`,
-  styles: [`
+    styles: [`
     .pick{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:start;margin-bottom:16px}
     .go{margin-top:24px} .found{list-style:none;margin:4px 0 0;padding:0;border:1px solid var(--wk-border);border-radius:var(--r-sm);max-height:200px;overflow:auto}
     .found button{width:100%;text-align:left;border:0;background:#fff;padding:8px 10px;cursor:pointer;font:inherit} .found button:hover{background:var(--wk-sky-50)}
     .score-card{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
     @media (max-width:760px){.pick{grid-template-columns:1fr}.go{margin-top:0}}
-  `],
+  `]
 })
 export class DuplicateComparePageComponent implements OnInit {
   private api = inject(ApiService);

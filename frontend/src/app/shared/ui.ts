@@ -1,4 +1,5 @@
-import { CommonModule } from '@angular/common';
+import { NgClass } from '@angular/common';
+
 import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnChanges, OnDestroy, Output, ViewChild, inject } from '@angular/core';
 import {
   ArcElement, BarController, BarElement, CategoryScale, Chart, ChartConfiguration, DoughnutController, Filler, Legend,
@@ -64,13 +65,13 @@ export class IconComponent {
 
 /* ── Logo ────────────────────────────────────────── */
 @Component({
-  selector: 'wk-logo', standalone: true, imports: [CommonModule],
-  template: `
+    selector: 'wk-logo', imports: [],
+    template: `
     <div class="logo" [class.light]="light" [class.big]="big">
       <img class="mark" src="assets/logo-mark.png" alt="" aria-hidden="true" />
       <div class="txt"><strong>Wakara</strong><span>{{ subtitle }}</span></div>
     </div>`,
-  styles: [`
+    styles: [`
     .logo{display:flex;align-items:center;gap:10px}
     .mark{width:46px;height:38px;flex:none;object-fit:contain}
     .big .mark{width:77px;height:64px}
@@ -81,7 +82,7 @@ export class IconComponent {
     span{font-size:11px;color:var(--wk-text-soft)}
     .big span{font-size:14px}
     .light strong{color:#fff} .light span{color:rgba(255,255,255,.72)}
-  `],
+  `]
 })
 export class LogoComponent {
   @Input() subtitle = 'État civil · Ratoma';
@@ -91,9 +92,9 @@ export class LogoComponent {
 
 /* ── Status badge ────────────────────────────────── */
 @Component({
-  selector: 'wk-status', standalone: true,
-  template: `<span class="badge" [ngClass]="'badge-' + tone">{{ label }}</span>`,
-  imports: [CommonModule],
+    selector: 'wk-status',
+    template: `<span class="badge" [ngClass]="'badge-' + tone">{{ label }}</span>`,
+    imports: [NgClass]
 })
 export class StatusBadgeComponent {
   @Input() status: Status | string = 'DRAFT';
@@ -103,8 +104,8 @@ export class StatusBadgeComponent {
 
 /* ── Pagination ──────────────────────────────────── */
 @Component({
-  selector: 'wk-pagination', standalone: true, imports: [CommonModule],
-  template: `
+    selector: 'wk-pagination', imports: [],
+    template: `
     @if (total > 0) {
       <div class="pager">
         <span class="soft">{{ from }}–{{ to }} sur {{ total }}</span>
@@ -115,7 +116,7 @@ export class StatusBadgeComponent {
         </div>
       </div>
     }`,
-  styles: ['.pager{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--wk-border)}'],
+    styles: ['.pager{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--wk-border)}']
 })
 export class PaginationComponent {
   @Input() page = 1;
@@ -154,8 +155,8 @@ export class ChartComponent implements AfterViewInit, OnChanges, OnDestroy {
 
 /* ── Toast host ──────────────────────────────────── */
 @Component({
-  selector: 'wk-toasts', standalone: true, imports: [CommonModule],
-  template: `
+    selector: 'wk-toasts', imports: [NgClass],
+    template: `
     <div class="host" aria-live="polite">
       @for (t of toast.toasts(); track t.id) {
         <div class="toast" [ngClass]="t.kind" role="status">
@@ -164,20 +165,20 @@ export class ChartComponent implements AfterViewInit, OnChanges, OnDestroy {
         </div>
       }
     </div>`,
-  styles: [`
+    styles: [`
     .host{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:800;max-width:min(420px,calc(100vw - 32px))}
     .toast{display:flex;gap:12px;justify-content:space-between;align-items:flex-start;padding:12px 14px;border-radius:12px;background:#fff;box-shadow:var(--shadow-lg);border-left:4px solid var(--wk-royal);animation:in .2s ease}
     .toast.success{border-color:var(--wk-success)} .toast.error{border-color:var(--wk-danger)}
     .x{border:0;background:none;font-size:20px;line-height:1;cursor:pointer;color:var(--wk-text-mute)}
     @keyframes in{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
-  `],
+  `]
 })
 export class ToastHostComponent { toast = inject(ToastService); }
 
 /* ── Confirm / reason modal ──────────────────────── */
 @Component({
-  selector: 'wk-confirm', standalone: true, imports: [CommonModule],
-  template: `
+    selector: 'wk-confirm', imports: [NgClass],
+    template: `
     <div class="modal-backdrop" (click)="cancel.emit()" role="presentation">
       <div class="modal" role="dialog" aria-modal="true" [attr.aria-label]="title" (click)="$event.stopPropagation()">
         <h2>{{ title }}</h2>
@@ -195,7 +196,7 @@ export class ToastHostComponent { toast = inject(ToastService); }
           </button>
         </div>
       </div>
-    </div>`,
+    </div>`
 })
 export class ConfirmComponent {
   @Input() title = 'Confirmation';
@@ -212,18 +213,18 @@ export class ConfirmComponent {
 
 /* ── Page header ─────────────────────────────────── */
 @Component({
-  selector: 'wk-page-header', standalone: true,
-  imports: [RouterLink, IconComponent],
-  template: `
+    selector: 'wk-page-header',
+    imports: [RouterLink, IconComponent],
+    template: `
     @if (back) {
       <a class="back-link" [routerLink]="back" [attr.aria-label]="backLabel"><wk-icon name="back" [size]="16" /> {{ backLabel }}</a>
     }
     <div class="page-header"><div><h1>{{ title }}</h1>@if (subtitle) {<p [class.uc]="upper">{{ subtitle }}</p>}</div><div class="row"><ng-content /></div></div>`,
-  styles: [`
+    styles: [`
     :host{display:block}
     .back-link{display:inline-flex;align-items:center;gap:6px;margin:0 0 10px;padding:6px 12px 6px 8px;border-radius:999px;font-size:13px;font-weight:600;color:var(--wk-royal);background:var(--wk-info-bg);text-decoration:none}
     .back-link:hover{background:#dbe8ff}
-  `],
+  `]
 })
 export class PageHeaderComponent {
   @Input() title = '';

@@ -8,7 +8,21 @@ Méthode : lecture du code, recherche de motifs dangereux, `npm audit`, et **90 
 
 Note : aucun skill « ECC » n'est installé dans cet environnement ; l'audit a été fait à la main, avec la même méthode que le précédent ([audit-securite-hors-ligne-doublons.md](./audit-securite-hors-ligne-doublons.md)).
 
-## Verdict
+## Corrections apportées (17/11/2026)
+
+Les quatre points « à corriger avant la mise en production » sont corrigés et testés :
+
+| # | Correction | Vérification |
+|---|------------|--------------|
+| 1 | Angular 17 → **21.2** (migration pas à pas 18, 19, 20, 21 ; TypeScript 5.9). | `npm audit --omit=dev` : 0 vulnérabilité ; build de production ; 74 tests du navigateur ; parcours manuel (connexion, liste, tableau de bord) |
+| 2 | Un dossier hors délai refuse l'ajout et l'archivage d'une pièce, en ligne et à la synchronisation (sauf `dossier.override_deadline`). | `tests/test_audit_fixes.py` |
+| 3 | Verrouillage par couple **compte + adresse** : un inconnu se bloque lui-même, plus le titulaire. Le compte entier n'est verrouillé que si 5 adresses le sont en même temps (`LOGIN_LOCKED_SOURCES_BEFORE_ACCOUNT_LOCK`). | idem |
+| 4 | Personne n'accorde un droit qu'il ne détient pas (rôles, attributions, surcharges) ni n'agit sur un compte qui a plus de droits que lui (réinitialisation, modification, activation, rôles). | idem |
+| 6 | Les trois corps de requête mal formés répondent 400. | idem |
+
+Restent ouverts : les points 5 et 7 à 11, les trois décisions à prendre avec la mairie et les vérifications du déploiement. Limite connue du point 3 : une attaque menée depuis 5 adresses à la fois peut encore verrouiller un compte 15 minutes ; une limitation de débit au niveau du pare-feu la réduit.
+
+## Verdict (avant corrections)
 
 **Pas encore prêt pour une mise en production avec des données réelles.** Le socle est sain (aucune faille critique, aucun accès croisé entre comptes, aucune injection trouvée), mais 4 points sont à corriger avant, et 3 décisions sont à prendre avec la mairie.
 

@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService, errorMessage } from '../core/api.service';
@@ -8,9 +8,9 @@ import { ToastService } from '../core/toast.service';
 import { PageHeaderComponent } from '../shared/ui';
 
 @Component({
-  selector: 'wk-roles', standalone: true,
-  imports: [CommonModule, FormsModule, PageHeaderComponent],
-  template: `
+    selector: 'wk-roles',
+    imports: [FormsModule, PageHeaderComponent],
+    template: `
     <div class="page">
       <wk-page-header title="Rôles et permissions" subtitle="Les rôles regroupent des permissions. Chaque changement est tracé dans le journal d'audit." />
       @if (error()) { <div class="alert alert-danger" style="margin-bottom:16px">{{ error() }}</div> }
@@ -58,7 +58,7 @@ import { PageHeaderComponent } from '../shared/ui';
       </div></div>
     }
   `,
-  styles: [`
+    styles: [`
     .layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:16px;align-items:start}
     .list{display:flex;flex-direction:column;gap:6px;padding:12px}
     .role{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:none;border:1px solid transparent;border-radius:12px;padding:10px 12px;cursor:pointer;font:inherit}
@@ -68,7 +68,7 @@ import { PageHeaderComponent } from '../shared/ui';
     .perm{padding:10px 12px;border:1px solid var(--wk-border);border-radius:10px;align-items:flex-start}
     .perm span{display:flex;flex-direction:column}
     @media (max-width:900px){.layout{grid-template-columns:minmax(0,1fr)}}
-  `],
+  `]
 })
 export class RolesComponent implements OnInit {
   private api = inject(ApiService);

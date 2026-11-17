@@ -25,9 +25,9 @@ const DECISION_HELP: Record<DecisionCode, string> = {
 };
 
 @Component({
-  selector: 'wk-duplicate-case', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, ConfirmComponent, RiskBadgeComponent, CaseStatusBadgeComponent, ScoreComponent, DupCompareComponent, DupCriteriaComponent, DupTabsComponent],
-  template: `
+    selector: 'wk-duplicate-case',
+    imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, ConfirmComponent, RiskBadgeComponent, CaseStatusBadgeComponent, ScoreComponent, DupCompareComponent, DupCriteriaComponent, DupTabsComponent],
+    template: `
     @if (c(); as c) {
       <div class="page">
         <wk-page-header [title]="c.reference" [subtitle]="c.anomaly_label + ' · détecté le ' + (c.detected_at | date: 'dd/MM/yyyy HH:mm')" [back]="['/duplicates']" backLabel="Centre de contrôle des doublons">
@@ -192,7 +192,7 @@ const DECISION_HELP: Record<DecisionCode, string> = {
     } @else if (error()) { <div class="page"><div class="alert alert-danger">{{ error() }}</div></div> }
     @else { <div class="page"><div class="skeleton" style="height:300px"></div></div> }
   `,
-  styles: [`
+    styles: [`
     .pair{display:grid;grid-template-columns:1fr 1fr 220px;gap:16px;margin-bottom:16px}
     .pair article{display:flex;flex-direction:column;gap:3px;min-width:0}
     .tag{font-size:11px;font-weight:700;color:var(--wk-royal);text-transform:uppercase;letter-spacing:.05em}
@@ -209,7 +209,7 @@ const DECISION_HELP: Record<DecisionCode, string> = {
     .opt span{display:flex;flex-direction:column;gap:2px} .opt small{color:var(--wk-text-soft);font-size:12px}
     .req::after{content:' *';color:var(--wk-danger)}
     @media (max-width:960px){.pair{grid-template-columns:1fr}}
-  `],
+  `]
 })
 export class DuplicateCaseComponent implements OnInit {
   private api = inject(ApiService);

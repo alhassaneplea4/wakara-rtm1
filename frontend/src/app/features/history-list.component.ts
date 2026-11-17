@@ -19,9 +19,9 @@ const KINDS: [string, string][] = [
  * child, parent, recipient or person; open a dossier to read its whole story.
  */
 @Component({
-  selector: 'wk-history-list', standalone: true,
-  imports: [CommonModule, FormsModule, DatePipe, IconComponent, PageHeaderComponent, PaginationComponent, StatusBadgeComponent],
-  template: `
+    selector: 'wk-history-list',
+    imports: [CommonModule, FormsModule, DatePipe, IconComponent, PageHeaderComponent, PaginationComponent, StatusBadgeComponent],
+    template: `
     <div class="page">
       <wk-page-header title="Historiques des actes" subtitle="Qui a créé, modifié, validé, imprimé ou délivré chaque dossier — de la déclaration à la remise de l'acte" />
 
@@ -78,7 +78,7 @@ const KINDS: [string, string][] = [
       </section>
     </div>
   `,
-  styles: [`
+    styles: [`
     .counters{grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:var(--s4)}
     .counter{display:flex;gap:12px;align-items:center;padding:14px 16px}.counter>div{display:flex;flex-direction:column}
     .counter strong{font-size:24px;font-weight:800;line-height:1.1}.counter span:not(.ico){color:var(--wk-text-soft);font-size:12.5px}
@@ -92,7 +92,7 @@ const KINDS: [string, string][] = [
     .count{display:inline-block;min-width:30px;padding:2px 9px;border-radius:999px;background:var(--wk-info-bg);color:var(--wk-royal);font-weight:700;font-size:13px;text-align:center}
     td.go{color:var(--wk-text-mute);width:28px}tr.clickable:hover td.go{color:var(--wk-royal)}
     tr.clickable:focus-visible{outline:2px solid var(--wk-royal);outline-offset:-2px}
-  `],
+  `]
 })
 export class HistoryListComponent implements OnInit {
   private api = inject(ApiService);

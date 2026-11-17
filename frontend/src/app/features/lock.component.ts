@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -17,8 +17,8 @@ type Mode = 'setup' | 'unlock' | 'reset' | 'upgrade';
  *   upgrade the code that has just unlocked the device does not meet the current rules: a stronger one is chosen
  */
 @Component({
-  selector: 'wk-lock', standalone: true, imports: [CommonModule, FormsModule, IconComponent, LogoComponent],
-  template: `
+    selector: 'wk-lock', imports: [FormsModule, IconComponent, LogoComponent],
+    template: `
     <main class="lock">
       <section class="box" aria-labelledby="lock-title">
         <wk-logo subtitle="État civil · Ratoma" />
@@ -92,7 +92,7 @@ type Mode = 'setup' | 'unlock' | 'reset' | 'upgrade';
         }
       </section>
     </main>`,
-  styles: [`
+    styles: [`
     .lock{min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:20px;background:linear-gradient(160deg,var(--wk-sky-50),var(--wk-bg))}
     .box{width:min(460px,100%);background:#fff;border:1px solid var(--wk-border);border-radius:20px;box-shadow:var(--shadow-lg);padding:28px;display:flex;flex-direction:column;gap:14px}
     h1{font-size:24px;margin-top:6px}
@@ -105,7 +105,7 @@ type Mode = 'setup' | 'unlock' | 'reset' | 'upgrade';
     .links{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
     .link{background:none;border:0;padding:6px 0;color:var(--wk-royal);font:inherit;font-size:13px;cursor:pointer;text-align:left}
     .link:hover{text-decoration:underline}
-  `],
+  `]
 })
 export class LockComponent implements OnInit {
   gate = inject(OfflineGate);

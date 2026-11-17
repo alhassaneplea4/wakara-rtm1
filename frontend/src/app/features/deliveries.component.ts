@@ -15,9 +15,9 @@ import { IconComponent, PageHeaderComponent, PaginationComponent } from '../shar
  * dossier and how many copies were printed in the table, and the audit trail of the dossier in the panel.
  */
 @Component({
-  selector: 'wk-deliveries', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, PaginationComponent],
-  template: `
+    selector: 'wk-deliveries',
+    imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, PaginationComponent],
+    template: `
     <div class="page">
       <wk-page-header title="Suivi des délivrances" subtitle="Historique des actes remis aux demandeurs" />
 
@@ -153,7 +153,7 @@ import { IconComponent, PageHeaderComponent, PaginationComponent } from '../shar
       </div>
     }
   `,
-  styles: [`
+    styles: [`
     .counters{grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:var(--s4)}
     .counter{display:flex;flex-direction:column;gap:2px;padding:14px 18px}.counter strong{font-size:26px;font-weight:800}.counter span{color:var(--wk-text-soft);font-size:13px}
     @media (max-width:900px){.counters{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -174,7 +174,7 @@ import { IconComponent, PageHeaderComponent, PaginationComponent } from '../shar
     .steps{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:13.5px}.steps p{margin:2px 0 0}
     .adm{border-top:2px dashed var(--wk-border);padding-top:14px}
     .jrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:7px 0;border-top:1px solid var(--wk-border);font-size:13px}
-  `],
+  `]
 })
 export class DeliveriesComponent implements OnInit {
   private api = inject(ApiService);

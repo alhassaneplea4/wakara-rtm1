@@ -29,7 +29,7 @@ export const OP_STATUS_LABELS: Record<OpStatus, string> = {
 };
 
 /** AES-GCM output as stored in IndexedDB (binary, never base64). */
-export interface Cipher { iv: Uint8Array; ct: ArrayBuffer; }
+export interface Cipher { iv: Uint8Array<ArrayBuffer>; ct: ArrayBuffer; }
 
 /** One queued operation. Only what is needed to order and count the queue is readable without the key. */
 export interface OpRow {

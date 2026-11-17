@@ -10,8 +10,8 @@ import { IconComponent } from '../../shared/ui';
 
 /** Risk level as a badge (high / medium / low). */
 @Component({
-  selector: 'wk-risk', standalone: true, imports: [CommonModule],
-  template: `<span class="badge" [ngClass]="'badge-' + tone">{{ label }}</span>`,
+    selector: 'wk-risk', imports: [CommonModule],
+    template: `<span class="badge" [ngClass]="'badge-' + tone">{{ label }}</span>`
 })
 export class RiskBadgeComponent {
   @Input() level: RiskLevel | string = 'LOW';
@@ -20,8 +20,8 @@ export class RiskBadgeComponent {
 }
 
 @Component({
-  selector: 'wk-case-status', standalone: true, imports: [CommonModule],
-  template: `<span class="badge" [ngClass]="'badge-' + tone">{{ label }}</span>`,
+    selector: 'wk-case-status', imports: [CommonModule],
+    template: `<span class="badge" [ngClass]="'badge-' + tone">{{ label }}</span>`
 })
 export class CaseStatusBadgeComponent {
   @Input() status: CaseStatus | string = 'OPEN';
@@ -31,16 +31,16 @@ export class CaseStatusBadgeComponent {
 
 /** Score 0-100 as a small bar + figure (a score is an aid, never a verdict). */
 @Component({
-  selector: 'wk-score', standalone: true, imports: [CommonModule],
-  template: `<span class="sc" [title]="'Score de correspondance : ' + score + ' / 100 (aide à la décision, pas une conclusion)'">
+    selector: 'wk-score', imports: [CommonModule],
+    template: `<span class="sc" [title]="'Score de correspondance : ' + score + ' / 100 (aide à la décision, pas une conclusion)'">
     <b class="mono">{{ score | number: '1.0-0' }}</b>
     <i class="bar"><i [style.width.%]="score" [ngClass]="level"></i></i></span>`,
-  styles: [`
+    styles: [`
     .sc{display:inline-flex;align-items:center;gap:8px;min-width:96px}
     .bar{flex:1;height:6px;border-radius:99px;background:#e6ebf5;overflow:hidden;min-width:44px;display:block}
     .bar i{display:block;height:100%;border-radius:99px}
     .HIGH{background:var(--wk-danger)} .MEDIUM{background:var(--wk-warning)} .LOW{background:#9aa6c0}
-  `],
+  `]
 })
 export class ScoreComponent {
   @Input() score = 0;
@@ -50,8 +50,8 @@ export class ScoreComponent {
 
 /** Navigation between the screens of the control centre. */
 @Component({
-  selector: 'wk-dup-tabs', standalone: true, imports: [RouterLink, RouterLinkActive, IconComponent],
-  template: `
+    selector: 'wk-dup-tabs', imports: [RouterLink, RouterLinkActive, IconComponent],
+    template: `
     <nav class="tabs" aria-label="Centre de contrôle des doublons">
       <a class="tab" routerLink="/duplicates" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Dossiers suspects</a>
       <a class="tab" routerLink="/duplicates/alerts" routerLinkActive="active">Alertes</a>
@@ -59,7 +59,7 @@ export class ScoreComponent {
       <a class="tab" routerLink="/duplicates/history" routerLinkActive="active">Historique des conflits résolus</a>
       <a class="tab" routerLink="/duplicates/compare" routerLinkActive="active">Comparer deux dossiers</a>
     </nav>`,
-  styles: ['.tab{text-decoration:none}'],
+    styles: ['.tab{text-decoration:none}']
 })
 export class DupTabsComponent {}
 
@@ -70,8 +70,8 @@ const DOC_NOTE = 'Consultation tracée dans le dossier et le journal d\'audit.';
  * (identical / similar / different / missing), then the supporting documents (access is audited).
  */
 @Component({
-  selector: 'wk-dup-compare', standalone: true, imports: [CommonModule, DatePipe, RouterLink, IconComponent],
-  template: `
+    selector: 'wk-dup-compare', imports: [CommonModule, DatePipe, RouterLink, IconComponent],
+    template: `
     @if (data) {
       <div class="heads">
         <article class="side"><span class="tag">Déclaration A</span>
@@ -135,7 +135,7 @@ const DOC_NOTE = 'Consultation tracée dans le dossier et le journal d\'audit.';
       </section>
     }
   `,
-  styles: [`
+    styles: [`
     :host{display:block}
     .heads{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
     .side{background:#fff;border:1px solid var(--wk-border);border-radius:var(--r-md);padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -165,7 +165,7 @@ const DOC_NOTE = 'Consultation tracée dans le dossier et le journal d\'audit.';
       .cmp td.st{grid-column:1 / -1}
       .cmp td.v::before{content:attr(data-side) ' · ';color:var(--wk-text-mute);font-weight:700}
     }
-  `],
+  `]
 })
 export class DupCompareComponent {
   @Input() data: DuplicateComparison | null = null;
@@ -178,8 +178,8 @@ export class DupCompareComponent {
 
 /** The 6 weighted criteria of a match, with their comparable / missing state. */
 @Component({
-  selector: 'wk-dup-criteria', standalone: true, imports: [CommonModule],
-  template: `
+    selector: 'wk-dup-criteria', imports: [CommonModule],
+    template: `
     <div class="table-wrap">
       <table class="table">
         <thead><tr><th>Critère</th><th>Poids</th><th>Concordance</th><th>Points</th><th>Détail</th></tr></thead>
@@ -202,7 +202,7 @@ export class DupCompareComponent {
         </tbody>
       </table>
     </div>`,
-  styles: ['tr.dim td{opacity:.7}.bar{display:inline-block;width:70px;height:6px;border-radius:99px;background:#e6ebf5;overflow:hidden;margin-right:8px;vertical-align:middle}.bar i{display:block;height:100%;background:var(--wk-royal)}.small{font-size:12px}'],
+    styles: ['tr.dim td{opacity:.7}.bar{display:inline-block;width:70px;height:6px;border-radius:99px;background:#e6ebf5;overflow:hidden;margin-right:8px;vertical-align:middle}.bar i{display:block;height:100%;background:var(--wk-royal)}.small{font-size:12px}']
 })
 export class DupCriteriaComponent {
   @Input() criteria: Record<string, Criterion> | undefined;

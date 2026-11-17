@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -8,9 +8,9 @@ import { Acte, Page, STATUS_LABELS, Status } from '../core/models';
 import { PageHeaderComponent, PaginationComponent, StatusBadgeComponent } from '../shared/ui';
 
 @Component({
-  selector: 'wk-actes-list', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, PageHeaderComponent, PaginationComponent, StatusBadgeComponent],
-  template: `
+    selector: 'wk-actes-list',
+    imports: [FormsModule, RouterLink, PageHeaderComponent, PaginationComponent, StatusBadgeComponent],
+    template: `
     <div class="page">
       <wk-page-header title="Actes de naissance" subtitle="Dossiers terminés par le secrétariat : en attente de validation ou validés. Les actes remis sont dans « Délivrances »." />
       <section class="card flush">
@@ -41,7 +41,7 @@ import { PageHeaderComponent, PaginationComponent, StatusBadgeComponent } from '
       </section>
     </div>
   `,
-  styles: ['.filters{display:flex;gap:10px;flex-wrap:wrap;padding:16px;border-bottom:1px solid var(--wk-border)}.grow{flex:1;min-width:220px}.year{width:150px}.filters .input{min-height:40px;width:auto}.filters .grow{width:auto}'],
+    styles: ['.filters{display:flex;gap:10px;flex-wrap:wrap;padding:16px;border-bottom:1px solid var(--wk-border)}.grow{flex:1;min-width:220px}.year{width:150px}.filters .input{min-height:40px;width:auto}.filters .grow{width:auto}']
 })
 export class ActesListComponent implements OnInit {
   private api = inject(ApiService);

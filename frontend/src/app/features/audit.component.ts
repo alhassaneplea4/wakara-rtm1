@@ -8,9 +8,9 @@ import { ToastService } from '../core/toast.service';
 import { IconComponent, PageHeaderComponent, PaginationComponent } from '../shared/ui';
 
 @Component({
-  selector: 'wk-audit', standalone: true,
-  imports: [CommonModule, FormsModule, DatePipe, JsonPipe, IconComponent, PageHeaderComponent, PaginationComponent],
-  template: `
+    selector: 'wk-audit',
+    imports: [CommonModule, FormsModule, DatePipe, JsonPipe, IconComponent, PageHeaderComponent, PaginationComponent],
+    template: `
     <div class="page">
       <wk-page-header title="Journal d'activité" subtitle="Historique infalsifiable des opérations. La consultation et l'export sont eux-mêmes tracés.">
         @if (auth.can('data.export')) { <button class="btn" (click)="export()"><wk-icon name="download" [size]="16" /> Exporter (CSV)</button> }
@@ -43,7 +43,7 @@ import { IconComponent, PageHeaderComponent, PaginationComponent } from '../shar
       </section>
     </div>
   `,
-  styles: ['.filters{display:flex;gap:10px;flex-wrap:wrap;padding:16px;border-bottom:1px solid var(--wk-border)}.filters .input{width:auto;min-width:170px;min-height:40px}.detail{background:var(--wk-sky-50)}pre{margin:0;white-space:pre-wrap;word-break:break-word;font-size:12px}'],
+    styles: ['.filters{display:flex;gap:10px;flex-wrap:wrap;padding:16px;border-bottom:1px solid var(--wk-border)}.filters .input{width:auto;min-width:170px;min-height:40px}.detail{background:var(--wk-sky-50)}pre{margin:0;white-space:pre-wrap;word-break:break-word;font-size:12px}']
 })
 export class AuditComponent implements OnInit {
   private api = inject(ApiService);

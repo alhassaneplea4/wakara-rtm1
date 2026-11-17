@@ -12,9 +12,9 @@ import { ChartComponent, IconComponent, PageHeaderComponent, StatusBadgeComponen
 const PALETTE = ['#1f5ed8', '#4f9bff', '#12a36a', '#8b7cf6', '#e58a0a', '#c3cde0'];
 
 @Component({
-  selector: 'wk-dashboard', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, DatePipe, ChartComponent, IconComponent, PageHeaderComponent, StatusBadgeComponent],
-  template: `
+    selector: 'wk-dashboard',
+    imports: [CommonModule, FormsModule, RouterLink, DatePipe, ChartComponent, IconComponent, PageHeaderComponent, StatusBadgeComponent],
+    template: `
     <div class="page">
       <wk-page-header title="Tableau de bord" subtitle="Vue d'ensemble et statistiques de l'état civil de la mairie de Ratoma" />
 
@@ -159,7 +159,7 @@ const PALETTE = ['#1f5ed8', '#4f9bff', '#12a36a', '#8b7cf6', '#e58a0a', '#c3cde0
       </div>
     </div>
   `,
-  styles: [`
+    styles: [`
     .filters{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:var(--s3)}
     .filters .field{min-width:150px;flex:1 1 150px;max-width:240px}
     .filters .reset{align-self:flex-end}
@@ -204,7 +204,7 @@ const PALETTE = ['#1f5ed8', '#4f9bff', '#12a36a', '#8b7cf6', '#e58a0a', '#c3cde0
     .delay{margin-top:var(--s4);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
     @media (max-width:1100px){.charts,.bottom{grid-template-columns:minmax(0,1fr)}}
     @media (max-width:520px){.donut{grid-template-columns:minmax(0,1fr)}}
-  `],
+  `]
 })
 export class DashboardComponent implements OnInit {
   private api = inject(ApiService);

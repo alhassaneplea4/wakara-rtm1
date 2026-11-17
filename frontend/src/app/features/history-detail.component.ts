@@ -22,9 +22,9 @@ const FLOW = [
  * intervened, then every event (what, who, when, from which address, and the before/after of each change).
  */
 @Component({
-  selector: 'wk-history-detail', standalone: true,
-  imports: [CommonModule, DatePipe, RouterLink, IconComponent, PageHeaderComponent, StatusBadgeComponent],
-  template: `
+    selector: 'wk-history-detail',
+    imports: [CommonModule, DatePipe, RouterLink, IconComponent, PageHeaderComponent, StatusBadgeComponent],
+    template: `
     @if (data(); as h) {
       <div class="page">
         <wk-page-header [title]="h.dossier.reference" [subtitle]="(h.dossier.child_name || 'Enfant non renseigné') + (h.dossier.hospital_name ? ' · ' + h.dossier.hospital_name : '')"
@@ -131,7 +131,7 @@ const FLOW = [
     } @else if (error()) { <div class="page"><div class="alert alert-danger">{{ error() }}</div></div> }
     @else { <div class="page"><div class="card"><div class="skeleton" style="height:320px"></div></div></div> }
   `,
-  styles: [`
+    styles: [`
     .glance .facts{display:flex;gap:22px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
     .facts span{display:flex;flex-direction:column}.facts small{color:var(--wk-text-soft);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em}
     .flow{list-style:none;margin:4px 0 6px;padding:0;display:flex;gap:6px;overflow-x:auto}
@@ -174,7 +174,7 @@ const FLOW = [
     .diff td.old{background:var(--wk-danger-bg);color:var(--wk-danger);text-decoration:line-through;text-decoration-color:rgba(220,53,69,.45)}
     .diff td.new{background:var(--wk-success-bg);color:var(--wk-success);font-weight:600}
     .diff tr+tr th,.diff tr+tr td{border-top:1px solid var(--wk-border)}
-  `],
+  `]
 })
 export class HistoryDetailComponent implements OnInit {
   private api = inject(ApiService);

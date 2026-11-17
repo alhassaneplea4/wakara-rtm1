@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService, errorMessage } from '../core/api.service';
@@ -8,9 +8,9 @@ import { PageHeaderComponent } from '../shared/ui';
 interface Setting { key: string; value: string; description: string; is_public: boolean; }
 
 @Component({
-  selector: 'wk-settings', standalone: true,
-  imports: [CommonModule, FormsModule, PageHeaderComponent],
-  template: `
+    selector: 'wk-settings',
+    imports: [FormsModule, PageHeaderComponent],
+    template: `
     <div class="page">
       <wk-page-header title="Paramètres" subtitle="Textes de la page de connexion et valeurs par défaut des actes" />
       @if (error()) { <div class="alert alert-danger" style="margin-bottom:16px">{{ error() }}</div> }
@@ -26,7 +26,7 @@ interface Setting { key: string; value: string; description: string; is_public: 
         <div class="modal-actions"><button class="btn btn-primary" [disabled]="busy()" (click)="save()">Enregistrer</button></div>
       </section>
     </div>
-  `,
+  `
 })
 export class SettingsComponent implements OnInit {
   private api = inject(ApiService);

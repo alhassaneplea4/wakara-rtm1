@@ -60,8 +60,8 @@ export async function shrink(file: File, quality: PhotoQuality = 'standard'): Pr
  * - Without it (new dossier): files are kept in memory until the parent calls `uploadPending(uuid)`.
  */
 @Component({
-  selector: 'wk-paper-form', standalone: true, imports: [CommonModule, DatePipe, IconComponent, SyncChipComponent],
-  template: `
+    selector: 'wk-paper-form', imports: [CommonModule, DatePipe, IconComponent, SyncChipComponent],
+    template: `
     <div class="head">
       <div>
         <h2>Fiche de déclaration physique</h2>
@@ -121,7 +121,7 @@ export async function shrink(file: File, quality: PhotoQuality = 'standard'): Pr
       </div>
     }
   `,
-  styles: [`
+    styles: [`
     :host{display:block}
     .head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px}
     .head h2{font-size:16px}
@@ -144,7 +144,7 @@ export async function shrink(file: File, quality: PhotoQuality = 'standard'): Pr
     .lightbox{position:fixed;inset:0;z-index:200;background:rgba(7,27,68,.88);display:grid;place-items:center;padding:16px}
     .lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;background:#fff}
     .close{position:absolute;top:12px;right:12px;width:44px;height:44px;border-radius:50%;border:0;background:#fff;color:var(--wk-navy-800);display:grid;place-items:center;cursor:pointer}
-  `],
+  `]
 })
 export class PaperFormComponent implements OnChanges, OnDestroy {
   private api = inject(ApiService);

@@ -22,9 +22,9 @@ const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Statu
 };
 
 @Component({
-  selector: 'wk-declarations-list', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, PaginationComponent, StatusBadgeComponent, SyncChipComponent],
-  template: `
+    selector: 'wk-declarations-list',
+    imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, PaginationComponent, StatusBadgeComponent, SyncChipComponent],
+    template: `
     <div class="page">
       <wk-page-header [title]="text.title" [subtitle]="subtitle()">
         @if (mode === 'all' && auth.can('data.export')) {
@@ -121,7 +121,7 @@ const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Statu
       </section>
     </div>
   `,
-  styles: [`
+    styles: [`
     .scope{flex:1 1 100%;margin:4px 0 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--wk-text-soft)}
     .filters{display:flex;gap:10px;flex-wrap:wrap;padding:16px;border-bottom:1px solid var(--wk-border);align-items:center}
     .grow{flex:1;min-width:220px}
@@ -140,7 +140,7 @@ const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Statu
     }
     @media (hover:none),(pointer:coarse){.edit-btn{opacity:1;width:44px;height:44px;border-color:var(--wk-border);background:#fff}}
     .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-  `],
+  `]
 })
 export class DeclarationsListComponent implements OnInit {
   private api = inject(ApiService);

@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, DestroyRef, HostListener, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
@@ -32,10 +32,9 @@ const NAV: NavItem[] = [
 ];
 
 @Component({
-  selector: 'wk-shell', standalone: true,
-  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, IconComponent, LogoComponent,
-    ConnectionIndicatorComponent, ReauthComponent],
-  template: `
+    selector: 'wk-shell',
+    imports: [FormsModule, RouterOutlet, RouterLink, RouterLinkActive, IconComponent, LogoComponent, ConnectionIndicatorComponent, ReauthComponent],
+    template: `
     <div class="shell" [class.nav-open]="navOpen()">
       <aside class="sidebar" aria-label="Navigation principale" [attr.aria-hidden]="null">
         <div class="brand"><wk-logo [light]="true" subtitle="État civil · Ratoma" />
@@ -124,7 +123,7 @@ const NAV: NavItem[] = [
       </div>
     </div>
     @if (reauth()) { <wk-reauth (done)="reauth.set(false)" /> }`,
-  styles: [`
+    styles: [`
     .shell{display:grid;grid-template-columns:var(--sidebar-w) minmax(0,1fr);min-height:100vh}
     /* header and footer stay visible; only the menu itself scrolls on short screens */
     .sidebar{background:linear-gradient(180deg,var(--wk-navy-800),var(--wk-navy-900));color:#fff;padding:20px 14px 14px;display:flex;flex-direction:column;gap:20px;position:sticky;top:0;height:100vh;height:100dvh;overflow:hidden}
@@ -182,7 +181,7 @@ const NAV: NavItem[] = [
       .account{padding:2px}
       .avatar{width:34px;height:34px;font-size:13px}
     }
-  `],
+  `]
 })
 export class ShellComponent implements OnInit {
   auth = inject(AuthService);

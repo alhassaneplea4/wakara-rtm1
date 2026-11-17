@@ -3,8 +3,8 @@ import { RouterOutlet } from '@angular/router';
 import { ToastHostComponent } from './shared/ui';
 
 @Component({
-  selector: 'app-root', standalone: true,
-  imports: [RouterOutlet, ToastHostComponent],
-  template: `<router-outlet /><wk-toasts />`,
+    selector: 'app-root',
+    imports: [RouterOutlet, ToastHostComponent],
+    template: `<router-outlet /><wk-toasts />`
 })
 export class AppComponent {}

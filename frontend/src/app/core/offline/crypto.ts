@@ -13,7 +13,9 @@ export const PBKDF2_ITERATIONS = 600_000;
 const text = new TextEncoder();
 const untext = new TextDecoder();
 
-export function randomBytes(n: number): Uint8Array { return crypto.getRandomValues(new Uint8Array(n)); }
+export type Bytes = Uint8Array<ArrayBuffer>;
+
+export function randomBytes(n: number): Bytes { return crypto.getRandomValues(new Uint8Array(n)); }
 
 export function uuid(): string {
   if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
@@ -28,14 +30,14 @@ export function toBase64(buf: ArrayBuffer | Uint8Array): string {
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(s);
 }
-export function fromBase64(s: string): Uint8Array {
+export function fromBase64(s: string): Bytes {
   const bin = atob(s);
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
 }
 
-export async function deriveKek(pin: string, salt: Uint8Array, iterations = PBKDF2_ITERATIONS): Promise<CryptoKey> {
+export async function deriveKek(pin: string, salt: Bytes, iterations = PBKDF2_ITERATIONS): Promise<CryptoKey> {
   const material = await crypto.subtle.importKey('raw', text.encode(pin), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey(
     { name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, material, { name: 'AES-GCM', length: 256 }, false, ['wrapKey', 'unwrapKey']);
@@ -64,7 +66,7 @@ export async function rewrapDataKey(wrapped: Cipher, oldKek: CryptoKey, newKek: 
   return wrapDataKey(await unwrapDataKey(wrapped, oldKek, true), newKek);
 }
 
-export async function encryptBytes(key: CryptoKey, data: ArrayBuffer | Uint8Array): Promise<Cipher> {
+export async function encryptBytes(key: CryptoKey, data: ArrayBuffer | Bytes): Promise<Cipher> {
   const iv = randomBytes(12);
   return { iv, ct: await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data) };
 }

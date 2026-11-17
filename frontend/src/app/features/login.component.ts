@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { HttpClient } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -19,9 +19,9 @@ const FALLBACK: PublicSettings = {
 };
 
 @Component({
-  selector: 'wk-login', standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent],
-  template: `
+    selector: 'wk-login',
+    imports: [FormsModule, IconComponent],
+    template: `
     <div class="login">
       <section class="left">
         <div class="box">
@@ -103,7 +103,7 @@ const FALLBACK: PublicSettings = {
       </div>
     }
   `,
-  styles: [`
+    styles: [`
     .login{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);height:100vh;height:100dvh;background:#fff;overflow:hidden}
     .left{display:grid;grid-template-columns:minmax(0,1fr);place-items:center;padding:24px;background:radial-gradient(900px 500px at 0% 0%,#eaf2ff 0,#fff 60%);overflow-y:auto;min-height:0}
     .box{width:min(480px,100%);display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px}
@@ -165,7 +165,7 @@ const FALLBACK: PublicSettings = {
       .submit{height:46px}
       .foot{display:none}
     }
-  `],
+  `]
 })
 export class LoginComponent implements OnInit {
   private auth = inject(AuthService);

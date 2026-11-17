@@ -43,10 +43,10 @@ const SUBMISSION_KEYS: string[] = [
 ];
 
 @Component({
-  selector: 'wk-declaration-form', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, IconComponent, PageHeaderComponent, PaperFormComponent, DateLettersPipe,
-    PhoneInputDirective, IntegerInputDirective, NationalityInputDirective, NationalityListComponent],
-  template: `
+    selector: 'wk-declaration-form',
+    imports: [CommonModule, FormsModule, RouterLink, IconComponent, PageHeaderComponent, PaperFormComponent, DateLettersPipe,
+        PhoneInputDirective, IntegerInputDirective, NationalityInputDirective, NationalityListComponent],
+    template: `
     <div class="page">
       <wk-page-header [title]="uuid ? 'Modifier la déclaration' : 'Nouvelle déclaration de naissance'"
         [subtitle]="uuid ? ref : 'Saisie à partir du formulaire remis par l\\'hôpital ou la maternité'">
@@ -244,7 +244,7 @@ const SUBMISSION_KEYS: string[] = [
       } @else { <div class="card"><div class="skeleton" style="height:240px"></div></div> }
     </div>
   `,
-  styles: ['.geo{display:grid;gap:14px}.pick{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}.pick .input{flex:1 1 220px;min-width:0}.pick .opt{display:inline-flex;align-items:center;gap:6px;font-weight:500;color:var(--wk-text);cursor:pointer}.pick .de{font-weight:600;color:var(--wk-text-soft)}.sec .need>label:not(.req)::after{content:" *";color:var(--wk-danger)}.field.missing .input{border-color:var(--wk-danger);background:#fff7f7}.who.missing{outline:2px solid var(--wk-danger);outline-offset:6px;border-radius:12px}.hint{color:var(--wk-text-mute);font-size:12px}.letters{display:block;margin-top:4px;color:var(--wk-royal);font-weight:600;font-size:13px}.who{border:0;margin:0 0 14px;padding:0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}.who legend{float:left;margin-right:12px;font-weight:600;padding:0}.choice{display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border:1px solid var(--wk-border);border-radius:999px;cursor:pointer;background:#fff}.choice.on{border-color:var(--wk-royal);background:var(--wk-info-bg);color:var(--wk-royal);font-weight:600}.loaded{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:12px;background:var(--wk-info-bg);margin-bottom:14px;font-size:14px}.loaded .warn{color:var(--wk-warning)}.stack{display:flex;flex-direction:column;gap:16px}.actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end;position:sticky;bottom:0;padding:12px 0;background:linear-gradient(transparent,var(--wk-bg) 30%)}'],
+    styles: ['.geo{display:grid;gap:14px}.pick{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}.pick .input{flex:1 1 220px;min-width:0}.pick .opt{display:inline-flex;align-items:center;gap:6px;font-weight:500;color:var(--wk-text);cursor:pointer}.pick .de{font-weight:600;color:var(--wk-text-soft)}.sec .need>label:not(.req)::after{content:" *";color:var(--wk-danger)}.field.missing .input{border-color:var(--wk-danger);background:#fff7f7}.who.missing{outline:2px solid var(--wk-danger);outline-offset:6px;border-radius:12px}.hint{color:var(--wk-text-mute);font-size:12px}.letters{display:block;margin-top:4px;color:var(--wk-royal);font-weight:600;font-size:13px}.who{border:0;margin:0 0 14px;padding:0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}.who legend{float:left;margin-right:12px;font-weight:600;padding:0}.choice{display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border:1px solid var(--wk-border);border-radius:999px;cursor:pointer;background:#fff}.choice.on{border-color:var(--wk-royal);background:var(--wk-info-bg);color:var(--wk-royal);font-weight:600}.loaded{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:12px;background:var(--wk-info-bg);margin-bottom:14px;font-size:14px}.loaded .warn{color:var(--wk-warning)}.stack{display:flex;flex-direction:column;gap:16px}.actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end;position:sticky;bottom:0;padding:12px 0;background:linear-gradient(transparent,var(--wk-bg) 30%)}']
 })
 export class DeclarationFormComponent implements OnInit {
   private api = inject(ApiService);

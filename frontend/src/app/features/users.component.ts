@@ -8,9 +8,9 @@ import { ToastService } from '../core/toast.service';
 import { ConfirmComponent, IconComponent, PageHeaderComponent, PaginationComponent } from '../shared/ui';
 
 @Component({
-  selector: 'wk-users', standalone: true,
-  imports: [CommonModule, FormsModule, DatePipe, IconComponent, PageHeaderComponent, PaginationComponent, ConfirmComponent],
-  template: `
+    selector: 'wk-users',
+    imports: [CommonModule, FormsModule, DatePipe, IconComponent, PageHeaderComponent, PaginationComponent, ConfirmComponent],
+    template: `
     <div class="page">
       <wk-page-header title="Utilisateurs" subtitle="Comptes, rôles et accès. Un compte n'est jamais supprimé : il est désactivé.">
         @if (auth.can('user.create')) { <button class="btn btn-primary" (click)="openCreate()"><wk-icon name="plus" [size]="16" /> Nouvel utilisateur</button> }
@@ -126,14 +126,14 @@ import { ConfirmComponent, IconComponent, PageHeaderComponent, PaginationCompone
       </wk-confirm>
     }
   `,
-  styles: [`
+    styles: [`
     .filters{display:flex;gap:10px;flex-wrap:wrap;padding:16px;border-bottom:1px solid var(--wk-border)}.filters .input{width:auto;min-width:220px;min-height:40px}
     .modal.wide{width:min(720px,100%)}
     .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
     .chip{display:inline-flex;gap:8px;align-items:center;padding:7px 12px;border:1px solid var(--wk-border);border-radius:999px;cursor:pointer}
     .chip.on{background:var(--wk-info-bg);border-color:var(--wk-royal);color:var(--wk-royal-dark)}
     .ov{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--wk-border);margin-top:6px}
-  `],
+  `]
 })
 export class UsersComponent implements OnInit {
   private api = inject(ApiService);

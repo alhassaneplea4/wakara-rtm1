@@ -49,10 +49,10 @@ const STEP_TEXT: Record<string, { title: string; help: string; icon: string; ton
 };
 
 @Component({
-  selector: 'wk-declaration-detail', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, StatusBadgeComponent, ConfirmComponent, PaperFormComponent, DateLettersPipe,
-    SyncChipComponent, SyncBannerComponent],
-  template: `
+    selector: 'wk-declaration-detail',
+    imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, StatusBadgeComponent, ConfirmComponent, PaperFormComponent, DateLettersPipe,
+        SyncChipComponent, SyncBannerComponent],
+    template: `
     @if (d(); as d) {
       <div class="page">
         <wk-page-header [upper]="true" [title]="d.reference" [back]="['/declarations']" backLabel="Retour aux déclarations" [subtitle]="(d.child_name || 'Enfant non nommé') + ' · ' + (d.hospital_name || 'Établissement non identifié')">
@@ -243,7 +243,7 @@ const STEP_TEXT: Record<string, { title: string; help: string; icon: string; ton
     } @else if (error()) { <div class="page"><div class="alert alert-danger">{{ error() }}</div></div> }
     @else { <div class="page"><div class="card"><div class="skeleton" style="height:320px"></div></div></div> }
   `,
-  styles: [`
+    styles: [`
     .actions{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:16px;border-left:4px solid var(--wk-royal)}
     .actions.decision{border-left-color:var(--wk-success);background:linear-gradient(90deg,#f1fbf6,#fff)}
     .letters{display:block;color:var(--wk-royal);font-size:12.5px;font-weight:600;margin-top:2px}
@@ -277,7 +277,7 @@ const STEP_TEXT: Record<string, { title: string; help: string; icon: string; ton
     .jrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--wk-border)}
     .missing{margin:10px 0;padding-left:20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:2px 16px;font-weight:600}
     .num{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
-  `],
+  `]
 })
 export class DeclarationDetailComponent implements OnInit {
   private api = inject(ApiService);

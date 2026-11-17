@@ -11,9 +11,9 @@ import { ConfirmComponent, IconComponent, PageHeaderComponent, PaginationCompone
 const TYPES = [['HOSPITAL', 'Hôpital'], ['MATERNITY', 'Maternité'], ['CLINIC', 'Clinique'], ['HEALTH_CENTER', 'Centre de santé'], ['OTHER', 'Autre']];
 
 @Component({
-  selector: 'wk-hospitals', standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent, PageHeaderComponent, PaginationComponent, ConfirmComponent],
-  template: `
+    selector: 'wk-hospitals',
+    imports: [CommonModule, FormsModule, IconComponent, PageHeaderComponent, PaginationComponent, ConfirmComponent],
+    template: `
     <div class="page">
       <wk-page-header title="Hôpitaux et maternités" subtitle="Établissements de santé à l'origine des déclarations">
         @if (auth.can('hospital.create')) { <button class="btn btn-primary" (click)="edit(null)"><wk-icon name="plus" [size]="16" /> Nouvel établissement</button> }
@@ -73,7 +73,7 @@ const TYPES = [['HOSPITAL', 'Hôpital'], ['MATERNITY', 'Maternité'], ['CLINIC',
       </wk-confirm>
     }
   `,
-  styles: ['.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:16px;border-bottom:1px solid var(--wk-border)}.filters .input{width:auto;min-width:200px;min-height:40px}'],
+    styles: ['.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:16px;border-bottom:1px solid var(--wk-border)}.filters .input{width:auto;min-width:200px;min-height:40px}']
 })
 export class HospitalsComponent implements OnInit {
   private api = inject(ApiService);

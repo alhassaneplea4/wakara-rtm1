@@ -12,9 +12,9 @@ import { CaseStatusBadgeComponent, DupTabsComponent, RiskBadgeComponent, ScoreCo
 
 /* ── Alerts: every correspondence found by the engine (with or without a case) ───────────── */
 @Component({
-  selector: 'wk-duplicate-alerts', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, PaginationComponent, RiskBadgeComponent, ScoreComponent, CaseStatusBadgeComponent, DupTabsComponent],
-  template: `
+    selector: 'wk-duplicate-alerts',
+    imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, PaginationComponent, RiskBadgeComponent, ScoreComponent, CaseStatusBadgeComponent, DupTabsComponent],
+    template: `
     <div class="page">
       <wk-page-header title="Alertes de correspondance" subtitle="Toutes les ressemblances détectées par l'analyse automatique, y compris à risque faible" />
       <wk-dup-tabs />
@@ -59,7 +59,7 @@ import { CaseStatusBadgeComponent, DupTabsComponent, RiskBadgeComponent, ScoreCo
         <wk-pagination [page]="page" [total]="total()" [pageSize]="20" (pageChange)="goto($event)" />
       </section>
     </div>`,
-  styles: [LIST_STYLES()],
+    styles: [LIST_STYLES()]
 })
 export class DuplicateAlertsComponent implements OnInit {
   private api = inject(ApiService);
@@ -94,9 +94,9 @@ export class DuplicateAlertsComponent implements OnInit {
 
 /* ── History of the cases that were resolved ───────────────────────────────────────────── */
 @Component({
-  selector: 'wk-duplicate-history', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, PaginationComponent, RiskBadgeComponent, DupTabsComponent],
-  template: `
+    selector: 'wk-duplicate-history',
+    imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, PaginationComponent, RiskBadgeComponent, DupTabsComponent],
+    template: `
     <div class="page">
       <wk-page-header title="Historique des conflits résolus" subtitle="Décisions rendues, avec leur motif — consultables mais jamais modifiables" />
       <wk-dup-tabs />
@@ -132,7 +132,7 @@ export class DuplicateAlertsComponent implements OnInit {
         <wk-pagination [page]="page" [total]="total()" [pageSize]="20" (pageChange)="goto($event)" />
       </section>
     </div>`,
-  styles: [LIST_STYLES()],
+    styles: [LIST_STYLES()]
 })
 export class DuplicateHistoryComponent implements OnInit {
   private api = inject(ApiService);
@@ -155,9 +155,9 @@ export class DuplicateHistoryComponent implements OnInit {
 
 /* ── Synchronisation conflicts + device log ────────────────────────────────────────────── */
 @Component({
-  selector: 'wk-duplicate-sync', standalone: true,
-  imports: [CommonModule, RouterLink, DatePipe, PageHeaderComponent, RiskBadgeComponent, ScoreComponent, CaseStatusBadgeComponent, DupTabsComponent],
-  template: `
+    selector: 'wk-duplicate-sync',
+    imports: [CommonModule, RouterLink, DatePipe, PageHeaderComponent, RiskBadgeComponent, ScoreComponent, CaseStatusBadgeComponent, DupTabsComponent],
+    template: `
     <div class="page">
       <wk-page-header title="Conflits de synchronisation" subtitle="Naissances saisies hors connexion, sur plusieurs appareils, puis rapprochées par le serveur" />
       <wk-dup-tabs />
@@ -182,7 +182,7 @@ export class DuplicateHistoryComponent implements OnInit {
 
       <p class="soft">Le détail des appareils et des opérations reçues est dans <a routerLink="/appareils">Appareils hors connexion</a>.</p>
     </div>`,
-  styles: [LIST_STYLES(), '.sec{margin-bottom:16px}.h{padding:14px 16px;font-size:15px;border-bottom:1px solid var(--wk-border)}.note{margin-bottom:16px}'],
+    styles: [LIST_STYLES(), '.sec{margin-bottom:16px}.h{padding:14px 16px;font-size:15px;border-bottom:1px solid var(--wk-border)}.note{margin-bottom:16px}']
 })
 export class DuplicateSyncComponent implements OnInit {
   private api = inject(ApiService);

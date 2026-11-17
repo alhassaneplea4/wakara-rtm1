@@ -16,9 +16,9 @@ const WEIGHT_LABELS: Record<string, string> = {
 };
 
 @Component({
-  selector: 'wk-duplicates-center', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, PaginationComponent, RiskBadgeComponent, CaseStatusBadgeComponent, ScoreComponent, DupTabsComponent],
-  template: `
+    selector: 'wk-duplicates-center',
+    imports: [CommonModule, FormsModule, RouterLink, DatePipe, IconComponent, PageHeaderComponent, PaginationComponent, RiskBadgeComponent, CaseStatusBadgeComponent, ScoreComponent, DupTabsComponent],
+    template: `
     <div class="page">
       <wk-page-header title="Centre de contrôle des doublons" subtitle="Prévention des enregistrements multiples d'une même naissance — Mairie de Ratoma">
         @if (auth.can('duplicate.view')) { <button class="btn" (click)="toggleConfig()"><wk-icon name="settings" [size]="16" /> Règles de détection</button> }
@@ -125,7 +125,7 @@ const WEIGHT_LABELS: Record<string, string> = {
       </section>
     </div>
   `,
-  styles: [`
+    styles: [`
     .note{margin-bottom:16px}
     .kpis{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:16px}
     .kpi{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;cursor:pointer;font:inherit;border-left:4px solid var(--wk-border)}
@@ -141,7 +141,7 @@ const WEIGHT_LABELS: Record<string, string> = {
     .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
     @media (max-width:960px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
     @media (max-width:420px){.kpi strong{font-size:22px}}
-  `],
+  `]
 })
 export class DuplicatesCenterComponent implements OnInit {
   private api = inject(ApiService);

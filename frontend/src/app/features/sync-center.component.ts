@@ -10,9 +10,9 @@ const TONE: Record<OpStatus, string> = { pending: 'badge-warning', sending: 'bad
 
 /** Everything this device still has to send, what was sent, and what went wrong. */
 @Component({
-  selector: 'wk-sync-center', standalone: true,
-  imports: [CommonModule, DatePipe, RouterLink, IconComponent, PageHeaderComponent, ConfirmComponent],
-  template: `
+    selector: 'wk-sync-center',
+    imports: [CommonModule, DatePipe, RouterLink, IconComponent, PageHeaderComponent, ConfirmComponent],
+    template: `
     <div class="page">
       <wk-page-header title="Synchronisation" subtitle="Ce que cet appareil a envoyé au serveur et ce qui attend encore">
         <button class="btn" type="button" (click)="gate.lock()"><wk-icon name="lock" [size]="16" /> Verrouiller</button>
@@ -81,7 +81,7 @@ const TONE: Record<OpStatus, string> = { pending: 'badge-warning', sending: 'bad
         Les opérations et les photos non envoyées du dossier {{ op.reference }} seront supprimées de cet appareil. Cette action est définitive.
       </wk-confirm>
     }`,
-  styles: [`
+    styles: [`
     .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
     .tile{background:#fff;border:1px solid var(--wk-border);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
     .tile span{font-size:12.5px;color:var(--wk-text-soft)}.tile strong{font-size:18px}
@@ -93,7 +93,7 @@ const TONE: Record<OpStatus, string> = { pending: 'badge-warning', sending: 'bad
     .log.err{color:#8f1f2b}
     .alert{margin-bottom:16px}
     .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-  `],
+  `]
 })
 export class SyncCenterComponent {
   gate = inject(OfflineGate);
