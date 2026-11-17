@@ -20,6 +20,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 DEVICE_CLAIM = 'did'
+SESSION_CLAIM = 'sv'
 DEVICE_REVOKED_MESSAGE = "Cet appareil a été révoqué par l'administrateur."
 
 
@@ -47,11 +48,21 @@ def is_device_revoked(user_id, device_id) -> bool:
     return bool(did) and Device.objects.filter(user_id=user_id, device_id=did, is_revoked=True).exists()
 
 
+def _check_session_still_valid(user, token):
+    """A signed-out access token, or one issued before the account's sessions were cut, is refused at once."""
+    from .models import RevokedAccessToken
+    if int(token.get(SESSION_CLAIM, 0)) != user.session_version:
+        raise AuthenticationFailed('Session terminée : reconnectez-vous.', code='session_ended')
+    if RevokedAccessToken.objects.filter(jti=token.get('jti', '')).exists():
+        raise AuthenticationFailed('Session terminée : reconnectez-vous.', code='session_ended')
+
+
 class DeviceAwareJWTAuthentication(JWTAuthentication):
     """Standard JWT authentication, plus: a token bound to a revoked device is refused (401, code device_revoked)."""
 
     def get_user(self, validated_token):
         user = super().get_user(validated_token)
+        _check_session_still_valid(user, validated_token)
         if is_device_revoked(user.pk, device_of_token(validated_token)):
             raise AuthenticationFailed(DEVICE_REVOKED_MESSAGE, code='device_revoked')
         return user

@@ -11,7 +11,7 @@ from rest_framework.response import Response
 
 from audit import service as audit
 from audit.models import AuditAction
-from core.permissions import HasWakaraPermission
+from core.permissions import HasWakaraPermission, user_has_perm
 from core.workflow import Status
 from declarations.models import Declaration
 from declarations.services import can_edit_data, visible_declarations
@@ -71,6 +71,11 @@ class DocumentViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Ret
     def perform_destroy(self, instance):
         if instance.declaration.status in Status.FROZEN:
             raise PermissionDenied("Le dossier est figé : impossible d'archiver cette pièce.")
+        # A page already sent is withdrawn by the secretariat (document.archive). The agent who took the photo may
+        # withdraw it only while the dossier is still his draft (a wrongly taken picture), never after transmission.
+        if not (user_has_perm(self.request.user, 'document.archive') or (
+                instance.uploaded_by_id == self.request.user.id and instance.declaration.status in Status.DECLARATION_EDITABLE)):
+            raise PermissionDenied("Cette pièce est déjà au secrétariat : seul le secrétariat peut la retirer.")
         from core.deadline import deadline_info, is_locked_for
         if is_locked_for(self.request.user, instance.declaration):   # six-month rule
             raise PermissionDenied(deadline_info(instance.declaration)['message'])

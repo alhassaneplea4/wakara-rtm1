@@ -55,7 +55,9 @@ class CsvFormulaTests(WakaraTestCase):
         self.assertEqual(r.status_code, 200)
         rows = list(csv.reader(io.StringIO(r.content.decode('utf-8-sig')), delimiter=';'))
         usernames = [row[1] for row in rows[1:]]
-        self.assertIn("'=HYPERLINK(\"http://x\",\"x\")", usernames)
+        # only a fingerprint of what was typed is kept (a password typed in the identifier field never reaches the log)
+        self.assertTrue([u for u in usernames if u.startswith('inconnu:')])
+        self.assertNotIn('HYPERLINK', r.content.decode('utf-8-sig'))
         self.assertFalse([u for u in usernames if u.startswith('=')])
 
     def test_declaration_export_neutralises_child_names(self):

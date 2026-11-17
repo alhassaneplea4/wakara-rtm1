@@ -1,11 +1,14 @@
 """Views for the accounts app: authentication, users, roles, permissions."""
 import secrets
 import string
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
+import hashlib
 
 from django.conf import settings
+from django.core.cache import cache
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
@@ -28,7 +31,7 @@ from core.permissions import (
     ALL_PERMISSION_CODES, PROTECTED_ADMIN_PERMISSIONS, HasWakaraPermission, get_user_permissions, permissions_of,
 )
 
-from .models import LoginAttempt, Permission, Role, RolePermission, UserPermission, UserRole
+from .models import LoginAttempt, RevokedAccessToken, Permission, Role, RolePermission, UserPermission, UserRole
 from .serializers import (
     ChangePasswordSerializer, LoginSerializer, MeSerializer, PermissionSerializer,
     RoleSerializer, UserCreateSerializer, UserDetailSerializer, UserListSerializer,
@@ -38,6 +41,7 @@ from .serializers import (
 User = get_user_model()
 
 INVALID_CREDENTIALS = {"detail": "Identifiant ou mot de passe incorrect."}
+LOCKED = {"detail": "Trop de tentatives depuis cette adresse ou sur ce compte. Réessayez plus tard."}
 
 
 def _as_int(value):
@@ -51,9 +55,11 @@ def _as_int(value):
 def revoke_user_tokens(user):
     """Blacklist every outstanding refresh token of ``user`` (password change/reset, deactivation).
 
-    Access tokens already issued stay valid until they expire (JWT_ACCESS_TOKEN_LIFETIME_MINUTES), but a stolen
-    refresh token can no longer mint new ones.
+    The access tokens already issued are refused too: the version of the sessions goes up and every token carries
+    the version it was issued under (claim ``sv``), so a token of an older version is rejected on its next request.
     """
+    User.objects.filter(pk=user.pk).update(session_version=F('session_version') + 1)
+    user.session_version = User.objects.values_list('session_version', flat=True).get(pk=user.pk)
     for token in OutstandingToken.objects.filter(user=user):
         BlacklistedToken.objects.get_or_create(token=token)
 
@@ -86,22 +92,17 @@ class LoginView(APIView):
         identifier = serializer.validated_data['username'].strip()
         password = serializer.validated_data['password']
 
+        ip = client_ip(request) or ''
         user = _find_user(identifier)
         if user is None:
-            audit.log(AuditAction.LOGIN_FAILED, username=identifier[:150],
-                      object_type='User', reason='Identifiant inconnu')
-            return Response(INVALID_CREDENTIALS, status=status.HTTP_401_UNAUTHORIZED)
+            return self._unknown_identifier(identifier, ip)
 
         # Lockout per (account, address): a stranger guessing passwords locks HIS address out, not the owner of the
         # account. The account itself is locked only while several addresses are locked together (distributed attack).
-        ip = client_ip(request) or ''
         attempt = LoginAttempt.objects.filter(user=user, ip_address=ip).first()
         if user.is_locked or (attempt is not None and attempt.is_locked):
             audit.log(AuditAction.LOGIN_FAILED, user=user, obj=user, reason='Compte verrouillé')
-            return Response(
-                {"detail": "Trop de tentatives depuis cette adresse ou sur ce compte. Réessayez plus tard."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+            return Response(LOCKED, status=status.HTTP_403_FORBIDDEN)
 
         if not user.check_password(password):
             self._record_failure(user, ip)
@@ -132,6 +133,30 @@ class LoginView(APIView):
             'user': MeSerializer(user).data,
         })
 
+
+    @staticmethod
+    def _unknown_identifier(identifier, ip):
+        """
+        An identifier that matches no account behaves EXACTLY like a real one: the same count of mistakes per address,
+        the same lockout, the same answers (nobody learns which identifiers exist). The audit log keeps only a short
+        fingerprint of what was typed, never the text itself (a password typed in the identifier field stays secret).
+        """
+        fingerprint = hashlib.sha256(identifier.lower().encode()).hexdigest()[:12]
+        key = 'login-unknown:' + hashlib.sha256(f'{identifier.lower()}|{ip}'.encode()).hexdigest()
+        window = settings.LOGIN_LOCKOUT_MINUTES * 60
+        if cache.get(key + ':locked'):
+            audit.log(AuditAction.LOGIN_FAILED, username=f'inconnu:{fingerprint}', object_type='User', reason='Identifiant inconnu')
+            return Response(LOCKED, status=status.HTTP_403_FORBIDDEN)
+        cache.add(key, 0, window)
+        try:
+            count = cache.incr(key)
+        except ValueError:
+            count = 1
+        if count >= settings.LOGIN_MAX_FAILED_ATTEMPTS:
+            cache.set(key + ':locked', True, window)
+            cache.delete(key)
+        audit.log(AuditAction.LOGIN_FAILED, username=f'inconnu:{fingerprint}', object_type='User', reason='Identifiant inconnu')
+        return Response(INVALID_CREDENTIALS, status=status.HTTP_401_UNAUTHORIZED)
 
     @staticmethod
     def _record_failure(user, ip):
@@ -168,8 +193,22 @@ class LogoutView(APIView):
                 RefreshToken(token).blacklist()
             except TokenError:
                 pass
+        self._revoke_access_token(request.auth)
         audit.log(AuditAction.LOGOUT, user=request.user, obj=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+    @staticmethod
+    def _revoke_access_token(token):
+        """The access token used to sign out stops working now, not when it expires."""
+        try:
+            jti, exp = token['jti'], int(token['exp'])
+        except (KeyError, TypeError, ValueError):
+            return
+        now = timezone.now()
+        RevokedAccessToken.objects.filter(expires_at__lt=now).delete()
+        RevokedAccessToken.objects.get_or_create(
+            jti=jti, defaults={'expires_at': datetime.fromtimestamp(exp, tz=dt_timezone.utc)})
 
 
 class MeView(APIView):
@@ -200,6 +239,9 @@ class ChangePasswordView(APIView):
         serializer.is_valid(raise_exception=True)
         if not request.user.check_password(serializer.validated_data['old_password']):
             return Response({"detail": "Ancien mot de passe incorrect."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if serializer.validated_data['old_password'] == serializer.validated_data['new_password']:
+            return Response({"detail": "Le nouveau mot de passe doit être différent de l'ancien."},
                             status=status.HTTP_400_BAD_REQUEST)
         request.user.set_password(serializer.validated_data['new_password'])
         request.user.must_change_password = False

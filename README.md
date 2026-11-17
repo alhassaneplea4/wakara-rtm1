@@ -21,7 +21,7 @@ Prérequis : Python 3.12+, Node.js 18+.
 cd backend
 python -m venv venv
 venv\Scripts\activate            # Linux/macOS : source venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 cp .env.example .env             # puis renseigner SECRET_KEY, WAKARA_ADMIN_* (voir docs/configuration.md)
 python manage.py migrate
 python manage.py setup_initial_data      # permissions, rôles, paramètres, premier administrateur

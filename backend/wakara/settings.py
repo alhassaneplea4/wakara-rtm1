@@ -30,6 +30,7 @@ if VERCEL_ENV == 'preview' and not DATABASE_URL:
     raise RuntimeError("Aperçu Vercel sans PREVIEW_DATABASE_URL : un aperçu n'utilise jamais la base de production. "
                        "Connectez une base Neon de test à l'environnement Preview (préfixe PREVIEW).")
 SECRET_KEY = config('SECRET_KEY', default='') if VERCEL_ENV != 'preview' else ''
+SECRET_KEY_IS_EXPLICIT = bool(SECRET_KEY)   # False when it is derived from the database address (see check_production)
 if not SECRET_KEY and ON_VERCEL and DATABASE_URL:
     # No SECRET_KEY configured on Vercel: derive a stable, private one from the database credentials
     # (random, known only to Vercel and Neon). Define SECRET_KEY explicitly to use your own value.
@@ -168,7 +169,7 @@ if 'test' in sys.argv[1:2]:
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', 'OPTIONS': {'min_length': 10}},
     {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
@@ -268,7 +269,7 @@ REST_FRAMEWORK = {
 # ──────────────────────────────────────────────
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(
-        minutes=config('JWT_ACCESS_TOKEN_LIFETIME_MINUTES', default=60, cast=int)
+        minutes=config('JWT_ACCESS_TOKEN_LIFETIME_MINUTES', default=30, cast=int)
     ),
     'REFRESH_TOKEN_LIFETIME': timedelta(
         days=config('JWT_REFRESH_TOKEN_LIFETIME_DAYS', default=7, cast=int)
@@ -362,6 +363,9 @@ SYNC_PULL_PAGE_SIZE = config('SYNC_PULL_PAGE_SIZE', default=50, cast=int)
 SYNC_PULL_INITIAL_DAYS = config('SYNC_PULL_INITIAL_DAYS', default=90, cast=int)
 # Devices (browsers / phones) a user may have registered at the same time; revoke the old ones to free a place.
 SYNC_MAX_DEVICES_PER_USER = config('SYNC_MAX_DEVICES_PER_USER', default=3, cast=int)
+# Separation of duties ("four eyes"): the person who submitted a dossier to validation cannot validate it herself.
+# Switch off only in a very small office where one person does both (docs/securite-deploiement.md).
+DOSSIER_SEPARATE_SUBMIT_AND_VALIDATE = config('DOSSIER_SEPARATE_SUBMIT_AND_VALIDATE', default=True, cast=bool)
 # Months during which the mairie may treat a declaration (counted from the declaration date); then it goes to the courts.
 DOSSIER_DEADLINE_MONTHS = config('DOSSIER_DEADLINE_MONTHS', default=6, cast=int)
 

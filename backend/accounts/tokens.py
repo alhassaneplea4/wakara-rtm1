@@ -8,13 +8,14 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from .authentication import (
-    DEVICE_CLAIM, DEVICE_REVOKED_MESSAGE, clean_device_id, device_of_token, is_device_revoked,
+    DEVICE_CLAIM, DEVICE_REVOKED_MESSAGE, SESSION_CLAIM, clean_device_id, device_of_token, is_device_revoked,
 )
 
 
 def tokens_for(user, device_id=None) -> RefreshToken:
     """A refresh token (its ``access_token`` inherits the claim) bound to ``device_id`` when it is known."""
     refresh = RefreshToken.for_user(user)
+    refresh[SESSION_CLAIM] = user.session_version
     did = clean_device_id(device_id)
     if did:
         refresh[DEVICE_CLAIM] = did

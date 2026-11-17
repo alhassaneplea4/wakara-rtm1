@@ -2,6 +2,7 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { Component, ElementRef, HostListener, Input, OnChanges, OnDestroy, SimpleChanges, ViewChild, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiService, errorMessage } from '../core/api.service';
+import { AuthService } from '../core/auth.service';
 import { Page, SupportingDocument } from '../core/models';
 import { ToastService } from '../core/toast.service';
 import { SyncChipComponent } from './sync-ui';
@@ -92,7 +93,7 @@ export async function shrink(file: File, quality: PhotoQuality = 'standard'): Pr
             <span class="name">{{ s.doc.original_name }}</span>
             <small class="muted">{{ s.doc.uploaded_by_name }} · {{ s.doc.created_at | date: 'dd/MM/yyyy HH:mm' }}</small>
             @if ($any(s.doc).sync_state; as st) { <wk-sync [state]="st" /> }
-            @if (editable) { <button type="button" class="link danger" (click)="remove(s)">Retirer</button> }
+            @if (editable && canRemove(s)) { <button type="button" class="link danger" (click)="remove(s)">Retirer</button> }
           </figcaption>
         </figure>
       }
@@ -149,6 +150,7 @@ export async function shrink(file: File, quality: PhotoQuality = 'standard'): Pr
 export class PaperFormComponent implements OnChanges, OnDestroy {
   private api = inject(ApiService);
   private toast = inject(ToastService);
+  private auth = inject(AuthService);
 
   /** UUID of an existing dossier; empty while creating one. */
   @Input() declaration = '';
@@ -229,6 +231,9 @@ export class PaperFormComponent implements OnChanges, OnDestroy {
     }
     return failed;
   }
+
+  /** A page already sent to the server is withdrawn by the secretariat only; a page still on this device may always be removed. */
+  canRemove(s: Saved) { return this.auth.canAny('document.archive', 'declaration.create') || (s.doc as { sync_state?: string }).sync_state === 'local'; }
 
   remove(s: Saved) {
     this.api.delete(`/documents/${s.doc.uuid}/`).subscribe({

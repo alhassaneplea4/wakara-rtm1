@@ -1,4 +1,5 @@
 """Offline mode for every role: the secretariat and the validator work from a device like the collection agent."""
+from django.test import override_settings
 from django.utils import timezone
 import datetime
 
@@ -153,6 +154,7 @@ class ValidationFromADeviceTests(RoleSyncCase):
         d = Declaration.objects.get(uuid=uuid)
         self.assertEqual((d.status, d.acte.numero_acte, d.validated_by_id), ('VALIDATED', '4521', self.admin.id))
 
+    @override_settings(DOSSIER_SEPARATE_SUBMIT_AND_VALIDATE=False)
     def test_the_secretary_validates_like_the_administrator(self):
         uuid = self.pending()
         r = self.answer(self.secretary, self.op('transition', entity=uuid, payload={

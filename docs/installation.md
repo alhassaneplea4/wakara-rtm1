@@ -14,7 +14,7 @@
 cd backend
 python -m venv venv
 venv\Scripts\activate                 # PowerShell : .\venv\Scripts\Activate.ps1 — Linux/macOS : source venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 cp .env.example .env
 ```
 

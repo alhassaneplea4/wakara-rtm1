@@ -375,6 +375,12 @@ def transition_status(declaration_pk, target: str, user, reason: str = '', paylo
     reason = (reason or '').strip()
     if t.reason_required and not reason:
         raise ValidationError({'reason': "Un motif est obligatoire pour cette décision."})
+    if target == Status.VALIDATED and settings.DOSSIER_SEPARATE_SUBMIT_AND_VALIDATE:
+        sender = (StatusHistory.objects.filter(declaration=declaration, to_status=Status.PENDING_VALIDATION)
+                  .order_by('-changed_at', '-id').values_list('changed_by_id', flat=True).first())
+        if sender is not None and sender == user.id:
+            raise PermissionDenied("Séparation des tâches : un dossier ne peut pas être validé par la personne qui l'a "
+                                   "soumis à validation. Un autre responsable doit prendre la décision.")
 
     if target == Status.TRANSMITTED:
         missing = missing_fields(declaration, settings.DECLARATION_REQUIRED_FOR_TRANSMISSION)

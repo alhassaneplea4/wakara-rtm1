@@ -60,6 +60,7 @@ class AuthorisationTests(WakaraTestCase):
         self.assertEqual(self.transition(self.agent, d['uuid'], 'REJECTED', reason='non').status_code, 403)
         self.assertEqual(Declaration.objects.get(uuid=d['uuid']).status, 'PENDING_VALIDATION')
 
+    @override_settings(DOSSIER_SEPARATE_SUBMIT_AND_VALIDATE=False)
     def test_secretary_can_take_the_final_decision_unless_the_right_is_removed(self):
         from accounts.models import Permission, UserPermission
         d = self.create_declaration()

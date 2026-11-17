@@ -20,7 +20,20 @@ Les quatre points « à corriger avant la mise en production » sont corrigés e
 | 4 | Personne n'accorde un droit qu'il ne détient pas (rôles, attributions, surcharges) ni n'agit sur un compte qui a plus de droits que lui (réinitialisation, modification, activation, rôles). | idem |
 | 6 | Les trois corps de requête mal formés répondent 400. | idem |
 
-Restent ouverts : les points 5 et 7 à 11, les trois décisions à prendre avec la mairie et les vérifications du déploiement. Limite connue du point 3 : une attaque menée depuis 5 adresses à la fois peut encore verrouiller un compte 15 minutes ; une limitation de débit au niveau du pare-feu la réduit.
+### Deuxième série de corrections (17/11/2026)
+
+| # | Correction | Vérification |
+|---|------------|--------------|
+| 5 | Le jeton d'accès cesse de fonctionner **à la déconnexion** (liste des jetons révoqués) et, pour toutes les sessions du compte, au **changement ou à la réinitialisation du mot de passe** et à la **désactivation** (numéro de version des sessions porté par chaque jeton). Durée par défaut ramenée à 30 minutes. | `tests/test_production_readiness.py` |
+| 7 | Le nouveau mot de passe doit différer de l'ancien ; longueur minimale portée de 8 à 10 caractères. | idem |
+| 8 | Un identifiant inconnu n'est plus écrit dans le journal d'audit : seule une empreinte courte (`inconnu:…`) est conservée. | idem |
+| 9 | Dépendances Python **verrouillées** (`requirements.txt`) et contrôlées (`pip-audit` : aucune vulnérabilité connue) ; outils de test séparés (`requirements-dev.txt`). | `pip-audit` |
+| 10 | Un identifiant inconnu se comporte exactement comme un compte réel (mêmes réponses, même verrouillage par adresse) : on ne peut plus deviner quels comptes existent. | idem |
+| 11 | Nouveau droit `document.archive` (secrétariat, administrateur). L'agent ne retire sa propre photo que tant que le dossier est son brouillon, jamais après la transmission. | idem |
+| — | **Séparation des tâches** : la personne qui a soumis un dossier à validation ne peut pas le valider (`DOSSIER_SEPARATE_SUBMIT_AND_VALIDATE`, actif par défaut ; à désactiver seulement dans un très petit service). Vaut aussi hors ligne. | idem |
+| — | Commande `python manage.py check_production` : rapport de préparation du déploiement (configuration, base, comptes), exécuté à chaque déploiement de production dans les journaux du build. Node 22 imposé au frontend (`engines`). | idem |
+
+**Reste hors du code** (à faire par l'exploitant ou à décider avec la mairie) : la double authentification (non réalisée : le choix du moyen — application d'authentification ou SMS — dépend de la mairie), les variables d'environnement du déploiement (voir [securite-deploiement.md](./securite-deploiement.md)), la sauvegarde testée, et le test sur de vrais appareils. Limite connue du point 3 : une attaque menée depuis 5 adresses à la fois peut encore verrouiller un compte 15 minutes ; une limitation de débit au niveau du pare-feu la réduit.
 
 ## Verdict (avant corrections)
 

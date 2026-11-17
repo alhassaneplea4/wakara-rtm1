@@ -1,32 +1,53 @@
+# Versions VERROUILLÉES : celles que les tests ont validées (deux déploiements installent exactement la même chose).
+# Pour mettre à jour : modifier ici, lancer `python manage.py test tests` et `pip-audit -r requirements.txt`, puis committer.
+# Les outils de test (factory-boy, faker) sont dans requirements-dev.txt : ils ne sont pas installés en production.
+
 # Django core
-Django>=5.0,<6.0
-djangorestframework>=3.15,<4.0
-django-filter>=24.0
+Django==5.2.18
+djangorestframework==3.18.3
+django-filter==26.2
 
 # Authentication
-djangorestframework-simplejwt>=5.3,<6.0
+djangorestframework-simplejwt==5.5.1
+PyJWT==2.15.1
 
 # Shared cache for the rate limits (REDIS_URL); only imported when REDIS_URL is set
-redis>=5.0
+redis==7.4.1
 
 # Environment variables
-python-decouple>=3.8
+python-decouple==3.8
 
 # CORS
-django-cors-headers>=4.3
+django-cors-headers==4.9.0
 
 # Database (PostgreSQL: DATABASE_URL or DB_* variables)
-psycopg[binary]>=3.1
+psycopg[binary]==3.3.6
 
 # Private document storage on an S3-compatible bucket (DOCUMENTS_S3_BUCKET) — required on Vercel
-django-storages[s3]>=1.14
+django-storages[s3]==1.14.6
+boto3==1.43.122
+botocore==1.43.122
+s3transfer==0.19.3
 
 # File handling
-Pillow>=10.0
+Pillow==13.0.0
 
 # API documentation
-drf-spectacular>=0.27
+drf-spectacular==0.30.0
 
-# Testing
-factory-boy>=3.3
-faker>=24.0
+# Indirect dependencies, pinned too
+asgiref==3.13.0
+attrs==26.1.0
+inflection==0.5.1
+jmespath==1.1.0
+jsonschema==4.26.0
+jsonschema-specifications==2025.9.1
+python-dateutil==2.9.0.post0
+PyYAML==6.0.3
+referencing==0.37.0
+rpds-py==2026.9.1
+six==1.17.0
+sqlparse==0.6.0
+tzdata==2026.6
+uritemplate==4.2.0
+urllib3==2.8.0

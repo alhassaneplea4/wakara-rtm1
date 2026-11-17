@@ -11,7 +11,8 @@ En production, fournir les mêmes variables par l'environnement du service.
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:4200` | Origines du frontend |
 | `CSRF_TRUSTED_ORIGINS` | vide | Origines HTTPS de confiance (production) |
 | `DB_ENGINE`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | SQLite | PostgreSQL : `DB_ENGINE=django.db.backends.postgresql` (+ `pip install psycopg2-binary`) |
-| `JWT_ACCESS_TOKEN_LIFETIME_MINUTES` | `60` | Durée du jeton d'accès |
+| `JWT_ACCESS_TOKEN_LIFETIME_MINUTES` | `30` | Durée du jeton d'accès |
+| `DOSSIER_SEPARATE_SUBMIT_AND_VALIDATE` | `True` | Le dossier soumis par une personne doit être validé par une autre |
 | `JWT_REFRESH_TOKEN_LIFETIME_DAYS` | `7` | Durée du jeton de rafraîchissement |
 | `LOGIN_THROTTLE_RATE` | `10/min` | Limite de tentatives de connexion par IP |
 | `NUM_PROXIES` | `1` sur Vercel, `0` ailleurs | Nombre de proxys de confiance devant Django ; détermine quelle adresse de `X-Forwarded-For` est celle du client (journal d'audit et limitation de débit). `0` = en-tête ignoré |

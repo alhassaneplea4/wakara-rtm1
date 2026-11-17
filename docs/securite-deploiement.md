@@ -32,6 +32,15 @@ navigateur (aucune erreur « Refused to … Content Security Policy ») ; contr�
 | `NUM_PROXIES` | `1` derrière Vercel seul, `2` derrière Cloudflare puis Vercel | Adresse du client pour la limite de connexion et le journal d'audit |
 | `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `CORS_ALLOWED_ORIGINS` | domaines réels, sans joker | |
 | `SECURE_HSTS_SECONDS` | `31536000` (défaut) | |
+| `SECRET_KEY` | 50 caractères aléatoires ou plus | Sans elle, la clé est dérivée de l'adresse de la base. Changer la clé ferme toutes les sessions ouvertes |
+| `DOSSIER_SEPARATE_SUBMIT_AND_VALIDATE` | `True` (défaut) | Personne ne valide le dossier qu'il a soumis. À mettre à `False` seulement si une seule personne tient le secrétariat |
+| `JWT_ACCESS_TOKEN_LIFETIME_MINUTES` | `30` (défaut) | Durée de vie d'un jeton d'accès |
+
+**Vérifier le déploiement** : `python manage.py check_production` (le build de production l'affiche dans ses journaux). Il signale
+ce qui bloque (DEBUG actif, Redis absent, base non PostgreSQL, migrations en attente, comptes d'aperçu, aucun administrateur) et ce qui est
+seulement conseillé (SECRET_KEY non définie, domaines locaux autorisés, `NUM_PROXIES`).
+
+**Node** : le frontend (Angular 21) demande Node 20.19 ou plus ; `package.json` impose `22.x`, que Vercel applique au build.
 
 ## 3. Cloudflare devant l'application
 
@@ -61,5 +70,6 @@ Cloudflare n'est pas requis. S'il est placé devant Vercel :
 ## 4. Points qui restent à la charge de l'exploitation
 
 - **Appareil volé** : révoquer l'appareil (coupe ses sessions) *et*, si le code du coffre est faible ou connu, désactiver le compte puis changer le mot de passe.
-- **Jetons d'accès** : valables 60 minutes (`JWT_ACCESS_TOKEN_LIFETIME_MINUTES`) ; ils sont refusés dès la révocation de l'appareil.
-- **Dépendances** : Angular 17 n'est plus maintenu ; voir l'état de la mise à jour dans le rapport d'audit.
+- **Jetons d'accès** : valables 30 minutes (`JWT_ACCESS_TOKEN_LIFETIME_MINUTES`) ; ils sont refusés dès la déconnexion, la révocation de l'appareil, le changement ou la réinitialisation du mot de passe et la désactivation du compte.
+- **Dépendances** : Angular 21 et versions Python verrouillées ; relancer `npm audit --omit=dev` et `pip-audit -r backend/requirements.txt` avant chaque mise en production.
+- **Double authentification** : non réalisée ; à décider avec la mairie (application d'authentification ou SMS), surtout pour les comptes qui valident des actes.

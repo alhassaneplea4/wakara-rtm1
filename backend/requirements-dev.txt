@@ -1,0 +1,4 @@
+# Outils de développement et de test (jamais installés en production).
+-r requirements.txt
+factory-boy==3.3.3
+Faker==40.44.0

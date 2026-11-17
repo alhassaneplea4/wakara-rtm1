@@ -25,6 +25,11 @@ def main():
                  "d'environnement du projet Vercel, puis redéployez.")
     manage('migrate', '--noinput')
     manage('setup_initial_data')  # idempotent ; le mot de passe n'est lu que si l'administrateur n'existe pas
+    # Rapport de préparation à la production dans les journaux du déploiement (ne fait jamais échouer le déploiement).
+    try:
+        manage('check_production', '--warn')
+    except Exception as exc:  # noqa: BLE001
+        print(f"[wakara] check_production n'a pas pu s'exécuter : {exc}")
 
 
 def build_preview():

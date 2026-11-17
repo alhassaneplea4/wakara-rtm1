@@ -29,6 +29,7 @@ PERMISSION_CATALOG = [
     ('dossier.override_deadline', 'Traiter un dossier de plus de 6 mois (délai dépassé)', 'Validation'),
     ('document.view', 'Consulter les pièces justificatives', 'Pièces'),
     ('document.upload', 'Ajouter une pièce justificative', 'Pièces'),
+    ('document.archive', 'Retirer (archiver) une pièce justificative déjà envoyée', 'Pièces'),
     ('hospital.view', 'Consulter les établissements', 'Établissements'),
     ('hospital.create', 'Créer un établissement', 'Établissements'),
     ('hospital.update', 'Modifier un établissement', 'Établissements'),
@@ -67,7 +68,7 @@ DEFAULT_ROLES = {
             'declaration.view', 'declaration.view_all',
             'acte.view', 'acte.complete', 'acte.update', 'acte.submit',
             'acte.print', 'acte.deliver',
-            'document.view', 'document.upload',
+            'document.view', 'document.upload', 'document.archive',
             'hospital.view', 'hospital.create', 'hospital.update', 'hospital.archive',
             'stats.view',
             'dossier.validate', 'dossier.reject',   # the secretariat also takes the final decision
@@ -94,6 +95,7 @@ DEFAULT_ROLES = {
 ROLE_UPGRADE_GRANTS = [
     ('secretary-final-validation', 'secretary', ['dossier.validate', 'dossier.reject']),
     ('secretary-duplicate-decision', 'secretary', ['duplicate.decide']),
+    ('secretary-document-archive', 'secretary', ['document.archive']),
 ]
 
 # Permissions the 'admin' system role can never lose (lock-out protection).

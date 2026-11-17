@@ -24,6 +24,10 @@ class CustomUser(NoHardDeleteMixin, AbstractUser):
     must_change_password = models.BooleanField("Doit changer son mot de passe", default=False)
     failed_login_count = models.PositiveIntegerField("Échecs de connexion", default=0)
     locked_until = models.DateTimeField("Verrouillé jusqu'à", null=True, blank=True)
+    session_version = models.PositiveIntegerField(
+        "Version des sessions", default=0,
+        help_text="Augmente à chaque changement ou réinitialisation de mot de passe et à chaque désactivation : "
+                  "les jetons portant une ancienne version sont refusés aussitôt.")
     created_by = models.ForeignKey(
         'self', on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
     )
@@ -74,6 +78,16 @@ class LoginAttempt(models.Model):
     @property
     def is_locked(self) -> bool:
         return bool(self.locked_until and self.locked_until > timezone.now())
+
+
+class RevokedAccessToken(models.Model):
+    """An access token ended by a sign-out: refused until it would have expired anyway (then the row is purged)."""
+    jti = models.CharField(max_length=64, unique=True)
+    expires_at = models.DateTimeField(db_index=True)
+
+    class Meta:
+        verbose_name = "Jeton d'accès révoqué"
+        verbose_name_plural = "Jetons d'accès révoqués"
 
 
 class Role(NoHardDeleteMixin, TimeStampedMixin):
