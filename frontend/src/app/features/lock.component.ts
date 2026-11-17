@@ -7,13 +7,14 @@ import { AuthService } from '../core/auth.service';
 import { OfflineGate } from '../core/offline/offline-gate.service';
 import { IconComponent, LogoComponent } from '../shared/ui';
 
-type Mode = 'setup' | 'unlock' | 'reset';
+type Mode = 'setup' | 'unlock' | 'reset' | 'upgrade';
 
 /**
  * PIN screen of the offline mode.
  *   setup   first use on this device: the signed-in agent chooses the code that encrypts the local data
  *   unlock  every time the application is reopened (works without network)
  *   reset   code forgotten: sign in again online, the local data are erased, a new code is chosen
+ *   upgrade the code that has just unlocked the device does not meet the current rules: a stronger one is chosen
  */
 @Component({
   selector: 'wk-lock', standalone: true, imports: [CommonModule, FormsModule, IconComponent, LogoComponent],
@@ -24,12 +25,12 @@ type Mode = 'setup' | 'unlock' | 'reset';
 
         @if (mode() === 'setup') {
           <h1 id="lock-title">Protégez cet appareil</h1>
-          <p class="soft">Choisissez un code de verrouillage. Il chiffre les déclarations enregistrées sur cet appareil et vous sera demandé à chaque ouverture de Wakara, même sans connexion.</p>
+          <p class="soft">Choisissez un code de verrouillage. Il chiffre les déclarations enregistrées sur cet appareil. Vous ne le créez qu'une seule fois sur cet appareil : il vous sera ensuite demandé pour déverrouiller, à l'ouverture de Wakara ou après une reconnexion, même sans connexion Internet.</p>
           <form (ngSubmit)="setup()" novalidate>
-            <div class="field"><label for="pin">Code de verrouillage (6 caractères au minimum)</label>
-              <input id="pin" class="input code" type="password" name="pin" autocomplete="new-password" inputmode="numeric" [(ngModel)]="pin" autofocus /></div>
+            <div class="field"><label for="pin">Code de verrouillage (8 caractères minimum, lettres et chiffres)</label>
+              <input id="pin" class="input code" type="password" name="pin" autocomplete="new-password" [(ngModel)]="pin" autofocus /></div>
             <div class="field"><label for="pin2">Confirmez le code</label>
-              <input id="pin2" class="input code" type="password" name="pin2" autocomplete="new-password" inputmode="numeric" [(ngModel)]="confirm" /></div>
+              <input id="pin2" class="input code" type="password" name="pin2" autocomplete="new-password" [(ngModel)]="confirm" /></div>
             @if (error()) { <div class="alert alert-danger" role="alert">{{ error() }}</div> }
             <p class="warn"><wk-icon name="alert" [size]="16" /> Ce code ne peut pas être récupéré. Si vous l'oubliez, les déclarations de cet appareil qui n'ont pas encore été synchronisées seront perdues.</p>
             <button class="btn btn-primary big" type="submit" [disabled]="busy()">
@@ -40,13 +41,13 @@ type Mode = 'setup' | 'unlock' | 'reset';
 
         @if (mode() === 'unlock') {
           <h1 id="lock-title">Appareil verrouillé</h1>
-          <p class="soft">Session de <strong>{{ owner()?.name || owner()?.username }}</strong>. Saisissez votre code de verrouillage pour continuer.</p>
+          <p class="soft">Session de <strong>{{ owner()?.name || owner()?.username }}</strong>. Saisissez votre code de verrouillage pour continuer. Vos déclarations enregistrées hors connexion sont conservées sur cet appareil, même après une déconnexion.</p>
           @if (gate.unsynced()) {
             <p class="count"><wk-icon name="phone" [size]="16" /> {{ gate.unsynced() }} opération(s) enregistrée(s) sur cet appareil, pas encore synchronisée(s).</p>
           }
           <form (ngSubmit)="unlock()" novalidate>
             <div class="field"><label for="code">Code de verrouillage</label>
-              <input id="code" class="input code" type="password" name="code" autocomplete="off" inputmode="numeric" [(ngModel)]="pin" autofocus /></div>
+              <input id="code" class="input code" type="password" name="code" autocomplete="off" [(ngModel)]="pin" autofocus /></div>
             @if (error()) { <div class="alert alert-danger" role="alert">{{ error() }}</div> }
             <button class="btn btn-primary big" type="submit" [disabled]="busy() || !pin">
               @if (busy()) { <span class="spinner"></span> } Déverrouiller</button>
@@ -55,6 +56,20 @@ type Mode = 'setup' | 'unlock' | 'reset';
             <button type="button" class="link" (click)="go('reset')">Code oublié ?</button>
             <button type="button" class="link" (click)="otherAccount()">Utiliser un autre compte</button>
           </div>
+        }
+
+        @if (mode() === 'upgrade') {
+          <h1 id="lock-title">Renforcez votre code</h1>
+          <p class="soft">Le code que vous venez de saisir est trop faible : si l'appareil était volé, il pourrait être deviné. Choisissez un nouveau code (8 caractères minimum, avec des lettres et des chiffres, ou une phrase de 14 caractères). Vos données sont conservées.</p>
+          <form (ngSubmit)="upgrade()" novalidate>
+            <div class="field"><label for="npin">Nouveau code</label>
+              <input id="npin" class="input code" type="password" name="npin" autocomplete="new-password" [(ngModel)]="pin" autofocus /></div>
+            <div class="field"><label for="npin2">Confirmez le nouveau code</label>
+              <input id="npin2" class="input code" type="password" name="npin2" autocomplete="new-password" [(ngModel)]="confirm" /></div>
+            @if (error()) { <div class="alert alert-danger" role="alert">{{ error() }}</div> }
+            <button class="btn btn-primary big" type="submit" [disabled]="busy()">
+              @if (busy()) { <span class="spinner"></span> } Enregistrer le nouveau code</button>
+          </form>
         }
 
         @if (mode() === 'reset') {
@@ -101,7 +116,7 @@ export class LockComponent implements OnInit {
   mode = signal<Mode>('unlock');
   busy = signal(false);
   error = signal('');
-  pin = ''; confirm = ''; password = ''; ack = false;
+  pin = ''; confirm = ''; password = ''; ack = false; private oldPin = '';
 
   owner = () => this.gate.header()?.user ?? null;
 
@@ -114,7 +129,7 @@ export class LockComponent implements OnInit {
     else void this.router.navigate(['/login']);
   }
 
-  go(mode: Mode) { this.error.set(''); this.pin = this.confirm = this.password = ''; this.ack = false; this.mode.set(mode); }
+  go(mode: Mode) { this.error.set(''); this.pin = this.confirm = this.password = ''; this.ack = false; if (mode !== 'upgrade') this.oldPin = ''; this.mode.set(mode); }
 
   private leave() {
     const next = this.route.snapshot.queryParamMap.get('next');
@@ -135,8 +150,25 @@ export class LockComponent implements OnInit {
   async unlock() {
     if (!this.pin) return;
     this.error.set(''); this.busy.set(true);
-    try { await this.gate.unlock(this.pin); this.leave(); }
+    try {
+      await this.gate.unlock(this.pin);
+      if (await this.gate.pinProblem(this.pin)) { this.oldPin = this.pin; this.go('upgrade'); return; }   // a code made before the rules were tightened
+      this.leave();
+    }
     catch (e: any) { this.pin = ''; this.error.set(e?.message ?? 'Code incorrect.'); }
+    finally { this.busy.set(false); }
+  }
+
+  /** The device is already unlocked with the weak code: it is replaced before the agent goes on. */
+  async upgrade() {
+    this.error.set('');
+    const problem = await this.gate.pinProblem(this.pin);
+    if (problem) { this.error.set(problem); return; }
+    if (this.pin !== this.confirm) { this.error.set('Les deux codes ne sont pas identiques.'); return; }
+    if (this.pin === this.oldPin) { this.error.set("Choisissez un code différent de l'ancien."); return; }
+    this.busy.set(true);
+    try { await this.gate.changePin(this.oldPin, this.pin); this.oldPin = ''; this.leave(); }
+    catch (e: any) { this.error.set(e?.message ?? 'Impossible de changer le code.'); }
     finally { this.busy.set(false); }
   }
 

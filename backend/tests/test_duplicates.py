@@ -1,4 +1,5 @@
 """Duplicate prevention: detection, scoring, cases, decisions, blocking, offline synchronisation (fictional data)."""
+from django.utils import timezone
 import datetime
 import uuid as uuid_lib
 from unittest import mock
@@ -21,7 +22,7 @@ from duplicates.services.scoring import DuplicateScoringService
 from .base import WakaraTestCase, make_user
 from .test_offline_sync import DEVICE, SyncTestCase
 
-BIRTH = (datetime.date.today() - datetime.timedelta(days=5)).isoformat()
+BIRTH = (timezone.localdate() - datetime.timedelta(days=5)).isoformat()
 
 
 class DuplicateBase(WakaraTestCase):
@@ -78,7 +79,7 @@ class DuplicateBase(WakaraTestCase):
         det = self.client_for(self.secretary).get(f'/api/declarations/{uuid}/').data
         c = self.client_for(self.secretary)
         self.assertEqual(c.patch(f'/api/actes/{det["acte_uuid"]}/', {
-            'declaration_date': datetime.date.today().isoformat(), 'registre': 'R1'}, format='json').status_code, 200)
+            'declaration_date': timezone.localdate().isoformat(), 'registre': 'R1'}, format='json').status_code, 200)
         self.assertEqual(c.patch(f'/api/declarations/{uuid}/', {'declarant': {
             'first_names': 'Mamadou', 'last_name': 'Diallo', 'relationship': 'Père'}}, format='json').status_code, 200)
         self.assertEqual(self.transition(self.secretary, uuid, 'PENDING_VALIDATION').status_code, 200)
@@ -230,7 +231,7 @@ class ScoringTests(DuplicateBase):
         self.assertEqual(bad.status_code, 400)
         cfg = default_config()
         cfg['thresholds'] = {'high': 90, 'medium': 70}
-        ok = c.patch('/api/duplicates/config/', cfg, format='json')
+        ok = c.patch('/api/duplicates/config/', {**cfg, 'reason': 'Calibrage après essai sur dossiers réels'}, format='json')
         self.assertEqual(ok.status_code, 200, ok.content)
         self.assertEqual(c.get('/api/duplicates/config/').data['config']['thresholds']['high'], 90)
         self.assertEqual(self.client_for(self.secretary).patch('/api/duplicates/config/', cfg, format='json')
@@ -252,16 +253,18 @@ class SyncTests(SyncTestCase, DuplicateBase):
         self.assertEqual(r.status_code, 200, r.content)
         rb = r.data['results'][0]
         self.assertEqual((ra['status'], rb['status']), ('applied', 'applied'))     # nothing refused, nothing lost
-        self.assertFalse(ra.get('duplicate_cases'))
-        self.assertEqual(len(rb['duplicate_cases']), 1)
+        # the agents are told nothing about a possible duplicate (no oracle on the register)...
+        self.assertNotIn('duplicate_cases', ra)
+        self.assertNotIn('duplicate_cases', rb)
+        self.assertEqual(DuplicateCase.objects.count(), 1)             # ...but the control centre has its case
         self.assertEqual(Declaration.objects.count(), 2)
         case = DuplicateCase.objects.get()
         self.assertEqual(case.anomaly_type, 'SYNC_CONFLICT')
         self.assertEqual(case.match.analysis.trigger, 'SYNC')
         da = Declaration.objects.get(uuid=ra['entity_uuid'])
         self.assertIsNotNone(da.device_created_at)
-        # the answer carries the dossier with its alert; neither dossier can get an official number yet
-        self.assertTrue(rb['declaration']['duplicate_alert']['blocked'])
+        # neither dossier can get an official number yet
+        self.assertIsNone(rb['declaration']['duplicate_alert'])
         for uuid_, number in ((ra['entity_uuid'], '700'), (rb['entity_uuid'], '701')):
             self.to_pending(uuid_)
             res = self.validate(self.admin, uuid_, number)
@@ -322,8 +325,8 @@ class ValidationGuardTests(DuplicateBase):
         # the validation takes the numbering lock shared by every validation (serialises simultaneous ones)
         self.assertIn('official-numbering', [c.args[0] for c in lock.call_args_list])
         blocked = self.validate(self.admin, b['uuid'], '802')
-        self.assertEqual(blocked.status_code, 400)
-        self.assertEqual(blocked.data['code'], 'duplicate_block')
+        self.assertEqual(blocked.status_code, 400)          # the redundant dossier was rejected by the decision
+        self.assertEqual(Declaration.objects.get(uuid=b['uuid']).status, 'REJECTED')
         self.assertEqual(Acte.objects.exclude(numero_acte=None).count(), 1)
 
     def test_10_declaration_similar_to_an_existing_official_act(self):
@@ -393,7 +396,8 @@ class ValidationGuardTests(DuplicateBase):
         self.assertEqual(case.duplicate_declaration.uuid, uuid_lib.UUID(b['uuid']))
         self.assertEqual(case.principal_declaration.uuid, uuid_lib.UUID(a['uuid']))
         self.assertEqual(Declaration.objects.count(), 2)                   # nothing deleted or merged
-        self.assertEqual(Declaration.objects.get(uuid=b['uuid']).status, 'DRAFT')   # no automatic legal change
+        self.assertEqual(Declaration.objects.get(uuid=b['uuid']).status, 'REJECTED')   # the redundant entry is rejected
+        self.assertEqual(Declaration.objects.get(uuid=a['uuid']).status, 'DRAFT')      # the principal keeps its status
         row = case.decisions.get()
         self.assertEqual((row.decided_by, row.reason), (self.admin, 'Pièces identiques'))
         self.assertIsNotNone(row.decided_at)
@@ -413,6 +417,7 @@ class ValidationGuardTests(DuplicateBase):
         self.assertEqual(r.status_code, 200)
         case.refresh_from_db()
         self.assertEqual((case.status, case.decisions.count()), (CaseStatus.IN_REVIEW, 1))
+        self.assertEqual(Declaration.objects.get(uuid=b['uuid']).status, 'DRAFT')      # reopened: back as it was
 
     def test_distinct_children_decision_releases_both(self):
         a, b = self.mk(self.agent), self.mk(self.agent2)
@@ -467,8 +472,18 @@ class PermissionAndApiTests(DuplicateBase):
             self.assertEqual(c.post('/api/duplicates/analyze/', {'declaration': self.a['uuid']}, format='json').status_code, 403)
         self.assertEqual(self.client.get('/api/duplicates/cases/').status_code, 401)
 
+    def test_secretary_decides_on_duplicates_by_default(self):
+        self.assertTrue(self.client_for(self.secretary).get(f'{self.base}/').data['permissions']['decide'])
+        r = self.client_for(self.secretary).post(f'{self.base}/decide/', {
+            'decision': 'DISTINCT_CHILDREN', 'reason': 'Actes de naissance des parents'}, format='json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(self.client_for(self.agent).get(f'{self.base}/').status_code, 403)   # the agent still sees nothing
+
     def test_consult_investigate_and_decide_are_distinct_permissions(self):
-        sec = self.client_for(self.secretary)
+        from accounts.models import CustomUser, RolePermission
+        # the administrator can take the right away from the role: it is a permission of its own
+        RolePermission.objects.filter(role__codename='secretary', permission__codename='duplicate.decide').delete()
+        sec = self.client_for(CustomUser.objects.get(pk=self.secretary.pk))
         self.assertEqual(sec.get(f'{self.base}/').status_code, 200)
         self.assertEqual(sec.post(f'{self.base}/take/').status_code, 200)
         self.assertEqual(sec.post(f'{self.base}/note/', {'content': 'Registre papier vérifié'}, format='json').status_code, 201)
@@ -535,19 +550,19 @@ class PermissionAndApiTests(DuplicateBase):
         detail = sec.get(f'{self.base}/').data
         self.assertEqual(len(detail['decisions']), 1)
         self.assertEqual(len(detail['evidence']), 1)
-        self.assertFalse(detail['permissions']['decide'])
+        self.assertTrue(detail['permissions']['decide'])
 
     def test_declaration_detail_exposes_the_duplicate_alert_to_those_who_see_it(self):
+        # the author of the dossier learns nothing about a possible duplicate (no oracle on the civil register)
         r = self.client_for(self.agent).get(f"/api/declarations/{self.a['uuid']}/")
         self.assertEqual(r.status_code, 200, r.content)
-        alert = r.data['duplicate_alert']
-        self.assertTrue(alert['blocked'])
-        self.assertEqual(alert['open_cases'][0]['risk_level'], 'HIGH')
-        # the agent sees that the dossier is held, but not the case itself (no case uuid, no other dossier)
-        self.assertNotIn('uuid', alert['open_cases'][0])
+        self.assertIsNone(r.data['duplicate_alert'])
         self.transition(self.agent, self.a['uuid'], 'TRANSMITTED')       # drafts are visible to their author only
         sec = self.client_for(self.secretary).get(f"/api/declarations/{self.a['uuid']}/")
-        self.assertIn('uuid', sec.data['duplicate_alert']['open_cases'][0])
+        alert = sec.data['duplicate_alert']
+        self.assertTrue(alert['blocked'])
+        self.assertEqual(alert['open_cases'][0]['risk_level'], 'HIGH')
+        self.assertIn('uuid', alert['open_cases'][0])
 
     def test_one_unresolved_case_per_pair_is_enforced_by_the_database(self):
         dup = DuplicateCase(reference='DUP-X', pair_key=self.case.pair_key, match=self.case.match,
@@ -560,3 +575,120 @@ class PermissionAndApiTests(DuplicateBase):
         r = self.client_for(self.admin).get('/api/inbox/')
         self.assertEqual(r.data['badges'].get('/duplicates'), 1)
         self.assertNotIn('/duplicates', self.client_for(self.agent).get('/api/inbox/').data['badges'])
+
+
+# ── redundant entry: rejected and left out of the lists ──────────
+
+class RedundantEntryTests(DuplicateBase):
+    def listed(self, user, **params):
+        r = self.client_for(user).get('/api/declarations/', params)
+        self.assertEqual(r.status_code, 200)
+        return {x['uuid'] for x in r.data['results']}
+
+    def pair(self):
+        a, b = self.mk(self.agent), self.mk(self.agent2)
+        return a, b, self.case_for(a['uuid'], b['uuid'])
+
+    def test_confirmed_duplicate_rejects_the_redundant_dossier_and_hides_it_from_the_lists(self):
+        a, b, case = self.pair()
+        self.assertLessEqual({a['uuid'], b['uuid']}, self.listed(self.admin))
+        self.assertIn(b['uuid'], self.listed(self.agent2))
+        r = self.decide(self.admin, case, 'CONFIRMED_DUPLICATE', 'Même enfant', duplicate_declaration=b['uuid'])
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.data['redundant_outcome'], 'rejected')
+        redundant = Declaration.objects.get(uuid=b['uuid'])
+        self.assertEqual(redundant.status, 'REJECTED')
+        self.assertIn('Saisie redondante', redundant.last_decision_reason)
+        history = redundant.status_history.first()
+        self.assertEqual((history.to_status, history.changed_by), ('REJECTED', self.admin))
+        self.assertTrue(AuditLog.objects.filter(action='reject', object_id=str(redundant.uuid)).exists())
+        # the principal stays valid and listed; the redundant one is in nobody's list
+        for user in (self.admin, self.agent, self.agent2):
+            self.assertNotIn(b['uuid'], self.listed(user), user)
+        self.assertIn(a['uuid'], self.listed(self.admin))
+        self.assertNotIn(b['uuid'], self.listed(self.admin, status='REJECTED'))
+        # still reachable by its link (Centre des doublons, history) and nothing is deleted
+        self.assertEqual(self.client_for(self.admin).get(f"/api/declarations/{b['uuid']}/").status_code, 200)
+        self.assertEqual(Declaration.objects.count(), 2)
+        # and the principal can be validated as before
+        self.to_pending(a['uuid'])
+        self.assertEqual(self.validate(self.admin, a['uuid'], '2001').status_code, 200)
+
+    def test_redundant_dossier_is_left_out_of_the_figures(self):
+        a, b, case = self.pair()
+        before = self.client_for(self.admin).get('/api/stats/dashboard/')
+        self.assertEqual(before.status_code, 200, before.content)
+        self.assertEqual(self.decide(self.admin, case, 'CONFIRMED_DUPLICATE', 'Même enfant',
+                                     duplicate_declaration=b['uuid']).status_code, 200)
+        after = self.client_for(self.admin).get('/api/stats/dashboard/')
+        self.assertEqual(after.data['kpis']['rejected'], 0)
+        self.assertEqual(after.data['kpis']['births_declared'], before.data['kpis']['births_declared'] - 1)
+
+    def test_data_entry_error_also_rejects_the_redundant_entry(self):
+        a, b, case = self.pair()
+        r = self.decide(self.admin, case, 'DATA_ENTRY_ERROR', 'Saisie faite deux fois par erreur',
+                        duplicate_declaration=a['uuid'])
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(Declaration.objects.get(uuid=a['uuid']).status, 'REJECTED')
+        self.assertNotIn(a['uuid'], self.listed(self.admin))
+        self.assertIn(b['uuid'], self.listed(self.admin))
+
+    def test_other_decisions_keep_both_dossiers_listed(self):
+        a, b, case = self.pair()
+        self.assertEqual(self.decide(self.admin, case, 'DISTINCT_CHILDREN', 'Actes des parents').status_code, 200)
+        self.assertLessEqual({a['uuid'], b['uuid']}, self.listed(self.admin))
+        self.assertEqual({Declaration.objects.get(uuid=x['uuid']).status for x in (a, b)}, {'DRAFT'})
+
+    def test_reopening_brings_the_redundant_dossier_back_as_it_was(self):
+        a, b, case = self.pair()
+        self.to_pending(b['uuid'])
+        self.assertEqual(self.decide(self.admin, case, 'CONFIRMED_DUPLICATE', 'Même enfant',
+                                     duplicate_declaration=b['uuid']).status_code, 200)
+        self.assertEqual(Declaration.objects.get(uuid=b['uuid']).status, 'REJECTED')
+        r = self.client_for(self.admin).post(f'/api/duplicates/cases/{case.uuid}/reopen/',
+                                             {'reason': 'Pièce nouvelle'}, format='json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(Declaration.objects.get(uuid=b['uuid']).status, 'PENDING_VALIDATION')
+        self.assertIn(b['uuid'], self.listed(self.admin))
+
+    def test_a_dossier_rejected_for_another_reason_is_not_restored_by_a_reopening(self):
+        a, b, case = self.pair()
+        self.to_pending(b['uuid'])
+        self.assertEqual(self.transition(self.admin, b['uuid'], 'REJECTED', reason='Pièces illisibles').status_code, 200)
+        self.assertEqual(self.decide(self.admin, case, 'CONFIRMED_DUPLICATE', 'Même enfant',
+                                     duplicate_declaration=b['uuid']).data['redundant_outcome'], 'already_rejected')
+        self.client_for(self.admin).post(f'/api/duplicates/cases/{case.uuid}/reopen/', {'reason': 'Pièce nouvelle'},
+                                         format='json')
+        self.assertEqual(Declaration.objects.get(uuid=b['uuid']).status, 'REJECTED')
+
+    def test_a_validated_dossier_is_never_rejected_automatically(self):
+        a = self.mk(self.agent)
+        self.to_pending(a['uuid'])
+        self.assertEqual(self.validate(self.admin, a['uuid'], '2101').status_code, 200)
+        b = self.mk(self.agent2)
+        case = self.case_for(a['uuid'], b['uuid'])
+        r = self.decide(self.admin, case, 'CONFIRMED_DUPLICATE', 'Même enfant', duplicate_declaration=a['uuid'])
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.data['redundant_outcome'], 'kept')
+        self.assertTrue(r.data['warnings'])
+        self.assertEqual(Declaration.objects.get(uuid=a['uuid']).status, 'VALIDATED')
+        self.assertIn(a['uuid'], self.listed(self.admin))                  # an official act never disappears
+
+    def test_command_applies_old_decisions_to_dossiers_that_were_not_rejected(self):
+        from io import StringIO
+        from django.core.management import call_command
+        a, b, case = self.pair()
+        self.assertEqual(self.decide(self.admin, case, 'CONFIRMED_DUPLICATE', 'Même enfant',
+                                     duplicate_declaration=b['uuid']).status_code, 200)
+        # a decision taken before the rejection became automatic: the dossier is still in its old status
+        Declaration.objects.filter(uuid=b['uuid']).update(status='DRAFT')
+        self.assertIn(b['uuid'], self.listed(self.admin))
+        out = StringIO()
+        call_command('reject_confirmed_duplicates', stdout=out)           # preview: nothing changes
+        self.assertEqual(Declaration.objects.get(uuid=b['uuid']).status, 'DRAFT')
+        call_command('reject_confirmed_duplicates', '--apply', stdout=out)
+        self.assertEqual(Declaration.objects.get(uuid=b['uuid']).status, 'REJECTED')
+        self.assertNotIn(b['uuid'], self.listed(self.admin))
+        rows = Declaration.objects.get(uuid=b['uuid']).status_history.count()
+        call_command('reject_confirmed_duplicates', '--apply', stdout=out)  # idempotent
+        self.assertEqual(Declaration.objects.get(uuid=b['uuid']).status_history.count(), rows)

@@ -49,4 +49,5 @@ class DuplicateAuditService:
     def log_check(user, declaration, check):
         return audit.log(AuditAction.DUPLICATE_CHECK, user=user, obj=declaration, changes={
             'trigger': check.trigger, 'candidates': check.candidates_examined,
-            'matches': check.matches_found, 'highest_score': check.highest_score})
+            'matches': check.matches_found, 'highest_score': check.highest_score,
+            **({'truncated': True} if check.candidates_truncated else {})})

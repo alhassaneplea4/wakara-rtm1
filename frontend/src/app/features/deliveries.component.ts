@@ -84,7 +84,6 @@ import { IconComponent, PageHeaderComponent, PaginationComponent } from '../shar
           @if (detail(); as d) {
             <div class="pbody">
               <div class="row actions">
-                <a class="btn btn-primary btn-sm" [routerLink]="['/actes', s.acte_uuid, 'document']" (click)="close()"><wk-icon name="eye" [size]="14" /> Voir l'acte</a>
                 <a class="btn btn-sm" [routerLink]="['/declarations', s.declaration_uuid]" (click)="close()"><wk-icon name="file" [size]="14" /> Voir le dossier</a>
               </div>
 

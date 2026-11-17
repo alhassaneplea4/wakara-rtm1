@@ -1,4 +1,5 @@
 """Phone / e-mail validation and nationality of the parents and the declarant (fictional data only)."""
+from django.utils import timezone
 import datetime
 
 from rest_framework import serializers
@@ -84,7 +85,7 @@ class PhoneOnDeclarationsTests(WakaraTestCase):
         self.assertEqual(bad.status_code, 400, bad.content)
 
     def test_age_rank_and_parent_birth_date_are_bounded(self):
-        future = (datetime.date.today() + datetime.timedelta(days=2)).isoformat()
+        future = (timezone.localdate() + datetime.timedelta(days=2)).isoformat()
         for section, payload in (
                 ('mother', {'first_names': 'F', 'age': 200}),
                 ('mother', {'first_names': 'F', 'age': -1}),

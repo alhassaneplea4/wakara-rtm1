@@ -1,4 +1,5 @@
 """« Historiques des actes » : the administrator reads who did what on every dossier."""
+from django.utils import timezone
 import datetime
 import shutil
 import tempfile
@@ -155,7 +156,7 @@ class DossierHistoryTests(WakaraTestCase):
         self.assertEqual(ids(kind='creation'), {uuid, pending})
         self.assertEqual(ids(status='DELIVERED'), {uuid})
         self.assertEqual(ids(status='DRAFT'), {pending})
-        today = datetime.date.today().isoformat()
+        today = timezone.localdate().isoformat()
         self.assertEqual(ids(**{'from': today, 'to': today}), {uuid, pending})
         self.assertEqual(ids(**{'from': '2000-01-01', 'to': '2000-01-02'}), set())
         self.assertEqual(ids(user=str(self.agent.uuid), kind='delivrance'), set())     # combined: the agent delivered nothing

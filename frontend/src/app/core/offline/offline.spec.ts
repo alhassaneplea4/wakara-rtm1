@@ -4,11 +4,11 @@ import { Subject, firstValueFrom, of, throwError } from 'rxjs';
 import { decryptJson, encryptJson, sha256Hex } from './crypto';
 import { OfflineDb, countUnsynced, deleteDb } from './db';
 import { LocalApi } from './local-api';
-import { localReference, materialize, mergeWrite, missingForTransmission, syncStateOf } from './materialize';
+import { WORKFLOW, localReference, materialize, mergeWrite, missingForTransmission, syncStateOf, userTransitions } from './materialize';
 import { OfflineStore } from './store';
 import { SyncEngine } from './sync';
 import { LocalDeclaration, Op, PushResult } from './types';
-import { PinError, changeVaultPin, createVault, destroyVault, loadVaultSession, openVault, pinProblem, saveVaultSession } from './vault';
+import { PinError, changeVaultPin, clearVaultSession, createVault, destroyVault, loadVaultSession, openVault, pinProblem, saveVaultSession } from './vault';
 import { readVaultHeader, writeVaultHeader } from './vault-header';
 
 const API = '/api';
@@ -35,10 +35,17 @@ describe('Offline vault (PIN)', () => {
   afterAll(() => writeVaultHeader(null));
 
   it('refuses weak codes', () => {
-    expect(pinProblem('12345')).toContain('au moins 6');
-    expect(pinProblem('000000')).toContain('trop simple');
-    expect(pinProblem('123456')).toContain('trop simple');
-    expect(pinProblem('482915')).toBe('');
+    expect(pinProblem('12345')).toContain('au moins 8');
+    expect(pinProblem('00000000')).toContain('trop simple');
+    expect(pinProblem('12345678')).toContain('trop simple');
+    expect(pinProblem('482915')).toContain('au moins 8');
+    expect(pinProblem('48291563')).toContain('lettres et des chiffres');   // digits only: falls to a graphics card in minutes
+    expect(pinProblem('abcdefgh')).toContain('trop simple');
+    expect(pinProblem('kadiatou')).toContain('lettres et des chiffres');
+    expect(pinProblem('Wakara2026')).toContain('trop courant');
+    expect(pinProblem('Fatou4827')).toBe('');
+    expect(pinProblem('mon enfant est ne a ratoma')).toBe('');            // a long phrase needs no digit
+    expect(pinProblem('aaaa1111')).toContain('trop peu');
   });
 
   it('opens with the right code only, and counts wrong attempts', async () => {
@@ -87,6 +94,15 @@ describe('Offline vault (PIN)', () => {
     destroyVault();
     expect(readVaultHeader()).toBeNull();
     expect(localStorage.getItem('wk_vault_session')).toBeNull();
+  });
+
+  it('sign-out keeps the vault (the code is created once per device) but removes the saved session', async () => {
+    const key = await createVault('482915', USER, FAST);
+    await saveVaultSession(key, { access: 'a', refresh: 'r', me: {} as any });
+    clearVaultSession();
+    expect(readVaultHeader()?.user.uuid).toBe(USER.uuid);            // same code, no new set-up
+    expect(await loadVaultSession(key)).toBeNull();                  // data cannot be reopened without a new sign-in
+    await expectAsync(openVault('482915')).toBeResolved();           // the code still unlocks the device
   });
 });
 
@@ -145,13 +161,15 @@ describe('Offline view of a dossier', () => {
   it('folds successive edits into one payload', () => {
     const merged = mergeWrite(payload(), { birth_place: 'Kipé', child: { gender: 'M' }, father: null, acte: { numero_acte: '1' } });
     expect([merged['birth_place'], merged['child'], merged['father']]).toEqual(['Kipé', { first_names: 'Aminata', last_name: 'Diallo', gender: 'M' }, null]);
-    expect('acte' in merged).toBeFalse();
+    // the registry header (secretariat) is folded like the other sections
+    expect(merged['acte']).toEqual({ numero_acte: '1' });
+    expect(mergeWrite(merged, { acte: { registre: 'R2' } })['acte']).toEqual({ numero_acte: '1', registre: 'R2' });
   });
 
   it('mirrors the transmission rule of the server', () => {
     const d = materialize('d1', null, [op({ payload: payload({ birth_time: null, child: { gender: '' } }) })], ctx)!;
-    expect(missingForTransmission(d, ['birth_date', 'birth_time', 'birth_place', 'child.gender', 'mother.name', 'father.name', 'acte.registre']))
-      .toEqual(['birth_time', 'child.gender', 'father.name']);
+    expect(missingForTransmission(d, ['birth_date', 'birth_time', 'birth_place', 'child.gender', 'mother.name', 'father.name', 'acte.registre', 'acte.declaration_date']))
+      .toEqual(['birth_time', 'child.gender', 'father.name', 'acte.registre']);   // the date of declaration is set by the server
   });
 });
 
@@ -229,7 +247,7 @@ describe('Offline queue and synchronisation', () => {
   let userUuid: string;
   const online = signal(false);
   const expired = signal(false);
-  let host: { messages: string[]; revoked: boolean };
+  let host: { messages: string[]; revoked: boolean; signIn: number };
   const conn: any = { online, offlineEnabled: signal(true), changes: new Subject<boolean>(), check: async () => online(), reportFailure: () => online.set(false), start: () => undefined };
   const offlineNext = () => throwError(() => new HttpErrorResponse({ status: 0 }));
 
@@ -247,9 +265,9 @@ describe('Offline queue and synchronisation', () => {
     store = new OfflineStore(db, key, () => ({ userName: 'Agent Test', canUpdate: true, canTransmit: true }));
     await store.setSecret('hospitals', ctx.hospitals);
     server = new FakeServer();
-    host = { messages: [], revoked: false };
+    host = { messages: [], revoked: false, signIn: 0 };
     sync = new SyncEngine(store, server as any, conn, {
-      syncing: () => undefined, synced: () => undefined, failed: m => host.messages.push(m), deviceRevoked: () => { host.revoked = true; },
+      syncing: () => undefined, synced: () => undefined, failed: m => host.messages.push(m), deviceRevoked: () => { host.revoked = true; }, deviceLimit: () => undefined, signInRequired: () => { host.signIn++; },
       changed: () => undefined, sessionExpired: () => expired(),
     }, { apiUrl: API, deviceId: 'device-1', deviceLabel: 'Test', userUuid });
     api = new LocalApi(store, conn, { apiUrl: API, userName: () => 'Agent Test', sessionExpired: () => expired(), changed: () => undefined });
@@ -463,11 +481,14 @@ describe('Offline queue and synchronisation', () => {
     expect((await call('GET', '/hospitals/')).body.results[0].name).toBe('Clinique');
   });
 
-  it('leaves the other endpoints to the network', async () => {
-    const res = await call('GET', '/users/', null, {}, () => of(new HttpResponse({ body: 'réseau', status: 200 })));
-    expect(res.body).toBe('réseau');
+  it('leaves the other endpoints to the network, and keeps what they answered for offline reading', async () => {
+    online.set(true);
+    const res = await call('GET', '/users/', null, {}, () => of(new HttpResponse({ body: { count: 1, results: ['réseau'] }, status: 200 })));
+    expect(res.body.results).toEqual(['réseau']);
     const validate = await call('POST', '/declarations/00000000-0000-0000-0000-000000000000/transition/', { status: 'VALIDATED' }, {}, () => of(new HttpResponse({ body: 'réseau', status: 200 })));
     expect(validate.body).toBe('réseau');
+    online.set(false);
+    expect((await call('GET', '/users/')).body.results).toEqual(['réseau']);    // read again from the device
   });
 
   it('a revoked device is reported and keeps its queue', async () => {
@@ -478,6 +499,70 @@ describe('Offline queue and synchronisation', () => {
     expect(host.revoked).toBeTrue();
     expect(await store.counts()).toEqual({ waiting: 1, problems: 0 });
   });
+
+  it('receives the facilities and the rules first, even when the dossiers cannot be pulled', async () => {
+    await store.setSecret('hospitals', []);
+    online.set(true);
+    const calls: string[] = [];
+    (server as any).get = (url: string) => {
+      calls.push(url);
+      return url.endsWith('/sync/reference/')
+        ? of({ server_time: new Date().toISOString(), offline_enabled: true, hospitals: [{ uuid: 'h9', code: 'NEW', name: 'Maternité du Port' }],
+               rules: { required_for_transmission: ['birth_date'], required_for_submission: ['child.nationality'], max_upload_size: 1048576, max_batch: 5 } })
+        : throwError(() => new HttpErrorResponse({ status: 500 }));
+    };
+    await sync.run();
+    expect(calls[0]).toContain('/sync/reference/');
+    expect((await store.hospitals()).map(h => h.name)).toEqual(['Maternité du Port']);
+    const rules = await store.rules();
+    expect([rules.required_for_submission, rules.max_batch]).toEqual([['child.nationality'], 5]);
+    expect(await store.referenceAt()).not.toBeNull();
+    expect(host.messages.at(-1)).toContain('interrompue');       // the pull failed, the reference data are kept anyway
+  });
+
+  it('an empty list from the server never blanks the facilities already on the device', async () => {
+    online.set(true);
+    (server as any).get = () => of({ server_time: new Date().toISOString(), offline_enabled: true, cursor: null, has_more: false, declarations: [], hospitals: [], rules: { required_for_transmission: [], max_upload_size: 1, max_batch: 1 } });
+    await sync.run();
+    expect((await store.hospitals()).map(h => h.name)).toEqual(['Clinique']);
+  });
+
+  it('a device that learned the dossiers before the secretariat could use it starts its pull again once', async () => {
+    await store.setClear('cursor', '2026-11-12T00:00:00+00:00');
+    await store.setClear('schema', 1);
+    await store.migrate();
+    expect(await store.clear<string | null>('cursor', null)).toBeNull();
+    await store.setClear('cursor', '2026-11-13T00:00:00+00:00');
+    await store.migrate();                                               // already migrated: the cursor stays
+    expect(await store.clear<string | null>('cursor', null)).toBe('2026-11-13T00:00:00+00:00');
+  });
+
+  it('keeps the pages it reads online encrypted, and says clearly when a page was never consulted', async () => {
+    online.set(true);
+    await call('GET', '/stats/summary/', null, {}, () => of(new HttpResponse({ body: { total: 12, secret: 'Confidentiel' }, status: 200 })));
+    online.set(false);
+    expect((await call('GET', '/stats/summary/')).body.total).toBe(12);
+    expect(JSON.stringify(await db.cache.toArray())).not.toContain('Confidentiel');
+    const never: any = await call('GET', '/audit/').catch(e => e);
+    expect([never.status, never.error.detail]).toEqual([503, jasmine.stringContaining('première consultation')]);
+  });
+
+  it('refuses, with a reason, what cannot be queued (users, roles, settings, decisions on duplicates)', async () => {
+    const res: any = await call('POST', '/users/', { username: 'x' }).catch(e => e);
+    expect([res.status, res.error.detail]).toEqual([503, jasmine.stringContaining('connexion au serveur')]);
+  });
+
+  for (const code of ['device_binding_required', 'device_mismatch']) {
+    it(`asks for a new sign-in when the session is not bound to this device (${code}) and keeps the queue`, async () => {
+      await create();
+      online.set(true);
+      server.post = () => throwError(() => new HttpErrorResponse({ status: 403, error: { code, detail: 'Reconnectez-vous.' } }));
+      await sync.run();
+      expect(host.signIn).toBe(1);
+      expect(host.messages.at(-1)).toContain('Reconnectez-vous');
+      expect(await store.counts()).toEqual({ waiting: 1, problems: 0 });
+    });
+  }
 });
 
 function form(declaration: string, file: File): FormData {
@@ -485,3 +570,192 @@ function form(declaration: string, file: File): FormData {
   fd.append('declaration', declaration); fd.append('kind', 'PAPER_FORM'); fd.append('file', file);
   return fd;
 }
+
+/* ───────────────────────── secretariat, validators, administrator ───────────────────────── */
+
+describe('Offline mode for the other roles', () => {
+  const D1 = '11111111-1111-4111-8111-111111111111';
+  const D2 = '22222222-2222-4222-8222-222222222222';
+  const A1 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const BACK_OFFICE = ['declaration.view', 'declaration.view_all', 'acte.view', 'acte.update', 'acte.submit', 'document.upload', 'dossier.validate', 'dossier.reject', 'hospital.view'];
+  const HEADER = { uuid: A1, declaration_uuid: D1, registre: '', feuillet: '', annee: 2026, numero_acte: null, declaration_date: null, can_edit: true };
+  const DECLARANT = { first_names: 'Mamadou', last_name: 'Diallo', relationship: 'Père' };
+
+  let db: OfflineDb, store: OfflineStore, api: LocalApi, userUuid: string, perms: string[];
+  const online = signal(false);
+  const conn: any = { online, offlineEnabled: signal(true), changes: new Subject<boolean>(), check: async () => online(), reportFailure: () => online.set(false), start: () => undefined };
+  const offlineNext = () => throwError(() => new HttpErrorResponse({ status: 0 }));
+  const reached = (body: any) => () => of(new HttpResponse({ body, status: 200 }));
+  const call = async (method: string, path: string, body: any = null, next: any = offlineNext) =>
+    (await firstValueFrom(api.handle(new HttpRequest<any>(method as any, API + path, body, { params: new HttpParams() }), next))) as HttpResponse<any>;
+  const refused = (method: string, path: string, body: any = null) => call(method, path, body).then(() => null as any, (e: any) => e);
+
+  const seed = async (over: Record<string, any> = {}) => {
+    await store.putServer(serverRow({ uuid: D1, status: 'TRANSMITTED', acte_uuid: A1, acte: { ...HEADER }, sync_version: 4, can_edit: false, ...over }) as any);
+  };
+
+  beforeEach(async () => {
+    userUuid = `back-${Math.random().toString(36).slice(2)}`;
+    online.set(false); perms = [...BACK_OFFICE];
+    const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    db = new OfflineDb(userUuid);
+    store = new OfflineStore(db, key, () => ({ userName: 'Secrétaire Test', canUpdate: false, canTransmit: false, can: (p: string) => perms.includes(p), today: '2026-11-17' }));
+    await store.setSecret('hospitals', ctx.hospitals);
+    await store.setSecret('rules', { required_for_transmission: ['birth_date'], required_for_submission: ['declarant.first_names', 'acte.registre'], expected_for_validation: ['child.nationality'], max_upload_size: 4194304, max_batch: 20 });
+    api = new LocalApi(store, conn, {
+      apiUrl: API, userName: () => 'Secrétaire Test', sessionExpired: () => false, changed: () => undefined,
+      can: p => perms.includes(p), localFirst: () => false,
+    });
+  });
+  afterEach(async () => { db.close(); await deleteDb(userUuid); });
+
+  it('mirrors the workflow of the server: each role sees the steps it could take online', () => {
+    const can = (list: string[]) => (p: string) => list.includes(p);
+    expect(userTransitions('TRANSMITTED', can(BACK_OFFICE), false).map(t => t.target)).toEqual(['PENDING_VALIDATION']);
+    expect(userTransitions('PENDING_VALIDATION', can(BACK_OFFICE), false).map(t => t.target)).toEqual(['VALIDATED', 'TO_CORRECT_COLLECTION', 'TO_CORRECT_SECRETARIAT', 'REJECTED']);
+    expect(userTransitions('PENDING_VALIDATION', can(['acte.submit']), false)).toEqual([]);          // no right to decide
+    expect(userTransitions('PENDING_VALIDATION', can(BACK_OFFICE), true)).toEqual([]);               // six-month rule
+    expect(userTransitions('VALIDATED', can(BACK_OFFICE), false)).toEqual([]);                       // frozen
+    expect(WORKFLOW.filter(t => t.reason_required).map(t => t.target)).toEqual(['TO_CORRECT_COLLECTION', 'TO_CORRECT_SECRETARIAT', 'REJECTED']);
+  });
+
+  it('offline, the secretariat completes the registry header of a transmitted dossier', async () => {
+    await seed();
+    const view = (await call('GET', `/declarations/${D1}/`)).body;
+    expect(view.can_edit).toBeTrue();                          // the secretariat may edit a transmitted dossier
+    const res = await call('PATCH', `/declarations/${D1}/`, { doctor_name: 'Dr Corrigé', acte: { registre: 'R7', feuillet: '12' } });
+    expect(res.body.doctor_name).toBe('Dr Corrigé');
+    const [queued] = await store.ops();
+    expect([queued.type, queued.baseVersion, queued.payload!['acte']]).toEqual(['declaration.update', 4, { registre: 'R7', feuillet: '12' }]);
+    const header = (await call('GET', `/actes/${A1}/`)).body;     // the registry screen reads what waits on the device
+    expect([header.registre, header.feuillet, header.uuid]).toEqual(['R7', '12', A1]);
+    // a second edit before sending rides on the same operation
+    await call('PATCH', `/declarations/${D1}/`, { acte: { registre: 'R8' } });
+    expect((await store.ops()).length).toBe(1);
+    expect((await store.ops())[0].payload!['acte']).toEqual({ registre: 'R8', feuillet: '12' });
+  });
+
+  it('a collection device never carries the registry header', async () => {
+    perms = ['declaration.view', 'declaration.update', 'declaration.transmit'];
+    await seed({ status: 'DRAFT' });
+    await call('PATCH', `/declarations/${D1}/`, { notes: 'ok', acte: { registre: 'R7' } });
+    expect((await store.ops())[0].payload).toEqual({ notes: 'ok' });
+  });
+
+  it('online, the secretariat works on the server as before and nothing is queued', async () => {
+    await seed();
+    online.set(true);
+    const answer = serverRow({ uuid: D1, status: 'TRANSMITTED', doctor_name: 'Dr Serveur', sync_version: 5 });
+    const res = await call('PATCH', `/declarations/${D1}/`, { doctor_name: 'Dr Serveur' }, reached(answer));
+    expect(res.body.doctor_name).toBe('Dr Serveur');
+    expect(await store.ops()).toEqual([]);
+    expect(((await store.server(D1)) as any).sync_version).toBe(5);        // the copy of the device follows
+    expect(((await store.server(D1)) as any).acte.uuid).toBe(A1);         // … without losing the registry header
+  });
+
+  it('online but the server stops answering during the write: the operation is queued, not lost', async () => {
+    await seed();
+    online.set(true);
+    await call('PATCH', `/declarations/${D1}/`, { doctor_name: 'Dr Coupé' });
+    expect((await store.ops()).map(o => o.type)).toEqual(['declaration.update']);
+    expect(online()).toBeFalse();
+  });
+
+  it('a dossier with operations waiting keeps going through the queue, even online', async () => {
+    await seed();
+    await call('PATCH', `/declarations/${D1}/`, { doctor_name: 'Avant' });
+    online.set(true);
+    let reachedServer = false;
+    await call('PATCH', `/declarations/${D1}/`, { notes: 'Après' }, () => { reachedServer = true; return of(new HttpResponse({ body: {}, status: 200 })); });
+    expect(reachedServer).toBeFalse();
+    expect((await store.ops())[0].payload).toEqual({ doctor_name: 'Avant', notes: 'Après' });
+  });
+
+  it('submits to validation only when the required data are there, then shows the dossier as submitted', async () => {
+    await seed();
+    const early = await refused('POST', `/declarations/${D1}/transition/`, { status: 'PENDING_VALIDATION' });
+    expect([early.status, early.error.detail]).toEqual([400, jasmine.stringContaining('registre')]);
+    await call('PATCH', `/declarations/${D1}/`, { declarant: DECLARANT, acte: { registre: 'R7' } });
+    const res = await call('POST', `/declarations/${D1}/transition/`, { status: 'PENDING_VALIDATION' });
+    expect(res.body.status).toBe('PENDING_VALIDATION');
+    expect(res.body.available_transitions.map((t: any) => t.target)).toEqual(['VALIDATED', 'TO_CORRECT_COLLECTION', 'TO_CORRECT_SECRETARIAT', 'REJECTED']);
+    const ops = await store.ops();
+    expect(ops.map(o => o.type)).toEqual(['declaration.update', 'declaration.transition']);
+    // taken on top of the device's own change: no version guard, but the step it saw is recorded
+    expect([ops[1].baseVersion, ops[1].payload!['from_status'], ops[1].payload!['status']]).toEqual([null, 'TRANSMITTED', 'PENDING_VALIDATION']);
+  });
+
+  it('a decision taken on the dossier as pulled carries the version and the step it saw', async () => {
+    await seed({ status: 'PENDING_VALIDATION', declarant: DECLARANT });
+    await call('POST', `/declarations/${D1}/transition/`, { status: 'TO_CORRECT_COLLECTION', reason: 'Date illisible' });
+    const [decision] = await store.ops();
+    expect([decision.baseVersion, decision.payload]).toEqual([4, { status: 'TO_CORRECT_COLLECTION', reason: 'Date illisible', from_status: 'PENDING_VALIDATION' }]);
+    expect((await store.view(D1))!.status).toBe('TO_CORRECT_COLLECTION');
+    expect((await store.view(D1))!.status_history[0].reason).toBe('Date illisible');
+  });
+
+  it('sending back or rejecting needs a reason; an impossible step is refused like online', async () => {
+    await seed({ status: 'PENDING_VALIDATION' });
+    const noReason = await refused('POST', `/declarations/${D1}/transition/`, { status: 'REJECTED' });
+    expect([noReason.status, noReason.error.reason[0]]).toEqual([400, 'Un motif est obligatoire pour cette décision.']);
+    const impossible = await refused('POST', `/declarations/${D1}/transition/`, { status: 'DELIVERED' });
+    expect([impossible.status, impossible.error.code]).toEqual([400, 'invalid_transition']);
+    expect(await store.ops()).toEqual([]);
+  });
+
+  it('final validation asks for the official number, then for the confirmation when expected fields are empty', async () => {
+    await seed({ status: 'PENDING_VALIDATION', acte: { ...HEADER, annee: null } });
+    const noYear = await refused('POST', `/declarations/${D1}/transition/`, { status: 'VALIDATED' });
+    expect(noYear.error.annee[0]).toContain('année');
+    const noNumber = await refused('POST', `/declarations/${D1}/transition/`, { status: 'VALIDATED', annee: 2026 });
+    expect(noNumber.error.numero_acte[0]).toContain('numéro officiel');
+    const warned = await refused('POST', `/declarations/${D1}/transition/`, { status: 'VALIDATED', annee: 2026, registre: 'R1', numero_acte: '4521' });
+    expect([warned.status, warned.error.code, warned.error.missing_fields]).toEqual([409, 'incomplete_confirmation_required', ['child.nationality']]);
+    expect(await store.ops()).toEqual([]);                                  // nothing is queued before the confirmation
+    const done = await call('POST', `/declarations/${D1}/transition/`, { status: 'VALIDATED', annee: 2026, registre: 'R1', numero_acte: '4521', accept_incomplete: true });
+    expect([done.body.status, done.body.official_number, done.body.available_transitions]).toEqual(['VALIDATED', '4521', []]);
+    expect((await store.ops())[0].payload).toEqual(jasmine.objectContaining({ status: 'VALIDATED', numero_acte: '4521', annee: 2026, accept_incomplete: true, from_status: 'PENDING_VALIDATION' }));
+  });
+
+  it('a step the server refused is replaced by the new attempt, not stacked', async () => {
+    await seed({ status: 'PENDING_VALIDATION' });
+    await call('POST', `/declarations/${D1}/transition/`, { status: 'TO_CORRECT_SECRETARIAT', reason: 'Nom à vérifier' });
+    const [first] = await store.ops();
+    first.status = 'rejected'; first.error = { code: 'forbidden', detail: 'Refusé' };
+    await store.saveOp(first);
+    expect((await store.view(D1))!.status).toBe('PENDING_VALIDATION');    // a refused step does not show as taken
+    await call('POST', `/declarations/${D1}/transition/`, { status: 'REJECTED', reason: 'Doublon avéré' });
+    expect((await store.ops()).map(o => (o.payload as any).status)).toEqual(['REJECTED']);
+  });
+
+  it('the six-month rule locks the dossier on the device for whoever may not override it', async () => {
+    await seed({ deadline: { months: 6, reference_date: '2026-03-01', deadline_date: '2026-09-01', applies: true, overdue: true, days_over: 77, message: 'Ce dossier date de plus de 6 mois : il doit être traité aux tribunaux.', can_override: false } });
+    const view = (await call('GET', `/declarations/${D1}/`)).body;
+    expect([view.can_edit, view.available_transitions, view.overdue]).toEqual([false, [], true]);
+    const edit = await refused('PATCH', `/declarations/${D1}/`, { notes: 'x' });
+    expect([edit.status, edit.error.detail]).toEqual([403, jasmine.stringContaining('tribunaux')]);
+    const step = await refused('POST', `/declarations/${D1}/transition/`, { status: 'PENDING_VALIDATION' });
+    expect(step.status).toBe(400);
+    perms = [...BACK_OFFICE, 'dossier.override_deadline'];                  // the administrator keeps the hand
+    expect((await call('GET', `/declarations/${D1}/`)).body.can_edit).toBeTrue();
+  });
+
+  it('lists the dossiers it holds with the filters of the secretariat, without any network', async () => {
+    await seed({ status: 'PENDING_VALIDATION' });
+    await store.putServer(serverRow({ uuid: D2, reference: 'WKR-2026-0002', status: 'TRANSMITTED', deadline: { deadline_date: '2026-01-01', applies: true, overdue: true } }) as any);
+    const list = async (query: string) => (await firstValueFrom(api.handle(new HttpRequest<any>('GET', `${API}/declarations/?${query}`, null, { params: new HttpParams({ fromString: query }) }), offlineNext)) as HttpResponse<any>).body;
+    expect((await list('status=PENDING_VALIDATION')).results.map((r: any) => r.uuid)).toEqual([D1]);
+    expect((await list('overdue=true')).results.map((r: any) => r.uuid)).toEqual([D2]);
+    expect((await list('overdue=true')).results[0].overdue).toBeTrue();
+    expect((await list('page_size=1')).results.length).toBe(1);
+  });
+
+  it('the pending documents of a dossier of the secretariat are queued like the agent\'s', async () => {
+    await seed();
+    const fd = new FormData();
+    fd.append('declaration', D1); fd.append('kind', 'OTHER'); fd.append('file', new File([new Uint8Array(10)], 'piece.pdf', { type: 'application/pdf' }));
+    const res = await call('POST', '/documents/', fd);
+    expect(res.status).toBe(201);
+    expect((await store.ops()).map(o => o.type)).toEqual(['document.upload']);
+  });
+});

@@ -11,7 +11,7 @@ import { LocalApi } from './local-api';
 import { OfflineStore } from './store';
 import { SyncEngine } from './sync';
 import { LocalDeclaration, LogRow, OpView } from './types';
-import { VaultSession, changeVaultPin, createVault, destroyVault, loadVaultSession, openVault, pinProblem, saveVaultSession } from './vault';
+import { VaultSession, changeVaultPin, clearVaultSession, createVault, destroyVault, loadVaultSession, openVault, pinProblem, saveVaultSession } from './vault';
 
 export { PinError, pinProblem, PIN_MIN_LENGTH } from './vault';
 
@@ -21,6 +21,9 @@ export interface EngineHost {
   synced(at: string | null): void;
   failed(message: string): void;
   deviceRevoked(): void;
+  deviceLimit(): void;
+  /** A collection agent works device-first; the other roles work on the server when it answers and queue otherwise. */
+  collectionProfile?(): boolean;
   /** Tells the screens that what they show may have changed. */
   bump(): void;
 }
@@ -30,7 +33,7 @@ export interface EngineDeps {
   apiUrl: string; deviceId: string; deviceLabel: string;
 }
 
-export const vault = { create: createVault, open: openVault, changePin: changeVaultPin, destroy: destroyVault, pinProblem };
+export const vault = { create: createVault, open: openVault, changePin: changeVaultPin, destroy: destroyVault, clearSession: clearVaultSession, pinProblem };
 export const storage = { countUnsynced, deleteDb };
 
 export class OfflineEngine {
@@ -44,13 +47,15 @@ export class OfflineEngine {
     this.db = new OfflineDb(userUuid);
     this.store = new OfflineStore(this.db, key, () => ({
       userName: auth.fullName(), canUpdate: auth.can('declaration.update'), canTransmit: auth.can('declaration.transmit'),
+      can: (permission: string) => auth.can(permission),
     }));
     this.sync = new SyncEngine(this.store, deps.http, conn, {
       syncing: v => host.syncing(v), synced: at => host.synced(at), failed: m => host.failed(m),
-      deviceRevoked: () => host.deviceRevoked(), changed: () => this.refresh(), sessionExpired: () => auth.sessionExpired(),
+      deviceRevoked: () => host.deviceRevoked(), deviceLimit: () => host.deviceLimit(), signInRequired: () => auth.expire(), changed: () => this.refresh(), sessionExpired: () => auth.sessionExpired(),
     }, { apiUrl: deps.apiUrl, deviceId: deps.deviceId, deviceLabel: deps.deviceLabel, userUuid });
     this.api = new LocalApi(this.store, conn, {
       apiUrl: deps.apiUrl, userName: () => auth.fullName(), sessionExpired: () => auth.sessionExpired(),
+      can: permission => auth.can(permission), localFirst: () => deps.host.collectionProfile?.() ?? true,
       changed: sync => { void this.refresh(); if (sync) this.sync.kick(); },
     });
   }
@@ -58,6 +63,7 @@ export class OfflineEngine {
   /** Opens the local database and brings the counters up to date. */
   async start() {
     await this.db.open();
+    await this.store.migrate();
     await this.store.resetSending();
     this.deps.host.synced(await this.store.clear<string | null>('lastSync', null));
     await this.refresh();
@@ -126,7 +132,7 @@ export class OfflineEngine {
     for (const op of await this.store.liveOps(entity)) {
       if (op.status !== 'rejected' && op.status !== 'conflict') continue;
       if (op.status === 'conflict' && op.error?.code !== 'version_conflict') continue;  // nothing to re-apply on a frozen dossier
-      if (op.type === 'declaration.update') op.baseVersion = server?.sync_version ?? op.baseVersion ?? null;
+      if (op.type === 'declaration.update' || op.type === 'declaration.transition') op.baseVersion = server?.sync_version ?? op.baseVersion ?? null;
       op.status = 'pending'; op.error = null;
       await this.store.saveOp(op);
     }

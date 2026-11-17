@@ -41,9 +41,77 @@ def visible_declarations(user, queryset=None):
     return qs.filter(created_by=user)
 
 
+def listed_declarations(queryset):
+    """
+    The declarations shown in the lists and the figures: those rejected as the redundant entry of a confirmed
+    duplicate are left out (the Centre de contrôle des doublons and the dossier itself still reach them).
+    Reopening the duplicate case brings the dossier back.
+    """
+    from django.db.models import Exists, OuterRef
+    from duplicates.models import CaseStatus, Decision, DuplicateCase
+    redundant = DuplicateCase.objects.filter(
+        duplicate_declaration=OuterRef('pk'), status=CaseStatus.RESOLVED,
+        final_decision__in=Decision.DESIGNATES_DUPLICATE)
+    return queryset.exclude(Q(status=Status.REJECTED) & Exists(redundant))
+
+
+REDUNDANT_REASON = "Saisie redondante — doublon du dossier {principal} (contrôle des doublons {case})"
+REDUNDANT_RESTORED = "Rétabli : la décision de doublon {case} a été rouverte"
+
+
+def reject_as_redundant(declaration, user, case_reference: str, principal_reference: str) -> str:
+    """
+    Reject the dossier designated as the redundant entry of a confirmed duplicate. Returns what happened:
+    ``rejected``, ``already_rejected`` or ``kept`` (an act number exists or the dossier is validated/delivered:
+    it is never touched automatically, the legal rectification procedure applies).
+    """
+    declaration = Declaration.objects.select_for_update().get(pk=declaration.pk)
+    if declaration.status == Status.REJECTED:
+        return 'already_rejected'
+    acte = getattr(declaration, 'acte', None)
+    if declaration.status in Status.FROZEN or (acte is not None and acte.numero_acte):
+        return 'kept'
+    old_status = declaration.status
+    reason = REDUNDANT_REASON.format(principal=principal_reference, case=case_reference)
+    declaration.status = Status.REJECTED
+    declaration.updated_by = user
+    declaration.last_decision_reason = reason
+    declaration.save()
+    StatusHistory.objects.create(declaration=declaration, from_status=old_status, to_status=Status.REJECTED,
+                                 changed_by=user, reason=reason)
+    audit.log(AuditAction.REJECT, user=user, obj=declaration,
+              changes={'status': {'from': old_status, 'to': Status.REJECTED}, 'redundant_of': principal_reference},
+              reason=reason)
+    return 'rejected'
+
+
+def restore_from_redundant(declaration, user, case_reference: str) -> bool:
+    """Undo ``reject_as_redundant`` when the duplicate case is reopened: back to the status it had."""
+    declaration = Declaration.objects.select_for_update().get(pk=declaration.pk)
+    if declaration.status != Status.REJECTED:
+        return False
+    last = (StatusHistory.objects.filter(declaration=declaration, to_status=Status.REJECTED)
+            .order_by('-changed_at', '-id').first())
+    if last is None or not last.reason.startswith("Saisie redondante") or case_reference not in last.reason:
+        return False   # rejected for another reason: reopening a duplicate case does not undo it
+    declaration.status = last.from_status
+    declaration.updated_by = user
+    declaration.last_decision_reason = ''
+    declaration.save()
+    reason = REDUNDANT_RESTORED.format(case=case_reference)
+    StatusHistory.objects.create(declaration=declaration, from_status=Status.REJECTED, to_status=last.from_status,
+                                 changed_by=user, reason=reason)
+    audit.log(AuditAction.TRANSITION, user=user, obj=declaration,
+              changes={'status': {'from': Status.REJECTED, 'to': last.from_status}}, reason=reason)
+    return True
+
+
 def can_edit_data(user, declaration) -> bool:
     """May ``user`` modify the identity data of this dossier in its current status?"""
     status = declaration.status
+    from core.deadline import is_locked_for
+    if is_locked_for(user, declaration):
+        return False   # past the six months: only the administrator may still act
     if status in Status.DECLARATION_EDITABLE and user_has_perm(user, 'declaration.update'):
         return user_has_perm(user, 'declaration.view_all') or declaration.created_by_id == user.id
     if status in Status.SECRETARIAT_DATA_EDITABLE and user_has_perm(user, 'acte.update'):
@@ -55,6 +123,9 @@ def can_edit_data(user, declaration) -> bool:
 
 def user_transitions(user, declaration):
     """Transitions the user can trigger right now (used by the API to drive the UI)."""
+    from core.deadline import is_locked_for
+    if is_locked_for(user, declaration):
+        return []
     result = []
     for t in available_transitions(declaration.status):
         if t.via_delivery or not user_has_perm(user, t.permission):
@@ -196,6 +267,8 @@ def update_declaration(user, declaration: Declaration, data: dict, *, expected_v
     ``expected_version`` (offline synchronisation): the edit is refused with VersionConflict when the dossier
     has changed on the server since the device read it. Nothing is overwritten silently.
     """
+    from core.deadline import assert_not_locked
+    assert_not_locked(user, declaration)
     if not can_edit_data(user, declaration):
         raise PermissionDenied("Ce dossier ne peut pas être modifié dans son état actuel ou par vous.")
     if expected_version is not None and declaration.sync_version != expected_version:
@@ -288,6 +361,8 @@ def transition_status(declaration_pk, target: str, user, reason: str = '', paylo
     payload = payload or {}
     declaration = Declaration.objects.select_for_update().get(pk=declaration_pk)
     t = get_transition(declaration.status, target)
+    from core.deadline import assert_not_locked
+    assert_not_locked(user, declaration)
     if t.via_delivery:
         raise ValidationError("Le passage à « délivré » se fait en enregistrant une délivrance.",
                               code='invalid_transition')

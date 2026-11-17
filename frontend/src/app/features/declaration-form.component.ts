@@ -64,7 +64,7 @@ const SUBMISSION_KEYS: string[] = [
                 <div class="field need" [class.missing]="miss('acte.annee')"><label>Année</label><input class="input" wkInteger min="1900" max="2200" name="a_annee" [(ngModel)]="m.acte.annee" /></div>
                 <div class="field need" [class.missing]="miss('acte.registre')"><label>Registre</label><input class="input" name="a_reg" [(ngModel)]="m.acte.registre" /></div>
                 <div class="field need" [class.missing]="miss('acte.feuillet')"><label>Feuillet</label><input class="input" name="a_feu" [(ngModel)]="m.acte.feuillet" /></div>
-                <div class="field"><label>N° officiel de l'acte</label><input class="input" name="a_num" autocomplete="off" [(ngModel)]="m.acte.numero_acte" [class.invalid]="err('numero_acte')" aria-describedby="num-help" />
+                <div class="field"><label>N° de l'acte</label><input class="input" name="a_num" autocomplete="off" [(ngModel)]="m.acte.numero_acte" [class.invalid]="err('numero_acte')" aria-describedby="num-help" />
                   <span class="field-error">{{ err('numero_acte') }}</span>
                   <small id="num-help" class="hint">Saisie libre ; l'administrateur le confirme ou le corrige à la validation.</small></div>
               </div>
@@ -91,7 +91,7 @@ const SUBMISSION_KEYS: string[] = [
               <div class="form-grid">
                 <div class="field need" [class.missing]="miss('acte.declaration_date')"><label>Date de déclaration</label><input class="input" type="date" name="a_dd" [(ngModel)]="m.acte.declaration_date" />
                   @if (m.acte.declaration_date) { <small class="letters">{{ m.acte.declaration_date | dateLetters }}</small> }</div>
-                <div class="field need" [class.missing]="miss('acte.officer_name')"><label>Officier d'état civil</label><input class="input" name="a_off" [(ngModel)]="m.acte.officer_name" /></div>
+                <div class="field need" [class.missing]="miss('acte.officer_name')"><label>L'Officier Délégué(e) de l'État Civil</label><input class="input" name="a_off" [(ngModel)]="m.acte.officer_name" /></div>
                 <div class="field wide"><label>Mentions</label><textarea class="input" name="a_men" [(ngModel)]="m.acte.mentions"></textarea></div>
               </div>
             </section>
@@ -108,7 +108,12 @@ const SUBMISSION_KEYS: string[] = [
                 <select class="input" name="hospital" [(ngModel)]="m.hospital" [class.invalid]="err('hospital')">
                   <option [ngValue]="null">— Non identifié —</option>
                   @for (h of hospitals(); track h.uuid) { <option [ngValue]="h.uuid">{{ h.name }} ({{ h.code }})</option> }
-                </select><span class="field-error">{{ err('hospital') }}</span></div>
+                </select><span class="field-error">{{ err('hospital') }}</span>
+                @if (loaded() && !hospitals().length) {
+                  <span class="field-error" role="status">La liste des établissements n'est pas disponible sur cet appareil.
+                    <button type="button" class="btn btn-sm" (click)="loadHospitals()">Actualiser</button>
+                    — hors connexion, elle se charge à la première synchronisation (ouvrez « Synchronisation » une fois en ligne).</span>
+                }</div>
               <div class="field"><label>Référence du document hospitalier</label><input class="input" name="ref" [(ngModel)]="m.hospital_document_ref" /></div>
               <div class="field"><label>Médecin</label><input class="input" name="doc" [(ngModel)]="m.doctor_name" /></div>
               <div class="field"><label>Sage-femme</label><input class="input" name="mw" [(ngModel)]="m.midwife_name" /></div>
@@ -292,7 +297,7 @@ export class DeclarationFormComponent implements OnInit {
 
   ngOnInit() {
     this.uuid = this.route.snapshot.paramMap.get('uuid') ?? '';
-    this.api.get<Page<Hospital>>('/hospitals/', { is_active: true, page_size: 100 }).subscribe({ next: p => this.hospitals.set(p.results), error: () => undefined });
+    this.loadHospitals();
     if (!this.uuid) { this.hasFather = true; this.loaded.set(true); return; }  // the father is asked first
     this.api.get<DeclarationDetail>(`/declarations/${this.uuid}/`).subscribe({
       next: d => {
@@ -319,6 +324,11 @@ export class DeclarationFormComponent implements OnInit {
       },
       error: e => { this.error.set(errorMessage(e)); this.loaded.set(true); },
     });
+  }
+
+  /** Health facilities for the select: the server's list, or the one kept on the device at the last synchronisation. */
+  loadHospitals() {
+    this.api.get<Page<Hospital>>('/hospitals/', { is_active: true, page_size: 100 }).subscribe({ next: p => this.hospitals.set(p.results), error: () => undefined });
   }
 
   /** Registry header of the dossier, with the defaults the secretariat would otherwise retype. */

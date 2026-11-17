@@ -11,7 +11,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from duplicates.config import get_config
+from duplicates.config import effective_blocking_levels, get_config
 from duplicates.models import (
     AnomalyType, CaseStatus, Decision, DuplicateCase, DuplicateCounter, DuplicateReviewHistory, RiskLevel,
 )
@@ -135,7 +135,7 @@ class DuplicateCaseService:
     @classmethod
     def blocking_cases(cls, declaration):
         """(unresolved cases of risk level in ``blocking_levels``, cases designating it as redundant entry)."""
-        levels = get_config()['blocking_levels']
+        levels = effective_blocking_levels(get_config()['blocking_levels'])
         pair = Q(declaration=declaration) | Q(other_declaration=declaration)
         unresolved = list(DuplicateCase.objects.filter(pair, risk_level__in=levels)
                           .exclude(status=CaseStatus.RESOLVED).select_related('declaration', 'other_declaration'))

@@ -1,5 +1,5 @@
 import Dexie, { Table } from 'dexie';
-import { FileRow, LogRow, OpRow, RecordRow } from './types';
+import { CacheRow, FileRow, LogRow, OpRow, RecordRow } from './types';
 
 /**
  * Local database of ONE agent on this browser (IndexedDB through Dexie). Contents are encrypted with the
@@ -11,6 +11,8 @@ export class OfflineDb extends Dexie {
   files!: Table<FileRow, string>;
   kv!: Table<{ key: string; value: any }, string>;
   log!: Table<LogRow, number>;
+  /** Answers of the server consulted on this device (read-through cache of the other screens). */
+  cache!: Table<CacheRow, string>;
 
   constructor(userUuid: string) {
     super(dbName(userUuid));
@@ -20,6 +22,15 @@ export class OfflineDb extends Dexie {
       files: 'id, entity',
       kv: 'key',
       log: '++id',
+    });
+    // version 2: encrypted copy of the pages consulted online (every role reads them again without connection)
+    this.version(2).stores({
+      operations: '++seq, &opId, entity, status',
+      declarations: 'uuid',
+      files: 'id, entity',
+      kv: 'key',
+      log: '++id',
+      cache: 'key, at',
     });
   }
 }

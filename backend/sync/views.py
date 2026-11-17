@@ -7,16 +7,25 @@ from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework.views import APIView
 
+from accounts.authentication import device_of_token
 from core.models import get_setting
 from core.permissions import AnyOf, HasWakaraPermission, user_has_perm
-from hospitals.models import Hospital
 
 from . import services
 from .models import Device, SyncOperation
 
 OpType = SyncOperation.Type
+
+
+class SyncRateThrottle(UserRateThrottle):
+    scope = 'sync'
+
+
+class PingRateThrottle(AnonRateThrottle):
+    scope = 'sync_ping'
 
 
 def offline_enabled() -> bool:
@@ -27,6 +36,7 @@ class PingView(APIView):
     """GET /api/sync/ping/ — is the server reachable, what time is it there, is the offline mode still on."""
     permission_classes = [AllowAny]
     authentication_classes = []
+    throttle_classes = [PingRateThrottle]
 
     def get(self, request):
         response = Response({'server_time': timezone.now().isoformat(), 'offline_enabled': offline_enabled()})
@@ -44,7 +54,8 @@ class DeviceField(serializers.Serializer):
 class OperationSerializer(serializers.Serializer):
     op_id = serializers.UUIDField()
     type = serializers.ChoiceField(choices=[
-        OpType.DECLARATION_CREATE, OpType.DECLARATION_UPDATE, OpType.DECLARATION_TRANSMIT])
+        OpType.DECLARATION_CREATE, OpType.DECLARATION_UPDATE, OpType.DECLARATION_TRANSMIT,
+        OpType.DECLARATION_TRANSITION])
     entity_uuid = serializers.UUIDField()
     device_time = serializers.DateTimeField(required=False, allow_null=True, default=None)
     base_version = serializers.IntegerField(required=False, allow_null=True, min_value=1, default=None)
@@ -60,7 +71,8 @@ class PushSerializer(serializers.Serializer):
     device = DeviceField()
     # the user who prepared the operations on the device: nobody else may synchronise them
     user = serializers.UUIDField(required=False, allow_null=True, default=None)
-    sent_at = serializers.DateTimeField(required=False, allow_null=True, default=None)
+    # device clock when the batch leaves: compulsory, the date checks of the server rely on it
+    sent_at = serializers.DateTimeField()
     operations = OperationSerializer(many=True, allow_empty=True)
 
     def validate_operations(self, value):
@@ -78,12 +90,37 @@ def _refuse_other_user(request, user_uuid):
     return None
 
 
+def _binding_refusal(request, device_id=None):
+    """
+    The session must be bound to the device that synchronises (claim ``did`` of the token, set at sign-in).
+    Without it a token stolen from a phone could be replayed under another device identifier.
+    """
+    bound = device_of_token(request.auth)
+    if bound is None:
+        return Response({'code': 'device_binding_required',
+                         'detail': "Reconnectez-vous avec votre mot de passe pour associer cette session à l'appareil."},
+                        status=status.HTTP_403_FORBIDDEN)
+    if device_id is not None and bound != str(device_id):
+        return Response({'code': 'device_mismatch',
+                         'detail': "Cette session appartient à un autre appareil : synchronisation refusée."},
+                        status=status.HTTP_403_FORBIDDEN)
+    return None
+
+
 def _device_or_refusal(request, device_id, label):
+    refusal = _binding_refusal(request, device_id)
+    if refusal:
+        return None, refusal
     try:
         return services.get_device(request.user, device_id, label, request.META.get('HTTP_USER_AGENT', '')), None
     except services.DeviceRevoked:
         return None, Response({'code': 'device_revoked',
                                'detail': "Cet appareil a été révoqué par l'administrateur."},
+                              status=status.HTTP_403_FORBIDDEN)
+    except services.DeviceLimit:
+        return None, Response({'code': 'device_limit',
+                               'detail': "Nombre maximum d'appareils atteint pour ce compte : "
+                                         "demandez à l'administrateur de révoquer un ancien appareil."},
                               status=status.HTTP_403_FORBIDDEN)
 
 
@@ -95,8 +132,13 @@ class PushView(APIView):
     Each operation is its own transaction and goes through the usual business services.
     """
     permission_classes = [HasWakaraPermission]
-    required_permission = AnyOf('declaration.create', 'declaration.update', 'declaration.transmit')
+    # whoever can act on a dossier: the agent, the secretariat, the validator, the administrator (each operation is
+    # then checked against the permission of its own step by the business service it goes through)
+    required_permission = AnyOf(
+        'declaration.create', 'declaration.update', 'declaration.transmit', 'acte.update', 'acte.submit',
+        'acte.complete', 'dossier.validate', 'dossier.reject')
     parser_classes = [JSONParser]
+    throttle_classes = [SyncRateThrottle]
 
     def post(self, request):
         serializer = PushSerializer(data=request.data)
@@ -117,7 +159,7 @@ class DocumentPushSerializer(serializers.Serializer):
     device_id = serializers.UUIDField()
     device_label = serializers.CharField(required=False, allow_blank=True, max_length=120, default='')
     user = serializers.UUIDField(required=False, allow_null=True, default=None)
-    sent_at = serializers.DateTimeField(required=False, allow_null=True, default=None)
+    sent_at = serializers.DateTimeField()
     device_time = serializers.DateTimeField(required=False, allow_null=True, default=None)
     uuid = serializers.UUIDField()
     declaration = serializers.UUIDField()
@@ -138,6 +180,7 @@ class DocumentPushView(APIView):
     permission_classes = [HasWakaraPermission]
     required_permission = 'document.upload'
     parser_classes = [MultiPartParser, FormParser]
+    throttle_classes = [SyncRateThrottle]
 
     def post(self, request):
         serializer = DocumentPushSerializer(data=request.data)
@@ -167,30 +210,45 @@ class PullView(APIView):
     """
     permission_classes = [HasWakaraPermission]
     required_permission = 'declaration.view'
+    throttle_classes = [SyncRateThrottle]
 
     def get(self, request):
+        refusal = _binding_refusal(request)
+        if refusal:
+            return refusal
         raw = request.query_params.get('since') or ''
         since = parse_datetime(raw) if raw else None
         if raw and since is None:
             return Response({'detail': "Paramètre « since » invalide."}, status=status.HTTP_400_BAD_REQUEST)
         declarations, cursor, has_more = services.pull_declarations(request.user, since, request)
-        hospitals = []
-        if user_has_perm(request.user, 'hospital.view'):
-            hospitals = [
-                {'uuid': str(h['uuid']), 'code': h['code'], 'name': h['name']}
-                for h in Hospital.objects.filter(is_active=True).order_by('name').values('uuid', 'code', 'name')]
         response = Response({
             'server_time': timezone.now().isoformat(),
             'offline_enabled': offline_enabled(),
             'cursor': cursor.isoformat() if cursor else None,
             'has_more': has_more,
             'declarations': declarations,
-            'hospitals': hospitals,
-            'rules': {
-                'required_for_transmission': list(settings.DECLARATION_REQUIRED_FOR_TRANSMISSION),
-                'max_upload_size': settings.MAX_UPLOAD_SIZE,
-                'max_batch': settings.SYNC_MAX_BATCH,
-            },
+            **services.reference_data(request.user),
+        })
+        response['Cache-Control'] = 'private, no-store'
+        return response
+
+
+class ReferenceView(APIView):
+    """
+    GET /api/sync/reference/ — health facilities and rules, without any dossier. The device asks for it first at
+    every synchronisation: the forms must work offline even when the rest of the synchronisation could not run.
+    """
+    permission_classes = [HasWakaraPermission]
+    required_permission = 'declaration.view'
+    throttle_classes = [SyncRateThrottle]
+
+    def get(self, request):
+        refusal = _binding_refusal(request)
+        if refusal:
+            return refusal
+        response = Response({
+            'server_time': timezone.now().isoformat(), 'offline_enabled': offline_enabled(),
+            **services.reference_data(request.user),
         })
         response['Cache-Control'] = 'private, no-store'
         return response
@@ -203,6 +261,13 @@ class SyncOperationSerializer(serializers.ModelSerializer):
     device_label = serializers.CharField(source='device.label', read_only=True)
     type_label = serializers.CharField(source='get_op_type_display', read_only=True)
     status_label = serializers.CharField(source='get_status_display', read_only=True)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        if request is not None and not user_has_perm(request.user, 'duplicate.view'):
+            data['result'] = {k: v for k, v in (data.get('result') or {}).items() if k != 'duplicate_cases'}
+        return data
 
     class Meta:
         model = SyncOperation

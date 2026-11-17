@@ -14,7 +14,9 @@ import {
 import { Cipher } from './types';
 import { VAULT_SESSION_KEY, VaultHeader, readVaultHeader, writeVaultHeader } from './vault-header';
 
-export const PIN_MIN_LENGTH = 6;
+export const PIN_MIN_LENGTH = 8;
+/** A long enough phrase needs no digit: 14 characters or more are accepted as they are. */
+export const PASSPHRASE_LENGTH = 14;
 const FREE_ATTEMPTS = 5;
 
 export interface VaultSession { access: string | null; refresh: string | null; me: Me; }
@@ -23,11 +25,23 @@ export class PinError extends Error {
   constructor(message: string, readonly lockedUntil = 0) { super(message); }
 }
 
-/** Why this PIN is not acceptable ('' when it is). */
+const COMMON = ['motdepasse', 'password', 'azerty', 'qwerty', 'wakara', 'ratoma', 'conakry', 'guinee', 'guinea', 'admin', 'bienvenue', 'soleil'];
+
+/**
+ * Why this code is not acceptable ('' when it is).
+ * The code is the ONLY thing protecting the encrypted data of a stolen phone (the attempt counter lives on the
+ * device and can be erased by whoever holds it): a code of digits only falls in minutes to a graphics card, so the
+ * code must mix letters and digits (8 characters or more) or be a long phrase (14 characters or more).
+ */
 export function pinProblem(pin: string): string {
-  if (pin.length < PIN_MIN_LENGTH) return `Le code doit contenir au moins ${PIN_MIN_LENGTH} caractères.`;
+  if (pin.length < PIN_MIN_LENGTH) return `Le code doit contenir au moins ${PIN_MIN_LENGTH} caractères, avec des lettres et des chiffres.`;
   if (/^(.)\1+$/.test(pin)) return 'Ce code est trop simple (un seul caractère répété).';
-  if ('01234567890123456789'.includes(pin) || '98765432109876543210'.includes(pin)) return 'Ce code est trop simple (suite de chiffres).';
+  if ('01234567890123456789'.includes(pin) || '98765432109876543210'.includes(pin) || 'abcdefghijklmnopqrstuvwxyz'.includes(pin.toLowerCase())) return 'Ce code est trop simple (suite de caractères).';
+  const lower = pin.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const letters = lower.replace(/[^a-z]/g, ''), digits = lower.replace(/\D/g, '');
+  if (pin.length < PASSPHRASE_LENGTH && (!letters || !digits)) return 'Mélangez des lettres et des chiffres (par exemple : Fatou4827), ou choisissez une phrase de 14 caractères.';
+  if (pin.length < PASSPHRASE_LENGTH && COMMON.some(w => lower.startsWith(w))) return 'Ce code est trop courant : évitez les mots usuels.';
+  if (new Set(pin).size < 4) return 'Ce code est trop simple (trop peu de caractères différents).';
   return '';
 }
 
@@ -82,8 +96,9 @@ export async function changeVaultPin(oldPin: string, newPin: string): Promise<vo
   await openVault(oldPin);  // counts a wrong attempt like an unlock
   const oldKek = await deriveKek(oldPin, fromBase64(header.salt), header.iterations);
   const salt = randomBytes(16);
-  const wrapped = await rewrapDataKey(wrappedOf(header), oldKek, await deriveKek(newPin, salt, header.iterations));
-  writeVaultHeader({ ...header, salt: toBase64(salt), wrapIv: toBase64(wrapped.iv), wrapped: toBase64(wrapped.ct), fails: 0, lockedUntil: 0 });
+  const iterations = Math.max(header.iterations, PBKDF2_ITERATIONS);   // a new code also brings the key derivation up to the current cost
+  const wrapped = await rewrapDataKey(wrappedOf(header), oldKek, await deriveKek(newPin, salt, iterations));
+  writeVaultHeader({ ...header, iterations, salt: toBase64(salt), wrapIv: toBase64(wrapped.iv), wrapped: toBase64(wrapped.ct), fails: 0, lockedUntil: 0 });
 }
 
 export async function saveVaultSession(key: CryptoKey, session: VaultSession): Promise<void> {
@@ -102,3 +117,6 @@ export async function loadVaultSession(key: CryptoKey): Promise<VaultSession | n
 }
 
 export function destroyVault() { writeVaultHeader(null); }
+
+/** Sign-out: the saved session (tokens) is removed; the vault, the local data and the queue stay. */
+export function clearVaultSession() { try { localStorage.removeItem(VAULT_SESSION_KEY); } catch { /* ignore */ } }

@@ -4,10 +4,12 @@ overridden by an administrator through the SiteSetting ``duplicates.config``), n
 """
 import copy
 import json
+import logging
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 
+log = logging.getLogger(__name__)
 ENGINE_VERSION = '1.0'
 CONFIG_KEY = 'duplicates.config'
 
@@ -30,12 +32,36 @@ MIN_RECORDED_SCORE = 40
 CANDIDATE_LIMIT = 400
 
 
+# Guard rails. Whoever may calibrate the engine must not be able to switch the control off, by mistake or on
+# purpose: these limits are in the code (not editable through the API), and are applied when a change is made AND
+# every time the stored configuration is read (a value written straight in the database that breaks them is ignored).
+GUARDS = {
+    'high_threshold': (70, 95),            # a "high risk" level that nothing can reach would disable the blocking
+    'medium_threshold': (40, 80),
+    'min_weight': {'mother': 20, 'birth_date': 15},   # the two criteria that identify a birth cannot be dwarfed
+    'min_quality_for_high': (0, 70),
+    'date_window_days': (1, 30),
+    'min_recorded_score': (0, 60),
+}
+MANDATORY_BLOCKING_LEVELS = ('HIGH',)       # an unresolved high-risk case ALWAYS blocks the official number
+MIN_REASON_LENGTH = 10
+
+
+def effective_blocking_levels(levels) -> list:
+    """The levels that block the official number: the configured ones, plus the mandatory ones."""
+    out = [lv for lv in levels if lv in ('HIGH', 'MEDIUM', 'LOW')]
+    for lv in MANDATORY_BLOCKING_LEVELS:
+        if lv not in out:
+            out.append(lv)
+    return out
+
+
 def default_config() -> dict:
     return {
         'weights': dict(settings.DUPLICATE_WEIGHTS),
         'thresholds': dict(settings.DUPLICATE_THRESHOLDS),
         'min_quality_for_high': settings.DUPLICATE_MIN_QUALITY_FOR_HIGH,
-        'blocking_levels': list(settings.DUPLICATE_BLOCKING_LEVELS),
+        'blocking_levels': effective_blocking_levels(settings.DUPLICATE_BLOCKING_LEVELS),
         'date_window_days': settings.DUPLICATE_DATE_WINDOW_DAYS,
         'min_recorded_score': MIN_RECORDED_SCORE,
     }
@@ -56,17 +82,27 @@ def validate_config(cfg: dict) -> dict:
         raise ValidationError({'weights': "Les pondérations doivent être positives."})
     if abs(sum(weights.values()) - 100) > 0.01:
         raise ValidationError({'weights': "La somme des pondérations doit faire 100."})
+    for key, floor in GUARDS['min_weight'].items():
+        if weights[key] < floor:
+            raise ValidationError({'weights': (
+                f"« {CRITERIA_LABELS[key]} » doit peser au moins {floor} points : c'est un critère d'identification.")})
     out['weights'] = weights
     th = cfg.get('thresholds', base['thresholds'])
     try:
         high, medium = float(th['high']), float(th['medium'])
     except (KeyError, TypeError, ValueError):
         raise ValidationError({'thresholds': "Seuils attendus : high et medium."})
-    if not (0 < medium < high <= 100):
-        raise ValidationError({'thresholds': "Il faut 0 < seuil moyen < seuil élevé ≤ 100."})
+    if not medium < high:
+        raise ValidationError({'thresholds': "Le seuil moyen doit être inférieur au seuil élevé."})
+    (h_lo, h_hi), (m_lo, m_hi) = GUARDS['high_threshold'], GUARDS['medium_threshold']
+    if not h_lo <= high <= h_hi:
+        raise ValidationError({'thresholds': f"Le seuil « risque élevé » doit être compris entre {h_lo} et {h_hi}."})
+    if not m_lo <= medium <= m_hi:
+        raise ValidationError({'thresholds': f"Le seuil « risque moyen » doit être compris entre {m_lo} et {m_hi}."})
     out['thresholds'] = {'high': high, 'medium': medium}
-    for key, lo, hi in (('min_quality_for_high', 0, 100), ('date_window_days', 0, 30),
-                        ('min_recorded_score', 0, 100)):
+    for key, (lo, hi) in (('min_quality_for_high', GUARDS['min_quality_for_high']),
+                          ('date_window_days', GUARDS['date_window_days']),
+                          ('min_recorded_score', GUARDS['min_recorded_score'])):
         if key in cfg:
             try:
                 value = int(cfg[key])
@@ -76,10 +112,14 @@ def validate_config(cfg: dict) -> dict:
                 raise ValidationError({key: f"Doit être entre {lo} et {hi}."})
             out[key] = value
     if 'blocking_levels' in cfg:
-        levels = list(cfg['blocking_levels'])
-        if any(lv not in ('HIGH', 'MEDIUM', 'LOW') for lv in levels):
+        levels = cfg['blocking_levels']
+        if not isinstance(levels, (list, tuple)) or any(lv not in ('HIGH', 'MEDIUM', 'LOW') for lv in levels):
             raise ValidationError({'blocking_levels': "Niveaux possibles : HIGH, MEDIUM, LOW."})
-        out['blocking_levels'] = levels
+        missing = [lv for lv in MANDATORY_BLOCKING_LEVELS if lv not in levels]
+        if missing:
+            raise ValidationError({'blocking_levels': (
+                "Le niveau « risque élevé » (HIGH) bloque toujours la validation officielle : il ne peut pas être retiré.")})
+        out['blocking_levels'] = effective_blocking_levels(levels)
     return out
 
 
@@ -90,6 +130,19 @@ def get_config() -> dict:
     if row and row.value:
         try:
             return validate_config(json.loads(row.value))
-        except (ValueError, ValidationError):
-            pass  # a broken override must never stop the detection: fall back to the defaults
+        except (ValueError, TypeError, AttributeError, ValidationError):
+            # a broken or out-of-bounds override (typed in the database, by hand) must never weaken the control
+            # nor stop the detection: the safe defaults apply, and it is said in the log
+            log.warning("Configuration des doublons ignorée (invalide ou hors limites) : valeurs par défaut utilisées.")
     return default_config()
+
+
+def config_meta() -> dict:
+    """Who changed the rules last, when and why (shown in the control centre); empty when they are the defaults."""
+    from core.models import SiteSetting
+    row = SiteSetting.objects.filter(key=CONFIG_KEY).select_related('updated_by').first()
+    if not row or not row.value:
+        return {'customized': False}
+    user = row.updated_by
+    return {'customized': get_config() != default_config(), 'updated_at': row.updated_at,
+            'updated_by': (user.get_full_name() or user.username) if user else '', 'reason': row.description}

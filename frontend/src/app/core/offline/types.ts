@@ -16,12 +16,13 @@ export const SYNC_HELP: Record<SyncState, string> = {
   conflict: 'Ce dossier a changé sur le serveur pendant que vous travailliez hors connexion.',
 };
 
-export type OpType = 'declaration.create' | 'declaration.update' | 'declaration.transmit' | 'document.upload';
+export type OpType = 'declaration.create' | 'declaration.update' | 'declaration.transmit' | 'declaration.transition' | 'document.upload';
 export type OpStatus = 'pending' | 'sending' | 'applied' | 'rejected' | 'conflict';
 
 export const OP_LABELS: Record<OpType, string> = {
   'declaration.create': 'Création de la déclaration', 'declaration.update': 'Modification',
-  'declaration.transmit': 'Transmission au secrétariat', 'document.upload': "Ajout d'une photo ou d'une pièce",
+  'declaration.transmit': 'Transmission au secrétariat', 'declaration.transition': 'Changement d\'étape du dossier',
+  'document.upload': "Ajout d'une photo ou d'une pièce",
 };
 export const OP_STATUS_LABELS: Record<OpStatus, string> = {
   pending: 'En attente', sending: 'Envoi en cours', applied: 'Envoyée', rejected: 'Refusée', conflict: 'Conflit',
@@ -43,15 +44,31 @@ export interface OpSecret { payload?: Record<string, any>; error?: OpError | nul
 export interface Op extends Omit<OpRow, 'enc' | 'seq'>, OpSecret { seq: number; }
 
 export interface RecordRow { uuid: string; onServer: 0 | 1; updatedAt: string; enc: Cipher; }
+/** One answer of the server kept for offline reading; the content (and its address) is encrypted. */
+export interface CacheRow { key: string; at: string; enc: Cipher; }
 export interface FileRow { id: string; entity: string; kind: string; size: number; createdAt: string; meta: Cipher; data: Cipher; }
 export interface FileMeta { name: string; mime: string; sha256: string; }
 export interface LogRow { id?: number; at: string; kind: 'push' | 'pull' | 'error' | 'info'; message: string; }
 
 export interface HospitalRef { uuid: string; code: string; name: string; }
-export interface SyncRules { required_for_transmission: string[]; max_upload_size: number; max_batch: number; }
+/** Rules of the server mirrored on the device (the server stays the authority and checks them again). */
+export interface SyncRules {
+  required_for_transmission: string[]; max_upload_size: number; max_batch: number;
+  /** Data required to send a dossier to validation (secretariat). */
+  required_for_submission?: string[];
+  /** Fields the validator is warned about when still empty at the final validation. */
+  expected_for_validation?: string[];
+  deadline_months?: number;
+  /** The server attributes the official number itself when none is typed (ACTE_AUTO_NUMBERING). */
+  auto_numbering?: boolean;
+}
 export const DEFAULT_RULES: SyncRules = {
   required_for_transmission: ['birth_date', 'birth_time', 'birth_place', 'child.gender'], max_upload_size: 4 * 1024 * 1024, max_batch: 20,
+  required_for_submission: [], expected_for_validation: [],
 };
+
+/** Answer of GET /sync/reference/: what the forms need whatever the state of the dossiers. */
+export interface ReferenceResponse { server_time: string; offline_enabled: boolean; hospitals: HospitalRef[]; rules: SyncRules; }
 
 export interface SyncInfo { sync_state: SyncState; sync_error?: OpError | null; }
 export type LocalDeclaration = DeclarationDetail & SyncInfo & { sync_version?: number; is_archived?: boolean };

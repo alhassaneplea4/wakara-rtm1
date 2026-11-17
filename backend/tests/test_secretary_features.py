@@ -1,4 +1,5 @@
 """Tests of the secretary-facing changes: NPI, validation warning, validated-only acts, hospital management."""
+from django.utils import timezone
 import datetime
 
 from rest_framework.test import APIClient
@@ -82,7 +83,7 @@ class IncompleteValidationTests(WakaraTestCase):
         acte_uuid = self.advance_to_pending(d['uuid'])
         # the validator completes the registry reference while the dossier waits for the decision
         r = self.client_for(self.admin).patch(
-            f'/api/actes/{acte_uuid}/', {'feuillet': '12', 'declaration_date': datetime.date.today().isoformat()},
+            f'/api/actes/{acte_uuid}/', {'feuillet': '12', 'declaration_date': timezone.localdate().isoformat()},
             format='json')
         self.assertEqual(r.status_code, 200, r.content)
         r = self.validate(d['uuid'])
@@ -145,7 +146,7 @@ class DashboardParamsTests(WakaraTestCase):
             self.assertEqual(c.get('/api/stats/dashboard/', {'year': year}).status_code, 200, year)
 
     def test_today_period_is_accepted(self):
-        today = datetime.date.today().isoformat()
+        today = timezone.localdate().isoformat()
         r = self.client_for(self.secretary).get('/api/stats/dashboard/', {'date_from': today, 'date_to': today})
         self.assertEqual(r.status_code, 200)
         self.assertEqual(str(r.data['period']['date_from']), today)

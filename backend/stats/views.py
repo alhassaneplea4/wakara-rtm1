@@ -27,7 +27,7 @@ from rest_framework.views import APIView
 from core.permissions import HasWakaraPermission
 from core.workflow import Status
 from declarations.models import Declaration
-from declarations.services import visible_declarations
+from declarations.services import listed_declarations, visible_declarations
 
 MONTHS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
 
@@ -55,7 +55,7 @@ class DashboardView(APIView):
         date_from = _parse_date(params.get('date_from')) or datetime.date(year, 1, 1)
         date_to = _parse_date(params.get('date_to')) or datetime.date(year, 12, 31)
 
-        qs = visible_declarations(request.user, Declaration.objects.all()).filter(
+        qs = listed_declarations(visible_declarations(request.user, Declaration.objects.all())).filter(
             received_at__gte=date_from, received_at__lte=date_to)
         if params.get('hospital'):
             qs = qs.filter(hospital__uuid=params['hospital'])
@@ -84,7 +84,7 @@ class DashboardView(APIView):
         }
 
         # Monthly evolution of the selected year: received vs validated
-        base = visible_declarations(request.user, Declaration.objects.all())
+        base = listed_declarations(visible_declarations(request.user, Declaration.objects.all()))
         if params.get('hospital'):
             base = base.filter(hospital__uuid=params['hospital'])
         received_by_month = dict(

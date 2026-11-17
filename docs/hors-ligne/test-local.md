@@ -56,7 +56,7 @@ Connectez-vous en `agent.collecte`, une fois **avec Internet** : l'écran « Pro
 4. **Transmettre hors ligne** : « Transmettre au secrétariat ». Le dossier passe en *Transmis*, toujours **Sur cet appareil**, et n'est plus modifiable.
 5. **Retour de la connexion** : décochez *Hors connexion*. Les indicateurs passent à **En ligne** et la référence devient `WKR-…`. Vérifiez côté serveur en vous connectant en `secretaire` (dans une fenêtre privée) : la déclaration transmise est dans sa liste.
 6. **Écran Synchronisation** : liste des opérations, état de chacune, journal.
-7. **Déconnexion bloquée** : hors ligne, créez un dossier, puis cliquez *Déconnexion* : Wakara refuse et explique pourquoi. « Verrouiller l'appareil » fonctionne.
+7. **Déconnexion avec dossier en attente** : hors ligne, créez un dossier, puis cliquez *Déconnexion* : la déconnexion est acceptée et un message indique que le dossier reste sur l'appareil. Reconnectez-vous : le code est seulement **saisi** (pas recréé) et le dossier part à la synchronisation. Un autre compte est refusé tant que le dossier n'est pas synchronisé.
 8. **Autre compte** : appareil verrouillé avec un dossier en attente, essayez de vous connecter en `agent2.collecte` : refusé tant que le premier n'a pas synchronisé.
 9. **Code erroné** : 5 mauvais codes → blocage temporaire.
 10. **Réponse perdue** (panneau → `perdue`) : créez un dossier, observez : un seul dossier à la fin.

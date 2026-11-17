@@ -35,31 +35,44 @@ class DuplicateDetectionService:
     # ── candidate retrieval ──────────────────────
 
     @staticmethod
-    def candidate_identities(identity: BirthIdentity, config: dict):
+    def candidate_identities(identity: BirthIdentity, config: dict, exhaustive: bool = False):
         """
-        Cheap pre-filter (exact keys + date window, including a day/month swap) before the fuzzy scoring.
+        (candidates, truncated). Cheap pre-filter before the fuzzy scoring, in TIERS from the most telling to the
+        least: the exact keys of the mother (name, phonetic form, phone), the child's name, the exact birth date,
+        then the date window. Each tier has its own cap, and the first tiers are kept first when the total cap is
+        reached, so a busy week of births can never push out of the list an older dossier that shares the mother
+        or the child's name. ``truncated`` says that a cap was hit (the analysis is then not exhaustive: it is
+        recorded, and the validation redoes it with ``exhaustive=True``, which has no cap at all).
         REJECTED dossiers are ignored; archived ones are kept (old declarations must still be found).
         """
-        q = Q()
+        base = (BirthIdentity.objects.exclude(declaration_id=identity.declaration_id)
+                .exclude(declaration__status=Status.REJECTED)
+                .select_related('declaration', 'declaration__acte').order_by('-declaration_id'))
+        tiers = []
+        for field in ('mother_name_key', 'mother_phonetic', 'mother_phone_norm', 'child_name_key'):
+            if getattr(identity, field):
+                tiers.append(Q(**{field: getattr(identity, field)}))
         if identity.birth_date:
             d, w = identity.birth_date, datetime.timedelta(days=config['date_window_days'])
-            q |= Q(birth_date__range=(d - w, d + w))
+            exact = Q(birth_date=d)
             if d.day <= 12 and d.day != d.month:
-                q |= Q(birth_date=datetime.date(d.year, d.day, d.month))
-        if identity.mother_name_key:
-            q |= Q(mother_name_key=identity.mother_name_key)
-        if identity.mother_phonetic:
-            q |= Q(mother_phonetic=identity.mother_phonetic)
-        if identity.mother_phone_norm:
-            q |= Q(mother_phone_norm=identity.mother_phone_norm)
-        if identity.child_name_key:
-            q |= Q(child_name_key=identity.child_name_key)
-        if not q:
-            return BirthIdentity.objects.none()
-        return (BirthIdentity.objects.filter(q).exclude(declaration_id=identity.declaration_id)
-                .exclude(declaration__status=Status.REJECTED)
-                .select_related('declaration', 'declaration__acte')
-                .order_by('-declaration_id')[:CANDIDATE_LIMIT])
+                exact |= Q(birth_date=datetime.date(d.year, d.day, d.month))
+            tiers.append(exact)
+            tiers.append(Q(birth_date__range=(d - w, d + w)))
+        per_tier = None if exhaustive else CANDIDATE_LIMIT
+        total_cap = None if exhaustive else CANDIDATE_LIMIT * 3
+        found, truncated = {}, False
+        for q in tiers:
+            qs = base.filter(q)
+            rows = list(qs if per_tier is None else qs[:per_tier + 1])
+            if per_tier is not None and len(rows) > per_tier:
+                truncated, rows = True, rows[:per_tier]
+            for row in rows:
+                if total_cap is not None and len(found) >= total_cap and row.declaration_id not in found:
+                    truncated = True
+                    continue
+                found.setdefault(row.declaration_id, row)
+        return list(found.values()), truncated
 
     @staticmethod
     def has_official_act(declaration) -> bool:
@@ -74,7 +87,7 @@ class DuplicateDetectionService:
 
     @classmethod
     @transaction.atomic
-    def analyze(cls, declaration, *, trigger='MANUAL', user=None, force=True) -> DuplicateCheck:
+    def analyze(cls, declaration, *, trigger='MANUAL', user=None, force=True, exhaustive=False) -> DuplicateCheck:
         """Run (or reuse) the analysis. Returns the DuplicateCheck, with ``.cases`` = cases touched."""
         acquire_lock(DETECTION_LOCK)
         config = get_config()
@@ -86,7 +99,9 @@ class DuplicateDetectionService:
                 return last
 
         results, seen = [], set()
-        candidates = list(cls.candidate_identities(identity, config))
+        candidates, truncated = cls.candidate_identities(identity, config, exhaustive)
+        if truncated:
+            log.warning("Duplicate analysis of %s truncated: more candidates than the cap.", declaration.pk)
         for cand in candidates:
             res = DuplicateScoringService.score(identity, cand, config)
             seen.add(cand.declaration_id)
@@ -110,7 +125,8 @@ class DuplicateDetectionService:
         highest = max((r['score'] for _, r in recorded), default=0)
         check = DuplicateCheck.objects.create(
             declaration=declaration, trigger=trigger, identity_hash=identity.data_hash, performed_by=user,
-            candidates_examined=len(candidates), matches_found=len(recorded), highest_score=highest,
+            candidates_examined=len(candidates), candidates_truncated=truncated, matches_found=len(recorded),
+            highest_score=highest,
             data_quality=identity.data_quality, engine_version=ENGINE_VERSION,
             config_snapshot={'weights': config['weights'], 'thresholds': config['thresholds']})
 
@@ -157,8 +173,9 @@ class DuplicateDetectionService:
         """Make sure the declaration has been analysed on its CURRENT data (re-run otherwise)."""
         identity, changed = BirthIdentityService.refresh(declaration)
         last = cls.last_check(declaration)
-        if last is None or changed or last.identity_hash != identity.data_hash:
-            return cls.analyze(declaration, trigger='PRE_VALIDATION', user=user, force=True)
+        if last is None or changed or last.identity_hash != identity.data_hash or last.candidates_truncated:
+            # before an official number nothing is left to a cap: the analysis is exhaustive
+            return cls.analyze(declaration, trigger='PRE_VALIDATION', user=user, force=True, exhaustive=True)
         return last
 
     @classmethod

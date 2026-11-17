@@ -12,6 +12,11 @@ import {
 
 /** Applied operations stay in the history this long, then are removed (their content is dropped at once). */
 export const RETENTION_DAYS = 7;
+/** Shape of what is kept on the device (see ``migrate``). */
+export const SCHEMA_VERSION = 2;
+/** Pages kept for offline reading, the oldest consulted ones go first. */
+export const CACHE_LIMIT = 250;
+const CACHE_MAX_BYTES = 1_500_000;
 const LOG_LIMIT = 200;
 
 export interface StoredFile { id: string; entity: string; kind: string; size: number; createdAt: string; name: string; mime: string; sha256: string; }
@@ -30,7 +35,18 @@ export class OfflineStore {
   async setSecret(key: string, value: unknown) { await this.db.kv.put({ key: `enc:${key}`, value: await encryptJson(this.key, value) }); }
 
   hospitals() { return this.secret<HospitalRef[]>('hospitals', []); }
-  rules() { return this.secret<SyncRules>('rules', DEFAULT_RULES); }
+  /** Rules mirrored from the server; what an older server does not send keeps its default. */
+  async rules(): Promise<SyncRules> { return { ...DEFAULT_RULES, ...(await this.secret<Partial<SyncRules>>('rules', {})) }; }
+
+  /**
+   * A device that learned dossiers before the secretariat could use it holds copies without their registry header:
+   * the next pull starts again from the beginning once, so that every dossier is received in its present shape.
+   */
+  async migrate() {
+    if ((await this.clear<number>('schema', 1)) >= SCHEMA_VERSION) return;
+    await this.db.kv.delete('cursor');
+    await this.setClear('schema', SCHEMA_VERSION);
+  }
 
   /* ── dossiers received from the server ── */
   async server(uuid: string): Promise<DeclarationDetail | null> {
@@ -40,9 +56,38 @@ export class OfflineStore {
   async putServer(detail: DeclarationDetail) {
     const clean = { ...(detail as any) };
     delete clean.sync_state; delete clean.sync_error;
+    // the usual detail does not carry the registry header (only the pull and /actes/ do): keep the one already known
+    if (!clean.acte) { const previous = await this.server(detail.uuid) as any; if (previous?.acte) clean.acte = previous.acte; }
     await this.db.declarations.put({ uuid: detail.uuid, onServer: 1, updatedAt: detail.updated_at, enc: await encryptJson(this.key, clean) });
+    // the registry header is fetched by its own identifier: remember which dossier holds it (identifiers only)
+    if (detail.acte_uuid) await this.db.kv.put({ key: `acte:${detail.acte_uuid}`, value: detail.uuid });
   }
   dropServer(uuid: string) { return this.db.declarations.delete(uuid); }
+  /** The registry header just read online replaces the copy of the dossier that holds it. */
+  async putActe(acteUuid: string, acte: unknown): Promise<void> {
+    const declaration = await this.declarationOfActe(acteUuid);
+    const row = declaration ? await this.server(declaration) as any : null;
+    if (row) await this.putServer({ ...row, acte });
+  }
+  async declarationOfActe(acteUuid: string): Promise<string | null> {
+    return ((await this.db.kv.get(`acte:${acteUuid}`))?.value as string | undefined) ?? null;
+  }
+
+  /* ── pages consulted online, read again without connection ── */
+  async cachePut(address: string, body: unknown): Promise<void> {
+    const json = JSON.stringify(body);
+    if (json.length > CACHE_MAX_BYTES) return;           // a huge answer (export, long journal) is not worth keeping
+    const key = await sha256Hex(new TextEncoder().encode(address).buffer as ArrayBuffer);
+    await this.db.cache.put({ key, at: new Date().toISOString(), enc: await encryptJson(this.key, { address, body }) });
+    const extra = (await this.db.cache.count()) - CACHE_LIMIT;
+    if (extra > 0) await this.db.cache.orderBy('at').limit(extra).delete();
+  }
+  async cacheGet(address: string): Promise<{ body: unknown; at: string } | null> {
+    const key = await sha256Hex(new TextEncoder().encode(address).buffer as ArrayBuffer);
+    const row = await this.db.cache.get(key);
+    if (!row) return null;
+    try { return { body: (await decryptJson<{ body: unknown }>(this.key, row.enc)).body, at: row.at }; } catch { return null; }
+  }
 
   /* ── operation queue ── */
   private async open(row: OpRow): Promise<Op> {
@@ -88,6 +133,9 @@ export class OfflineStore {
     const extra = (await this.db.log.count()) - LOG_LIMIT;
     if (extra > 0) await this.db.log.orderBy('id').limit(extra).delete();
   }
+
+  /** When the facilities and rules were last received (reference data). */
+  referenceAt() { return this.clear<string | null>('referenceAt', null); }
 
   async counts(): Promise<{ waiting: number; problems: number }> {
     const waiting = await this.db.operations.where('status').anyOf('pending', 'sending').count();

@@ -1,4 +1,5 @@
 """Deliveries page (detail, filters, counters), dashboard links (acte filters) and the Ratoma facilities pre-fill."""
+from django.utils import timezone
 import datetime
 from io import StringIO
 
@@ -61,7 +62,7 @@ class DeliveryPageTests(WakaraTestCase):
         self.client_for(self.secretary).post(f'/api/actes/{acte}/deliver/', {'recipient_name': 'Duplicata'}, format='json')
         c = self.client_for(self.secretary)
         self.assertEqual(c.get('/api/actes/deliveries/', {'is_duplicate': 'true'}).data['count'], 1)
-        today = datetime.date.today().isoformat()
+        today = timezone.localdate().isoformat()
         self.assertEqual(c.get('/api/actes/deliveries/', {'delivered_from': today, 'delivered_to': today}).data['count'], 3)
         self.assertEqual(c.get('/api/actes/deliveries/', {'delivered_from': '2000-01-01', 'delivered_to': '2000-01-02'}).data['count'], 0)
         self.assertEqual(c.get('/api/actes/deliveries/', {'search': 'Duplicata'}).data['count'], 1)
@@ -85,7 +86,7 @@ class ActeListFilterTests(WakaraTestCase):
         self.assertEqual(self.transition(self.admin, d['uuid'], 'VALIDATED', annee=2026, registre='R1', numero_acte='1',
                                          accept_incomplete=True).status_code, 200)
         c = self.client_for(self.secretary)
-        today = datetime.date.today().isoformat()
+        today = timezone.localdate().isoformat()
         self.assertEqual(c.get('/api/actes/', {'received_from': today, 'received_to': today}).data['count'], 1)
         self.assertEqual(c.get('/api/actes/', {'received_from': '2000-01-01', 'received_to': '2000-12-31'}).data['count'], 0)
         self.assertEqual(c.get('/api/actes/', {'hospital': str(self.hospital.uuid)}).data['count'], 1)

@@ -25,10 +25,14 @@ def iso(dt):
 
 
 class SyncTestCase(WakaraTestCase):
+    def client_for(self, user, device=DEVICE):
+        # a real session of the offline mode is bound to the device that runs it
+        return super().client_for(user, device=device)
+
     def push(self, user, operations, device=DEVICE, prepared_by=None):
         body = {'device': {'id': device, 'label': 'Téléphone de test'}, 'user': str((prepared_by or user).uuid),
                 'sent_at': iso(timezone.now()), 'operations': operations}
-        return self.client_for(user).post('/api/sync/push/', body, format='json')
+        return self.client_for(user, device=device).post('/api/sync/push/', body, format='json')
 
     def op(self, kind, entity=None, **extra):
         return {'op_id': str(uuid.uuid4()), 'type': f'declaration.{kind}', 'entity_uuid': entity or str(uuid.uuid4()),
@@ -51,7 +55,7 @@ class SyncTestCase(WakaraTestCase):
                 'declaration': declaration, 'kind': 'PAPER_FORM',
                 'sha256': sha or hashlib.sha256(content).hexdigest(),
                 'file': SimpleUploadedFile(name, content), **extra}
-        return body, self.client_for(user).post('/api/sync/documents/', body, format='multipart')
+        return body, self.client_for(user, device=device).post('/api/sync/documents/', body, format='multipart')
 
 
 class DeviceClockTests(SimpleTestCase):
@@ -320,10 +324,11 @@ class TransmitTests(SyncTestCase):
 
 class PermissionTests(SyncTestCase):
     def test_push_requires_authentication_and_a_declaration_permission(self):
-        body = {'device': {'id': DEVICE}, 'operations': []}
+        body = {'device': {'id': DEVICE}, 'sent_at': iso(timezone.now()), 'operations': []}
         self.assertEqual(self.client.post('/api/sync/push/', body, format='json').status_code, 401)
         self.assertEqual(self.client_for(self.nobody).post('/api/sync/push/', body, format='json').status_code, 403)
-        self.assertEqual(self.client_for(self.secretary).post('/api/sync/push/', body, format='json').status_code, 403)
+        # the secretariat and the validators work from a device too (see tests/test_offline_roles.py)
+        self.assertEqual(self.client_for(self.secretary).post('/api/sync/push/', body, format='json').status_code, 200)
         self.assertEqual(self.client_for(self.agent).post('/api/sync/push/', body, format='json').status_code, 200)
 
     def test_account_that_must_change_its_password_cannot_synchronise(self):
@@ -340,12 +345,17 @@ class PermissionTests(SyncTestCase):
     def test_dossier_of_another_agent_is_refused(self):
         op, created = self.pushed()
         version = created['declaration']['sync_version']
-        for user in (self.agent2, self.admin):  # even an administrator: a device only works on its own dossiers
-            ops = [self.op('update', entity=op['entity_uuid'], base_version=version, payload={'notes': 'x'})]
-            answer = self.push(user, ops).data['results'][0]
-            self.assertEqual((answer['status'], answer['error']['code']), ('rejected', 'forbidden'), user)
-            self.assertIsNone(answer['declaration'])
+        # a device works on what its user may reach online: another agent has no access to this dossier
+        ops = [self.op('update', entity=op['entity_uuid'], base_version=version, payload={'notes': 'x'})]
+        answer = self.push(self.agent2, ops).data['results'][0]
+        self.assertEqual((answer['status'], answer['error']['code']), ('rejected', 'forbidden'))
+        self.assertIsNone(answer['declaration'])
         self.assertEqual(Declaration.objects.get(uuid=op['entity_uuid']).notes, '')
+        # ... whereas the administrator, who sees every dossier online, may act on it from a device as well
+        ops = [self.op('update', entity=op['entity_uuid'], base_version=version, payload={'notes': 'x'})]
+        answer = self.push(self.admin, ops).data['results'][0]
+        self.assertEqual(answer['status'], 'applied', answer)
+        self.assertEqual(Declaration.objects.get(uuid=op['entity_uuid']).notes, 'x')
 
     def test_operation_of_another_user_cannot_be_replayed(self):
         op = self.create_op()

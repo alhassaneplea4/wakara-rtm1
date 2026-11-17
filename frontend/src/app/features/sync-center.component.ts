@@ -23,6 +23,9 @@ const TONE: Record<OpStatus, string> = { pending: 'badge-warning', sending: 'bad
       @if (gate.revoked()) {
         <div class="alert alert-danger" role="alert">Cet appareil a été révoqué par l'administrateur : le serveur refuse ses envois. Vos déclarations restent enregistrées ici ; contactez l'administrateur pour rétablir l'appareil.</div>
       }
+      @if (gate.limited()) {
+        <div class="alert alert-danger" role="alert">Ce compte utilise déjà le nombre maximum d'appareils en mode hors connexion (3) : le serveur refuse cet appareil. Vos déclarations restent enregistrées ici ; demandez à l'administrateur de révoquer un ancien appareil dans « Appareils ».</div>
+      }
       @if (!gate.enabled()) {
         <div class="alert alert-warning" role="status">Le mode hors connexion a été désactivé par l'administrateur. Les opérations en attente restent synchronisables ; les nouvelles saisies se font en ligne.</div>
       }
@@ -33,6 +36,8 @@ const TONE: Record<OpStatus, string> = { pending: 'badge-warning', sending: 'bad
         <div class="tile"><span>En attente d'envoi</span><strong>{{ gate.waiting() }}</strong></div>
         <div class="tile" [class.bad]="gate.problems() > 0"><span>À corriger</span><strong>{{ gate.problems() }}</strong></div>
         <div class="tile"><span>Dernière synchronisation</span><strong>{{ gate.lastSync() ? (gate.lastSync() | date: 'dd/MM/yyyy HH:mm') : 'Jamais' }}</strong></div>
+        <div class="tile" [class.bad]="!referenceAt()" title="La liste des établissements et les règles de saisie, nécessaires aux formulaires sans connexion">
+          <span>Établissements et règles</span><strong>{{ referenceAt() ? ('mis à jour le ' + (referenceAt() | date: 'dd/MM HH:mm')) : 'Non reçus' }}</strong></div>
       </section>
 
       <section class="card flush">
@@ -95,6 +100,8 @@ export class SyncCenterComponent {
   private toast = inject(ToastService);
   ops = signal<OpView[]>([]);
   logs = signal<LogRow[]>([]);
+  /** When the health facilities and the rules were last received: without them the forms are empty offline. */
+  referenceAt = signal<string | null>(null);
   dropping = signal<OpView | null>(null);
   device = deviceLabel();
 
@@ -112,6 +119,7 @@ export class SyncCenterComponent {
     if (!engine) return;
     const [ops, logs] = await Promise.all([engine.operations(), engine.logs()]);
     this.ops.set(ops); this.logs.set(logs);
+    this.referenceAt.set(await engine.store.referenceAt());
   }
 
   async sync() {

@@ -1,4 +1,5 @@
 """Marital status, commune / centre types of the acte header, free official number, aperçu content."""
+from django.utils import timezone
 import datetime
 
 from actes.models import Acte
@@ -106,7 +107,7 @@ class FreeOfficialNumberTests(WakaraTestCase):
             self.set_number(uuid, number)
             self.client_for(self.secretary).patch(
                 f'/api/declarations/{uuid}/', {'declarant': {'first_names': 'A', 'last_name': 'B'},
-                                               'acte': {'declaration_date': datetime.date.today().isoformat()}},
+                                               'acte': {'declaration_date': timezone.localdate().isoformat()}},
                 format='json')
             self.assertEqual(self.transition(self.secretary, uuid, 'PENDING_VALIDATION').status_code, 200)
         r = self.transition(self.admin, keep, 'VALIDATED', accept_incomplete=True)       # nothing typed: confirmed

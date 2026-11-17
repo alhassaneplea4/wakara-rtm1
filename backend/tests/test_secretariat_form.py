@@ -1,4 +1,5 @@
 """One edit form for the secretariat: registry header, officer, every field but the NPI before validation."""
+from django.utils import timezone
 import datetime
 
 from django.conf import settings
@@ -31,7 +32,7 @@ def complete():
         'acte': {'annee': 2026, 'registre': 'R1', 'feuillet': '12', 'region': 'Conakry', 'prefecture': 'Conakry',
                  'commune_type': 'URBAINE', 'commune': 'Ratoma', 'centre_type': 'PRINCIPAL',
                  'centre': "Centre d'état civil de Ratoma",
-                 'declaration_date': datetime.date.today().isoformat(), 'officer_name': 'AMADOU KONIA CAMARA'},
+                 'declaration_date': timezone.localdate().isoformat(), 'officer_name': 'AMADOU KONIA CAMARA'},
     }
 
 
@@ -79,7 +80,7 @@ class SecretariatEditsTheTransmittedDossier(WakaraTestCase):
         uuid = self.transmitted()
         c = self.client_for(self.secretary)
         r = c.patch(f'/api/declarations/{uuid}/', {'declarant': {'first_names': 'A', 'last_name': 'B'},
-                                                   'acte': {'declaration_date': datetime.date.today().isoformat()}},
+                                                   'acte': {'declaration_date': timezone.localdate().isoformat()}},
                     format='json')
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual(self.transition(self.secretary, uuid, 'PENDING_VALIDATION').status_code, 200)

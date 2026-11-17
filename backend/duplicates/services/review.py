@@ -26,6 +26,13 @@ def require(user, codename):
         raise PermissionDenied(f"Permission requise : {codename}")
 
 
+def _own_declaration(case, declaration):
+    """An observation or a verification request can only target one of the two dossiers of the case."""
+    if declaration is not None and declaration.id not in (case.declaration_id, case.other_declaration_id):
+        raise ValidationError({'declaration': "Ce dossier ne fait pas partie du contrôle en cours."})
+    return declaration
+
+
 def _lock(case):
     return DuplicateCase.objects.select_for_update().get(pk=case.pk)
 
@@ -204,6 +211,7 @@ class DuplicateReviewService:
     @transaction.atomic
     def add_note(cls, case, user, content, kind=DuplicateEvidence.Kind.OBSERVATION, declaration=None):
         require(user, 'duplicate.investigate')
+        declaration = _own_declaration(case, declaration)
         content = (content or '').strip()
         if not content:
             raise ValidationError({'content': "Le texte est obligatoire."})
@@ -229,6 +237,7 @@ class DuplicateReviewService:
     @transaction.atomic
     def request_verification(cls, case, user, content, declaration=None):
         require(user, 'duplicate.investigate')
+        declaration = _own_declaration(case, declaration)
         content = (content or '').strip()
         if not content:
             raise ValidationError({'content': "Précisez la vérification demandée."})
@@ -293,6 +302,7 @@ class DuplicateReviewService:
             principal = next(d for i, d in ids.items() if i != duplicate.id)
 
         warnings = []
+        outcome = ''   # what became of the redundant dossier: rejected / already_rejected / kept
         if decision in Decision.FINAL:
             new_status = CaseStatus.RESOLVED
         else:
@@ -308,21 +318,29 @@ class DuplicateReviewService:
             case.resolution_hashes = {'declaration': case.match.declaration_hash,
                                       'candidate': case.match.candidate_hash}
             if duplicate is not None:
-                acte = getattr(duplicate, 'acte', None)
-                if acte and acte.numero_acte:
-                    warnings.append(
-                        f"Un acte officiel existe déjà pour {duplicate.reference} (n° {acte.numero_acte}). "
-                        "Aucune modification ni annulation n'est faite automatiquement : "
-                        "la rectification ou l'annulation doit suivre la procédure légale.")
+                from declarations.services import reject_as_redundant
+                outcome = reject_as_redundant(duplicate, user, case.reference, principal.reference)
+                if outcome == 'kept':
+                    acte = getattr(duplicate, 'acte', None)
+                    if acte and acte.numero_acte:
+                        warnings.append(
+                            f"Un acte officiel existe déjà pour {duplicate.reference} (n° {acte.numero_acte}). "
+                            "Aucune modification ni annulation n'est faite automatiquement : "
+                            "la rectification ou l'annulation doit suivre la procédure légale.")
+                    else:
+                        warnings.append(
+                            f"{duplicate.reference} est déjà validé : il n'est pas rejeté automatiquement "
+                            "et reste dans la liste des déclarations.")
         case.save()
         DuplicateAuditService.record(case, H.Action.DECISION, user, note=reason, detail={
             'decision': decision, 'resulting_status': new_status,
             'principal': principal.reference if principal else '',
-            'duplicate': duplicate.reference if duplicate else ''})
+            'duplicate': duplicate.reference if duplicate else '', 'outcome': outcome})
         DuplicateAuditService.log(AuditAction.DUPLICATE_DECISION, user, case, {
             'decision': decision, 'resulting_status': new_status,
             'principal': principal.reference if principal else '',
-            'duplicate': duplicate.reference if duplicate else ''}, reason=reason)
+            'duplicate': duplicate.reference if duplicate else '', 'outcome': outcome}, reason=reason)
+        case.redundant_outcome = outcome
         return case, row, warnings
 
     @classmethod
@@ -338,6 +356,10 @@ class DuplicateReviewService:
         if DuplicateCase.objects.filter(pair_key=case.pair_key).exclude(status=CaseStatus.RESOLVED).exists():
             raise ValidationError("Un autre dossier d'investigation est déjà ouvert pour ces déclarations.")
         previous = case.final_decision
+        restored = False
+        if case.duplicate_declaration_id:
+            from declarations.services import restore_from_redundant
+            restored = restore_from_redundant(case.duplicate_declaration, user, case.reference)
         case.status = CaseStatus.IN_REVIEW
         case.final_decision = ''
         case.principal_declaration = case.duplicate_declaration = None
@@ -346,7 +368,8 @@ class DuplicateReviewService:
         case.assigned_to = user
         case.save()
         DuplicateAuditService.record(case, H.Action.REOPENED, user, note=reason,
-                                     detail={'previous_decision': previous})
+                                     detail={'previous_decision': previous, 'redundant_restored': restored})
         DuplicateAuditService.log(AuditAction.DUPLICATE_DECISION, user, case,
-                                  {'reopened': True, 'previous_decision': previous}, reason=reason)
+                                  {'reopened': True, 'previous_decision': previous,
+                                   'redundant_restored': restored}, reason=reason)
         return case

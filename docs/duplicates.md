@@ -44,9 +44,48 @@ rectification ou l'annulation suit la procédure légale : **aucune modification
 ## Permissions
 
 `duplicate.view` (consulter), `duplicate.investigate` (prendre en charge, observations, vérifications, pièces),
-`duplicate.decide` (décider, attribuer, rouvrir). Défauts : administrateur = tout ; secrétaire = consulter +
-investiguer ; agent = rien. Les pièces justificatives restent sous `document.view` ; chaque consultation est
-tracée (historique du dossier + journal d'audit). Les paramètres de détection se modifient avec `settings.manage`.
+`duplicate.decide` (décider, attribuer, rouvrir), `duplicate.configure` (régler la détection). Défauts : administrateur = tout ;
+secrétaire = consulter + investiguer + décider (comme l'administrateur, hors réglage de la détection) ; agent = rien. Les pièces justificatives restent sous `document.view` ; chaque consultation est
+tracée (historique du dossier + journal d'audit). Les paramètres de détection se modifient avec `duplicate.configure` (et non `settings.manage`).
+
+## Décision « doublon confirmé » / « erreur de saisie » : ce qui se passe
+
+Quand la décision désigne une saisie redondante :
+
+- la déclaration redondante est **rejetée** (statut « Rejeté », motif « Saisie redondante — doublon du dossier … », trace dans l'historique du dossier et le journal d'audit) ;
+- elle **disparaît de la liste des déclarations**, de l'export CSV et des chiffres du tableau de bord, pour tout le monde (secrétariat, administrateur, agent) ; sa fiche reste accessible par son lien (Centre des doublons) et rien n'est supprimé ;
+- le dossier principal **ne change pas** : il reste valide et suit son circuit ;
+- une déclaration déjà **validée, délivrée ou portant un numéro officiel** n'est jamais rejetée ni masquée automatiquement : un avertissement le dit et la rectification suit la procédure légale ;
+- **rouvrir** le dossier rétablit la déclaration dans le statut qu'elle avait avant (sauf si elle avait été rejetée pour une autre raison) ;
+- les autres décisions (enfants distincts, naissance multiple, informations insuffisantes, vérification complémentaire) ne touchent à aucune déclaration.
+
+Dans l'écran de décision, le Centre suggère la saisie redondante (celle qui ne porte pas d'acte, sinon la plus récente) et annonce la conséquence avant l'enregistrement.
+
+Pour les décisions prises avant cette règle : `python manage.py reject_confirmed_duplicates` (aperçu) puis `python manage.py reject_confirmed_duplicates --apply`.
+
+## Réglage de la détection : garde-fous
+
+Changer les règles du contrôle est un acte sensible : droit à part (`duplicate.configure`), **motif écrit obligatoire** (10 caractères),
+valeurs précédentes et nouvelles conservées dans le journal d'audit, dernier auteur / date / motif affichés dans le Centre.
+Des limites fixées dans le code (`duplicates/config.py`, `GUARDS`) empêchent d'éteindre le contrôle, par erreur ou volontairement :
+seuil « élevé » entre 70 et 95, seuil « moyen » entre 40 et 80, mère ≥ 20 points, date de naissance ≥ 15 points, qualité minimale pour un
+risque élevé ≤ 70 %, fenêtre de dates 1 à 30 jours. Le niveau **HIGH bloque toujours** la validation officielle : impossible de le retirer
+de `blocking_levels`, et le service le rajoute même si la configuration stockée dit le contraire. Une valeur écrite directement en base
+qui franchit ces limites est ignorée (valeurs par défaut) et signalée dans le journal technique.
+
+## Recherche des candidats et analyse exhaustive
+
+Le pré-filtre cherche par paliers, du plus parlant au moins parlant : clé de la mère (nom, forme phonétique, téléphone), nom de l'enfant,
+date de naissance exacte, puis fenêtre de dates. Chaque palier a son plafond (`CANDIDATE_LIMIT`) et le total est borné : une semaine
+chargée ne peut pas faire sortir de la liste un dossier plus ancien qui partage la mère ou le nom de l'enfant. Lorsqu'un plafond est atteint,
+l'analyse est marquée `candidates_truncated` (et le journal d'audit le dit) ; **l'analyse faite avant l'attribution du numéro officiel
+et l'analyse manuelle n'ont aucun plafond**.
+
+## Ce que voit un agent de collecte
+
+Rien. Ni l'alerte sur la fiche du dossier (`duplicate_alert` vaut `null` sans `duplicate.view`), ni la réponse de synchronisation
+(`duplicate_cases`), ni l'historique de ses opérations ne disent qu'une ressemblance a été trouvée : un agent pourrait sinon saisir
+l'identité d'une personne pour savoir si une naissance existe déjà au registre. Le dossier suit son circuit ; le secrétariat voit l'alerte.
 
 ## Hors connexion
 
@@ -61,13 +100,13 @@ jamais exhaustive et n'est pas présentée comme telle. Détection sérialisée 
 
 `cases/` (liste filtrée, `summary/`, `filter-options/`, détail, `compare/`, `history/`, `take/`, `assign/`,
 `note/`, `request-verification/`, `attach-document/`, `decide/`, `reopen/`) · `matches/` (alertes, `open-case/`) ·
-`analyze/` · `compare/?a=&b=` · `config/`. La fiche d'une déclaration expose `duplicate_alert`.
+`analyze/` · `compare/?a=&b=` · `config/` (analyses et comparaisons limitées à 20 par minute et par utilisateur). La fiche d'une déclaration expose `duplicate_alert`.
 
 ## Mise en service
 
 ```bash
 python manage.py migrate
-python manage.py setup_initial_data --skip-admin   # crée les 3 permissions, les attache à l'admin et au secrétaire
+python manage.py setup_initial_data --skip-admin   # crée les 4 permissions, les attache à l'admin et au secrétaire
 python manage.py analyze_duplicates                # une fois : identités + analyse des déclarations existantes
 ```
 

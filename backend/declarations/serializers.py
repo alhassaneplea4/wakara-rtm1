@@ -70,6 +70,7 @@ class DeclarationListSerializer(serializers.ModelSerializer):
     assigned_to_name = serializers.SerializerMethodField()
     official_number = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
+    overdue = serializers.SerializerMethodField()
     transmitted_offline = serializers.SerializerMethodField()
     entered_offline = serializers.SerializerMethodField()
 
@@ -78,7 +79,7 @@ class DeclarationListSerializer(serializers.ModelSerializer):
         fields = [
             'uuid', 'reference', 'status', 'status_label', 'hospital', 'hospital_name', 'hospital_code',
             'birth_date', 'received_at', 'child_name', 'assigned_to_name', 'official_number',
-            'can_edit', 'updated_at', 'created_at', 'sync_version',
+            'can_edit', 'overdue', 'updated_at', 'created_at', 'sync_version',
             'transmitted_offline', 'entered_offline', 'device_created_at', 'device_transmitted_at',
         ]
 
@@ -91,6 +92,10 @@ class DeclarationListSerializer(serializers.ModelSerializer):
 
     def get_can_edit(self, obj):
         return can_edit_data(self.context['request'].user, obj)
+
+    def get_overdue(self, obj):
+        from core.deadline import is_overdue
+        return is_overdue(obj)
 
     def get_child_name(self, obj):
         child = getattr(obj, 'child', None)
@@ -115,14 +120,23 @@ class DeclarationDetailSerializer(DeclarationListSerializer):
     validated_by_name = serializers.SerializerMethodField()
     available_transitions = serializers.SerializerMethodField()
     duplicate_alert = serializers.SerializerMethodField()
+    deadline = serializers.SerializerMethodField()
 
     class Meta(DeclarationListSerializer.Meta):
         fields = DeclarationListSerializer.Meta.fields + [
             'hospital_document_ref', 'doctor_name', 'midwife_name', 'birth_time', 'birth_place',
             'notes', 'last_decision_reason', 'transmitted_at', 'validated_at',
             'validated_by_name', 'child', 'mother', 'father', 'declarant', 'acte_uuid',
-            'status_history', 'created_by_name', 'available_transitions', 'duplicate_alert',
+            'status_history', 'created_by_name', 'available_transitions', 'duplicate_alert', 'deadline',
         ]
+
+    def get_deadline(self, obj):
+        """Six-month rule: dates, whether it is exceeded, the message, and whether the user may still act."""
+        from core.deadline import OVERRIDE_PERMISSION, deadline_info
+        from core.permissions import user_has_perm
+        info = deadline_info(obj)
+        info['can_override'] = user_has_perm(self.context['request'].user, OVERRIDE_PERMISSION)
+        return info
 
     def get_child(self, obj):
         child = getattr(obj, 'child', None)
@@ -156,19 +170,15 @@ class DeclarationDetailSerializer(DeclarationListSerializer):
 
     def get_duplicate_alert(self, obj):
         """
-        Is the dossier held by a duplicate control? Everybody who sees the dossier learns that it is held
-        (and at which level); the case itself (uuid, score, other dossier) is for the control centre only.
+        Is the dossier held by a duplicate control? Only the people of the control centre (``duplicate.view``) are
+        told. Anybody else gets nothing at all: an agent who could see "held, high risk" on a dossier he just typed
+        would learn whether that birth already exists in the registry — a way to query the civil register.
         """
         from core.permissions import user_has_perm
         from duplicates.services.cases import DuplicateCaseService
-        info = DuplicateCaseService.status_for(obj)
-        if user_has_perm(self.context['request'].user, 'duplicate.view'):
-            return info
-        return {
-            'blocked': info['blocked'],
-            'open_cases': [{'risk_level': c['risk_level'], 'status': c['status']} for c in info['open_cases']],
-            'designated_duplicate': [{} for _ in info['designated_duplicate']],
-        }
+        if not user_has_perm(self.context['request'].user, 'duplicate.view'):
+            return None
+        return DuplicateCaseService.status_for(obj)
 
     def get_available_transitions(self, obj):
         user = self.context['request'].user

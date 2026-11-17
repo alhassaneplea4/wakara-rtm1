@@ -6,7 +6,7 @@ import { environment } from '@env/environment';
 import { AuthService } from '../auth.service';
 import { ConnectivityService } from './connectivity.service';
 import type { OfflineEngine } from './engine';
-import { DEVICE_KEY, SKIP_KEY, VaultHeader, offlineSupported, readVaultHeader } from './vault-header';
+import { SKIP_KEY, VaultHeader, deviceId, offlineSupported, readVaultHeader } from './vault-header';
 
 /** Inactivity after which the device locks itself (the PIN is asked again; nothing is lost). */
 export const AUTO_LOCK_MS = 15 * 60_000;
@@ -39,6 +39,8 @@ export class OfflineGate {
   readonly lastSync = signal<string | null>(null);
   readonly message = signal('');
   readonly revoked = signal(false);
+  /** The account already has its maximum number of offline devices: this one is refused by the server. */
+  readonly limited = signal(false);
   /** Incremented whenever what the screens show may have changed on the device. */
   readonly revision = signal(0);
   readonly skipped = signal(readFlag(SKIP_KEY));
@@ -48,8 +50,13 @@ export class OfflineGate {
   readonly enabled = this.conn.offlineEnabled;
   readonly supported = offlineSupported();
   readonly unsynced = computed(() => this.waiting() + this.problems());
-  /** A collection agent: creates and transmits declarations, does not work on the actes. */
-  readonly eligible = computed(() =>
+  /**
+   * Every account that works on the dossiers can protect a device and work offline: the collection agent, the
+   * secretariat, the validators, the administrator. (Managing users, roles and settings still needs the server.)
+   */
+  readonly eligible = computed(() => this.auth.can('declaration.view'));
+  /** A collection agent: creates and transmits declarations, does not work on the actes. His device comes first. */
+  readonly collectionProfile = computed(() =>
     this.auth.can('declaration.create') && this.auth.can('declaration.transmit') && !this.auth.can('acte.update'));
   /** The device belongs to the signed-in user and is unlocked: calls are answered offline-first. */
   readonly active = computed(() => this.unlocked() && !!this.header() && this.header()!.user.uuid === this.auth.user()?.uuid);
@@ -65,9 +72,10 @@ export class OfflineGate {
 
   constructor() {
     // Session rules of the offline mode, enforced by AuthService itself (whoever calls it).
-    this.auth.logoutBlocked = () => this.ownsDevice() && this.unsynced() > 0;
+    // Signing out never loses anything: the vault, the local data and the waiting operations stay on the device
+    // (encrypted) until the same agent signs in again, unlocks with the code chosen once, and synchronises.
     this.auth.holdOnExpire = () => this.active();
-    this.auth.onLoggedOut = uuid => { if (uuid && this.header()?.user.uuid === uuid) void this.destroy(); };
+    this.auth.onLoggedOut = uuid => { if (uuid && this.header()?.user.uuid === uuid) void this.keepForNextSignIn(); };
     this.auth.tokens$.subscribe(() => void this.engine?.saveSession());
     this.conn.changes.subscribe(up => { if (up) this.engine?.sync.kick(800); });
     effect(() => { if (!this.auth.sessionExpired() && this.unlocked()) this.engine?.sync.kick(500); });
@@ -82,9 +90,11 @@ export class OfflineGate {
   private host = {
     counts: (waiting: number, problems: number) => { this.waiting.set(waiting); this.problems.set(problems); },
     syncing: (v: boolean) => this.syncing.set(v),
-    synced: (at: string | null) => { this.lastSync.set(at); if (at) { this.message.set(''); this.revoked.set(false); } },
+    synced: (at: string | null) => { this.lastSync.set(at); if (at) { this.message.set(''); this.revoked.set(false); this.limited.set(false); } },
     failed: (m: string) => this.message.set(m),
     deviceRevoked: () => this.revoked.set(true),
+    deviceLimit: () => this.limited.set(true),
+    collectionProfile: () => this.collectionProfile(),
     bump: () => this.revision.update(n => n + 1),
   };
 
@@ -103,6 +113,9 @@ export class OfflineGate {
   /* ── set-up, unlock, lock ── */
 
   async pinProblem(pin: string): Promise<string> { return (await this.module()).vault.pinProblem(pin); }
+
+  /** New code for the same data (the old one is checked first and counts as an attempt). */
+  async changePin(oldPin: string, newPin: string) { await (await this.module()).vault.changePin(oldPin, newPin); this.header.set(readVaultHeader()); }
 
   /** First use on this device: the signed-in agent chooses the PIN that will protect the offline data. */
   async setup(pin: string) {
@@ -128,7 +141,11 @@ export class OfflineGate {
       await this.engine!.saveSession();            // just signed in online: the vault takes the fresh session
     } else {
       const session = await this.engine!.loadSession();
-      if (!session) throw new Error('Session introuvable sur cet appareil : reconnectez-vous avec votre mot de passe.');
+      if (!session) {
+        // signed out: the data stay on the device but need a new sign-in with the password first
+        this.engine?.close(); this.engine = null; this.unlocked.set(false);
+        throw new Error('Session terminée : connectez-vous avec votre mot de passe, puis saisissez votre code. Vos déclarations non synchronisées sont conservées sur cet appareil.');
+      }
       this.auth.adoptOfflineSession(session.me, session.access, session.refresh);
       // confirm with the server when it is reachable; without network the device keeps working on its own
       this.auth.reloadUser().subscribe({ next: () => void this.engine?.saveSession(), error: () => undefined });
@@ -160,6 +177,19 @@ export class OfflineGate {
     if (redirect) void this.router.navigate(['/verrouillage']);
   }
 
+  /**
+   * Sign-out of the owner of the device: the encrypted data, the queue and the code (vault) are KEPT; only the
+   * saved session is removed, so the local data cannot be opened again without signing in with the password
+   * and typing the code. The next sign-in of the same agent unlocks the device (no new code) and resumes the queue.
+   */
+  private async keepForNextSignIn() {
+    this.engine?.close();
+    this.engine = null;
+    this.unlocked.set(false);
+    try { (await this.module()).vault.clearSession(); } catch { /* nothing saved */ }
+    void this.refreshCounts();
+  }
+
   /** Removes everything the offline mode stored for the owner of this device. */
   async destroy() {
     const h = this.header();
@@ -172,7 +202,7 @@ export class OfflineGate {
       m.vault.destroy();
     } catch { /* ignore */ }
     this.header.set(readVaultHeader());
-    this.waiting.set(0); this.problems.set(0); this.lastSync.set(null); this.message.set(''); this.revoked.set(false);
+    this.waiting.set(0); this.problems.set(0); this.lastSync.set(null); this.message.set(''); this.revoked.set(false); this.limited.set(false);
   }
 
   skip() { writeFlag(SKIP_KEY); this.skipped.set(true); }
@@ -187,7 +217,7 @@ export class OfflineGate {
     let h = this.header();
     if (h && h.user.uuid !== user.uuid) {
       if ((await this.refreshCounts()) > 0) {
-        this.auth.logout(false);  // not blocked: the waiting operations belong to someone else
+        this.auth.logout(false);  // the waiting operations belong to someone else: refused, nothing is touched
         return this.router.createUrlTree(['/login'], { queryParams: { blocked: 1 } });
       }
       await this.destroy();
@@ -229,19 +259,6 @@ export class OfflineGate {
 
 function readFlag(key: string): boolean { try { return sessionStorage.getItem(key) === '1'; } catch { return false; } }
 function writeFlag(key: string) { try { sessionStorage.setItem(key, '1'); } catch { /* ignore */ } }
-
-/** Identifier of this browser for the server (random, created once, survives a reset of the vault). */
-export function deviceId(): string {
-  try {
-    let id = localStorage.getItem(DEVICE_KEY);
-    if (!id) {
-      id = typeof crypto.randomUUID === 'function' ? crypto.randomUUID()
-        : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => (crypto.getRandomValues(new Uint8Array(1))[0] & 15).toString(16));
-      localStorage.setItem(DEVICE_KEY, id);
-    }
-    return id;
-  } catch { return '00000000-0000-4000-8000-000000000000'; }
-}
 
 /** « Chrome · Android » — enough for an administrator to recognise the device in the list. */
 export function deviceLabel(): string {

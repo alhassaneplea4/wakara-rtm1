@@ -33,16 +33,22 @@ const WEIGHT_LABELS: Record<string, string> = {
           <div class="cfg-grid">
             @for (k of weightKeys; track k) {
               <div class="field"><label [for]="'w-' + k">{{ weightLabels[k] }} (points)</label>
-                <input [id]="'w-' + k" type="number" min="0" max="100" class="input" [(ngModel)]="c.weights[k]" [disabled]="!auth.can('settings.manage')" /></div>
+                <input [id]="'w-' + k" type="number" min="0" max="100" class="input" [(ngModel)]="c.weights[k]" [disabled]="!auth.can('duplicate.configure')" /></div>
             }
-            <div class="field"><label for="th-h">Seuil « risque élevé »</label><input id="th-h" type="number" class="input" [(ngModel)]="c.thresholds.high" [disabled]="!auth.can('settings.manage')" /></div>
-            <div class="field"><label for="th-m">Seuil « risque moyen »</label><input id="th-m" type="number" class="input" [(ngModel)]="c.thresholds.medium" [disabled]="!auth.can('settings.manage')" /></div>
-            <div class="field"><label for="th-q">Qualité minimale pour un risque élevé (%)</label><input id="th-q" type="number" class="input" [(ngModel)]="c.min_quality_for_high" [disabled]="!auth.can('settings.manage')" /></div>
+            <div class="field"><label for="th-h">Seuil « risque élevé »</label><input id="th-h" type="number" class="input" [(ngModel)]="c.thresholds.high" [disabled]="!auth.can('duplicate.configure')" /></div>
+            <div class="field"><label for="th-m">Seuil « risque moyen »</label><input id="th-m" type="number" class="input" [(ngModel)]="c.thresholds.medium" [disabled]="!auth.can('duplicate.configure')" /></div>
+            <div class="field"><label for="th-q">Qualité minimale pour un risque élevé (%)</label><input id="th-q" type="number" class="input" [(ngModel)]="c.min_quality_for_high" [disabled]="!auth.can('duplicate.configure')" /></div>
           </div>
           <p class="soft small">Somme des pondérations : <strong [class.bad]="weightSum() !== 100">{{ weightSum() }}</strong> / 100. Un critère non renseigné est exclu du calcul : le score est normalisé sur les critères réellement comparables. À calibrer sur des cas réels avant tout usage définitif.</p>
-          @if (auth.can('settings.manage')) {
-            <div class="row"><button class="btn btn-primary" [disabled]="weightSum() !== 100 || saving()" (click)="saveConfig()">Enregistrer</button></div>
-          } @else { <p class="soft small">Modification réservée aux administrateurs (permission « paramètres »).</p> }
+          @if (meta()?.customized) {
+            <p class="alert alert-info small">Règles personnalisées le {{ meta()!.updated_at | date: 'dd/MM/yyyy HH:mm' }} par <strong>{{ meta()!.updated_by }}</strong> — {{ meta()!.reason }}</p>
+          }
+          <p class="soft small">Limites fixées par le système : seuil « élevé » entre 70 et 95, seuil « moyen » entre 40 et 80, mère ≥ 20 points, date de naissance ≥ 15 points. Le risque élevé bloque toujours la validation officielle.</p>
+          @if (auth.can('duplicate.configure')) {
+            <div class="field"><label for="cfg-reason">Motif de la modification (obligatoire, conservé dans le journal)</label>
+              <textarea id="cfg-reason" class="input" rows="2" [(ngModel)]="reason" placeholder="Ex. : calibrage décidé en comité du … avec la mairie"></textarea></div>
+            <div class="row"><button class="btn btn-primary" [disabled]="weightSum() !== 100 || saving() || reason.trim().length < 10" (click)="saveConfig()">Enregistrer</button></div>
+          } @else { <p class="soft small">Modification réservée aux administrateurs (permission « régler la détection des doublons »).</p> }
         </section>
       }
 
@@ -156,6 +162,8 @@ export class DuplicatesCenterComponent implements OnInit {
   hospitals = signal<Hospital[]>([]);
   showConfig = signal(false);
   config = signal<DuplicateConfig | null>(null);
+  meta = signal<{ customized: boolean; updated_at?: string; updated_by?: string; reason?: string } | null>(null);
+  reason = '';
   saving = signal(false);
   weightKeys = Object.keys(WEIGHT_LABELS);
   weightLabels = WEIGHT_LABELS;
@@ -206,15 +214,15 @@ export class DuplicatesCenterComponent implements OnInit {
 
   toggleConfig() {
     if (this.showConfig()) { this.showConfig.set(false); return; }
-    this.api.get<{ config: DuplicateConfig }>('/duplicates/config/').subscribe({
-      next: r => { this.config.set(r.config); this.showConfig.set(true); }, error: e => this.toast.error(errorMessage(e)),
+    this.api.get<{ config: DuplicateConfig; meta: { customized: boolean; updated_at?: string; updated_by?: string; reason?: string } }>('/duplicates/config/').subscribe({
+      next: r => { this.config.set(r.config); this.meta.set(r.meta); this.showConfig.set(true); }, error: e => this.toast.error(errorMessage(e)),
     });
   }
   weightSum() { const w = this.config()?.weights ?? {}; return Object.values(w).reduce((a, b) => a + (Number(b) || 0), 0); }
   saveConfig() {
     this.saving.set(true);
-    this.api.patch<{ config: DuplicateConfig }>('/duplicates/config/', this.config()).subscribe({
-      next: r => { this.config.set(r.config); this.saving.set(false); this.toast.success('Règles de détection enregistrées (action tracée).'); },
+    this.api.patch<{ config: DuplicateConfig; meta: any }>('/duplicates/config/', { ...this.config(), reason: this.reason.trim() }).subscribe({
+      next: r => { this.config.set(r.config); this.meta.set(r.meta); this.reason = ''; this.saving.set(false); this.toast.success('Règles de détection enregistrées (action tracée).'); },
       error: e => { this.saving.set(false); this.toast.error(errorMessage(e)); },
     });
   }

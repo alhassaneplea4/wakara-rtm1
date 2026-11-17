@@ -1,4 +1,5 @@
 """The dossier state machine: who may do what, in which status, with which data."""
+from django.utils import timezone
 import datetime
 
 from django.test import override_settings
@@ -51,15 +52,30 @@ class HappyPathTests(WakaraTestCase):
 
 
 class AuthorisationTests(WakaraTestCase):
-    def test_only_admin_can_validate_or_reject(self):
+    def test_collection_agent_cannot_validate_or_reject(self):
         d = self.create_declaration()
         self.advance_to_pending(d['uuid'])
-        for user in (self.agent, self.secretary):
-            r = self.transition(user, d['uuid'], 'VALIDATED', annee=2026, numero_acte='1', accept_incomplete=True)
-            self.assertEqual(r.status_code, 403, user.username)
-            r = self.transition(user, d['uuid'], 'REJECTED', reason='non')
-            self.assertEqual(r.status_code, 403, user.username)
+        r = self.transition(self.agent, d['uuid'], 'VALIDATED', annee=2026, numero_acte='1', accept_incomplete=True)
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(self.transition(self.agent, d['uuid'], 'REJECTED', reason='non').status_code, 403)
         self.assertEqual(Declaration.objects.get(uuid=d['uuid']).status, 'PENDING_VALIDATION')
+
+    def test_secretary_can_take_the_final_decision_unless_the_right_is_removed(self):
+        from accounts.models import Permission, UserPermission
+        d = self.create_declaration()
+        self.advance_to_pending(d['uuid'])
+        self.assertIn('/validation', self.client_for(self.secretary).get('/api/inbox/').data['badges'])
+        # the administrator can still take the right away from one person (user-level override)
+        for code in ('dossier.validate', 'dossier.reject'):
+            UserPermission.objects.create(user=self.secretary, permission=Permission.objects.get(codename=code), granted=False)
+        self.secretary.__dict__.pop('_wk_perms', None)
+        r = self.transition(self.secretary, d['uuid'], 'VALIDATED', annee=2026, numero_acte='1', accept_incomplete=True)
+        self.assertEqual(r.status_code, 403)
+        UserPermission.objects.filter(user=self.secretary).delete()
+        self.secretary.__dict__.pop('_wk_perms', None)
+        r = self.transition(self.secretary, d['uuid'], 'VALIDATED', annee=2026, registre='R1', numero_acte='1', accept_incomplete=True)
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.data['validated_by_name'], 'Secretary Test')
 
     def test_agent_cannot_take_charge_or_submit(self):
         d = self.create_declaration()
@@ -190,9 +206,12 @@ class StateRuleTests(WakaraTestCase):
     def test_only_a_validator_can_still_edit_while_pending_validation_and_status_is_kept(self):
         d = self.create_declaration()
         self.advance_to_pending(d['uuid'])
-        # the secretary's work is done: she can no longer touch it
-        r = self.client_for(self.secretary).patch(f'/api/declarations/{d["uuid"]}/', {'notes': 'x'}, format='json')
+        # the collection agent cannot touch it any more; the secretary can, as she is now a validator too
+        r = self.client_for(self.agent).patch(f'/api/declarations/{d["uuid"]}/', {'notes': 'x'}, format='json')
         self.assertEqual(r.status_code, 403)
+        r = self.client_for(self.secretary).patch(f'/api/declarations/{d["uuid"]}/', {'notes': 'Vu par le secrétariat'}, format='json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.data['status'], 'PENDING_VALIDATION')
         # the administrator can work on it and it stays in his validation queue
         r = self.client_for(self.admin).patch(f'/api/declarations/{d["uuid"]}/', {'notes': "Vérifié par l'admin"}, format='json')
         self.assertEqual(r.status_code, 200, r.content)
@@ -205,7 +224,7 @@ class StateRuleTests(WakaraTestCase):
         self.assertEqual(r.status_code, 403)
 
     def test_future_birth_date_rejected(self):
-        future = (datetime.date.today() + datetime.timedelta(days=2)).isoformat()
+        future = (timezone.localdate() + datetime.timedelta(days=2)).isoformat()
         r = self.client_for(self.agent).post(
             '/api/declarations/', self.declaration_payload(birth_date=future), format='json')
         self.assertEqual(r.status_code, 400)
@@ -229,7 +248,9 @@ class StateRuleTests(WakaraTestCase):
         sec_t = self.client_for(self.secretary).get(f'/api/declarations/{d["uuid"]}/').data['available_transitions']
         self.assertEqual({t['target'] for t in admin_t},
                          {'VALIDATED', 'REJECTED', 'TO_CORRECT_COLLECTION', 'TO_CORRECT_SECRETARIAT'})
-        self.assertEqual(sec_t, [])
+        self.assertEqual({t['target'] for t in sec_t}, {t['target'] for t in admin_t})
+        agent_t = self.client_for(self.agent).get(f'/api/declarations/{d["uuid"]}/').data['available_transitions']
+        self.assertEqual(agent_t, [])
 
 
 class OfficialNumberTests(WakaraTestCase):

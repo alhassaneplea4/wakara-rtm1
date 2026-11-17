@@ -15,6 +15,8 @@ User = get_user_model()
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=254)
     password = serializers.CharField(write_only=True, trim_whitespace=False)
+    # identifier of the browser / phone (random UUID kept on the device): the session is bound to it
+    device_id = serializers.UUIDField(required=False, allow_null=True, default=None)
 
 
 class ChangePasswordSerializer(serializers.Serializer):

@@ -11,7 +11,7 @@ import { Inbox } from '../core/models';
 import { OfflineGate } from '../core/offline/offline-gate.service';
 import { ConnectionIndicatorComponent, ReauthComponent } from '../shared/sync-ui';
 import { ToastService } from '../core/toast.service';
-import { ConfirmComponent, IconComponent, LogoComponent } from '../shared/ui';
+import { IconComponent, LogoComponent } from '../shared/ui';
 
 interface NavItem { label: string; icon: string; link: string; perms: string[]; }
 
@@ -33,7 +33,7 @@ const NAV: NavItem[] = [
 
 @Component({
   selector: 'wk-shell', standalone: true,
-  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, IconComponent, LogoComponent, ConfirmComponent,
+  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, IconComponent, LogoComponent,
     ConnectionIndicatorComponent, ReauthComponent],
   template: `
     <div class="shell" [class.nav-open]="navOpen()">
@@ -83,7 +83,7 @@ const NAV: NavItem[] = [
               <div class="dropdown" (click)="$event.stopPropagation()">
                 <h3>À traiter</h3>
                 @for (i of inbox()?.items ?? []; track i.code) {
-                  <a [routerLink]="inboxLink(i.status)" (click)="open.set('')"><span>{{ i.label }}</span><strong>{{ i.count }}</strong></a>
+                  <a [routerLink]="inboxLink(i.status)" [queryParams]="i.status === 'OVERDUE' ? { overdue: 1 } : null" (click)="open.set('')"><span>{{ i.label }}</span><strong>{{ i.count }}</strong></a>
                 } @empty { <p class="muted pad">Aucune tâche en attente.</p> }
               </div>
             }
@@ -110,6 +110,9 @@ const NAV: NavItem[] = [
         @if (gate.visible() && gate.revoked()) {
           <div class="strip danger" role="alert"><span>Cet appareil a été révoqué par l'administrateur : la synchronisation est refusée. Vos saisies restent enregistrées ici.</span></div>
         }
+        @if (gate.visible() && gate.limited()) {
+          <div class="strip danger" role="alert"><span>Ce compte utilise déjà le nombre maximum d'appareils en mode hors connexion (3) : cet appareil est refusé par le serveur. Vos saisies restent enregistrées ici ; demandez à l'administrateur de révoquer un ancien appareil.</span></div>
+        }
         @if (gate.visible() && !gate.online()) {
           <div class="strip" role="status"><span>Vous travaillez hors connexion : les déclarations sont enregistrées sur cet appareil et seront envoyées au retour de la connexion.</span></div>
         }
@@ -120,14 +123,6 @@ const NAV: NavItem[] = [
         <main class="content"><router-outlet /></main>
       </div>
     </div>
-    @if (blocked()) {
-      <wk-confirm title="Déconnexion impossible pour le moment" [confirmLabel]="blockedLabel()"
-        (cancel)="blocked.set(false)" (confirm)="resolveBlocked()">
-        {{ gate.unsynced() }} opération(s) enregistrée(s) sur cet appareil ne sont pas encore sur le serveur
-        @if (gate.problems()) { (dont {{ gate.problems() }} à corriger) }. Se déconnecter les effacerait : synchronisez d'abord.
-        Pour laisser l'appareil sans rien perdre, utilisez « Verrouiller l'appareil ».
-      </wk-confirm>
-    }
     @if (reauth()) { <wk-reauth (done)="reauth.set(false)" /> }`,
   styles: [`
     .shell{display:grid;grid-template-columns:var(--sidebar-w) minmax(0,1fr);min-height:100vh}
@@ -199,7 +194,6 @@ export class ShellComponent implements OnInit {
   gate = inject(OfflineGate);
 
   /** Sign-out refused: operations of this device are not on the server yet. */
-  blocked = signal(false);
   reauth = signal(false);
   navOpen = signal(false);
   open = signal<'' | 'inbox' | 'account'>('');
@@ -240,21 +234,14 @@ export class ShellComponent implements OnInit {
 
   logout() {
     this.open.set(''); this.navOpen.set(false);
-    // refused by AuthService itself while this device holds operations the server has not confirmed
-    if (!this.auth.logout()) { void this.gate.refreshCounts(); this.blocked.set(true); }
-  }
-  async resolveBlocked() {
-    this.blocked.set(false);
-    if (!this.gate.online()) { this.gate.lock(); return; }
-    await this.gate.syncNow();
-    if (this.gate.unsynced()) { this.toast.error(this.gate.message() || 'Des opérations restent à corriger avant de pouvoir vous déconnecter.'); void this.router.navigate(['/synchronisation']); }
-    else this.toast.success('Tout est synchronisé : vous pouvez vous déconnecter.');
+    const waiting = this.gate.unsynced();
+    this.auth.logout();
+    if (waiting) this.toast.info(`${waiting} opération(s) restent enregistrées (chiffrées) sur cet appareil : elles seront envoyées à votre prochaine connexion.`);
   }
   reload() { window.location.reload(); }
-  blockedLabel() { return this.gate.online() ? 'Synchroniser maintenant' : "Verrouiller l'appareil"; }
 
   inboxLink(status: string): string {
-    return status === 'PENDING_VALIDATION' ? '/validation' : '/declarations';
+    return status === 'PENDING_VALIDATION' ? '/validation' : status === 'DUPLICATES' ? '/duplicates' : '/declarations';
   }
   search(e: Event) {
     e.preventDefault();

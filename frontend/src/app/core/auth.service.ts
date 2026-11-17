@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { Observable, Subject, catchError, finalize, map, of, shareReplay, tap, throwError } from 'rxjs';
 import { environment } from '@env/environment';
 import { Me } from './models';
-import { readVaultHeader } from './offline/vault-header';
+import { deviceId, readVaultHeader } from './offline/vault-header';
 
 /** Requests flagged with this context skip the bearer/refresh/redirect logic of the interceptor. */
 export const SKIP_AUTH = new HttpContextToken<boolean>(() => false);
@@ -70,7 +70,7 @@ export class AuthService {
   canAny(...codes: string[]): boolean { return codes.some(c => this.can(c)); }
 
   login(username: string, password: string, remember: boolean): Observable<Me> {
-    return this.http.post<{ access: string; refresh: string; user: Me }>(`${this.api}/auth/login/`, { username, password }).pipe(
+    return this.http.post<{ access: string; refresh: string; user: Me }>(`${this.api}/auth/login/`, { username, password, device_id: deviceId() }).pipe(
       tap(r => {
         this.signedOut = false; this.sessionExpired.set(false); this.offlineSession.set(false);
         this.user.set(r.user); this.save(r.access, r.refresh, remember);

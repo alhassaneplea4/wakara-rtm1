@@ -12,7 +12,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom, timeout } from 'rxjs';
 import { ConnectivityService } from './connectivity.service';
 import { OfflineStore } from './store';
-import { HospitalRef, LocalDeclaration, Op, PushResult, SyncRules } from './types';
+import { HospitalRef, LocalDeclaration, Op, PushResult, ReferenceResponse, SyncRules } from './types';
 
 const RETRY_DELAYS_MS = [5_000, 15_000, 60_000, 300_000];
 const MAX_PULL_PAGES = 40;
@@ -25,6 +25,10 @@ export interface SyncHost {
   synced(at: string): void;
   failed(message: string): void;
   deviceRevoked(): void;
+  /** The account already uses its maximum number of devices: this one is not accepted for offline use. */
+  deviceLimit(): void;
+  /** The server wants a new sign-in (session not bound to this device): same screen as an expired session. */
+  signInRequired(): void;
   changed(): Promise<void> | void;
   sessionExpired(): boolean;
 }
@@ -70,6 +74,8 @@ export class SyncEngine {
     this.host.syncing(true);
     try {
       await this.store.resetSending();
+      // facilities and rules first: the forms must work offline even if the rest of the cycle fails
+      await this.reference();
       const sent = await this.push();
       const received = await this.pull();
       await this.store.purge();
@@ -93,6 +99,18 @@ export class SyncEngine {
     if (status === 403 && err.error?.code === 'device_revoked') {
       this.host.deviceRevoked();
       await this.store.log('error', "Appareil révoqué par l'administrateur : synchronisation refusée.");
+      return;
+    }
+    if (status === 403 && err.error?.code === 'device_limit') {
+      this.host.deviceLimit();
+      this.host.failed(err.error?.detail ?? "Nombre maximum d'appareils atteint pour ce compte.");
+      await this.store.log('error', "Nombre maximum d'appareils atteint pour ce compte : cet appareil n'est pas accepté (les opérations en attente sont conservées).");
+      return;
+    }
+    if (status === 403 && (err.error?.code === 'device_binding_required' || err.error?.code === 'device_mismatch')) {
+      this.host.signInRequired();
+      this.host.failed(err.error?.detail ?? 'Reconnectez-vous avec votre mot de passe.');
+      await this.store.log('error', 'Session non associée à cet appareil : nouvelle connexion demandée (les opérations en attente sont conservées).');
       return;
     }
     if (status === 0 || status === undefined || status >= 500 || status === 429) {
@@ -153,6 +171,9 @@ export class SyncEngine {
   }
 
   private async baseVersion(op: Op): Promise<number | null> {
+    // a decision (validation, return…) is only guarded by the version its author SAW; none when it rides on the
+    // device's own earlier operations (they change the version themselves)
+    if (op.type === 'declaration.transition') return op.baseVersion ?? null;
     if (op.type !== 'declaration.update') return null;
     // an edit stacked on the agent's own earlier operations targets the version they produced
     return op.baseVersion ?? ((await this.store.server(op.entity)) as LocalDeclaration | null)?.sync_version ?? null;
@@ -257,6 +278,32 @@ export class SyncEngine {
     return String(detail);
   }
 
+  /* ── reference data ── */
+
+  /**
+   * The health facilities and the rules, independent of any dossier. A refusal that concerns the session or the
+   * device is the same as for the rest of the cycle (and handled by it); anything else only means the data are not
+   * refreshed this time, the copy already on the device stays.
+   */
+  private async reference() {
+    try {
+      const res = await firstValueFrom(this.http.get<ReferenceResponse>(`${this.id.apiUrl}/sync/reference/`).pipe(timeout(REQUEST_TIMEOUT_MS)));
+      await this.keepReference(res);
+    } catch (e) {
+      const status = (e as HttpErrorResponse)?.status;
+      if (status === 0 || status === 401 || status === 403 || status === undefined) throw e;
+      await this.store.log('error', `Données de référence non actualisées (${status}).`);
+    }
+  }
+
+  private async keepReference(res: Partial<ReferenceResponse>) {
+    // an empty list never replaces a known one: it would blank the forms of the device for a transient reason
+    if (res.hospitals?.length) await this.store.setSecret('hospitals', res.hospitals);
+    if (res.rules) await this.store.setSecret('rules', res.rules);
+    if (typeof res.offline_enabled === 'boolean') this.conn.offlineEnabled.set(res.offline_enabled);
+    await this.store.setClear('referenceAt', new Date().toISOString());
+  }
+
   /* ── pull ── */
 
   private async pull(): Promise<number> {
@@ -264,9 +311,7 @@ export class SyncEngine {
     for (let page = 0; page < MAX_PULL_PAGES; page++) {
       const since = await this.store.clear<string | null>('cursor', null);
       const res = await firstValueFrom(this.http.get<PullResponse>(`${this.id.apiUrl}/sync/pull/`, { params: since ? { since } : {} }).pipe(timeout(REQUEST_TIMEOUT_MS)));
-      await this.store.setSecret('hospitals', res.hospitals ?? []);
-      if (res.rules) await this.store.setSecret('rules', res.rules);
-      if (typeof res.offline_enabled === 'boolean') this.conn.offlineEnabled.set(res.offline_enabled);
+      await this.keepReference(res);
       for (const d of res.declarations ?? []) {
         if (d.is_archived && !(await this.store.liveOps(d.uuid)).length) await this.store.dropServer(d.uuid);
         else await this.store.putServer(d);

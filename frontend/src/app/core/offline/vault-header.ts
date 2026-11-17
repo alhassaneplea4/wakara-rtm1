@@ -36,3 +36,16 @@ export function offlineSupported(): boolean {
     return typeof indexedDB !== 'undefined' && !!globalThis.crypto?.subtle && typeof localStorage !== 'undefined';
   } catch { return false; }
 }
+
+/** Identifier of this browser for the server (random, created once, survives a reset of the vault). */
+export function deviceId(): string {
+  try {
+    let id = localStorage.getItem(DEVICE_KEY);
+    if (!id) {
+      id = typeof crypto.randomUUID === 'function' ? crypto.randomUUID()
+        : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => (crypto.getRandomValues(new Uint8Array(1))[0] & 15).toString(16));
+      localStorage.setItem(DEVICE_KEY, id);
+    }
+    return id;
+  } catch { return '00000000-0000-4000-8000-000000000000'; }
+}

@@ -34,6 +34,12 @@ class DeclarationFilter(filters.FilterSet):
     # offline mode: how the dossier reached the server (see docs/hors-ligne/architecture.md)
     transmitted_offline = filters.BooleanFilter(field_name='device_transmitted_at', lookup_expr='isnull', exclude=True)
     entered_offline = filters.BooleanFilter(field_name='device_created_at', lookup_expr='isnull', exclude=True)
+    # six-month rule: dossiers past the deadline and still to be treated (they belong to the courts)
+    overdue = filters.BooleanFilter(method='filter_overdue')
+
+    def filter_overdue(self, queryset, name, value):
+        from core.deadline import overdue_filter
+        return queryset.filter(overdue_filter()) if value else queryset.exclude(overdue_filter())
 
     class Meta:
         model = Declaration
@@ -70,7 +76,11 @@ class DeclarationViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin,
     }
 
     def get_queryset(self):
-        return services.visible_declarations(self.request.user, super().get_queryset())
+        qs = services.visible_declarations(self.request.user, super().get_queryset())
+        if self.action in ('list', 'export', 'agents'):
+            # a dossier rejected as the redundant entry of a confirmed duplicate no longer appears in the lists
+            qs = services.listed_declarations(qs)
+        return qs
 
     def get_serializer_class(self):
         if self.action in ('create', 'update', 'partial_update'):

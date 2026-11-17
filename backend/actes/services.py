@@ -51,7 +51,8 @@ def can_edit_acte_in_status(user, status) -> bool:
 
 
 def can_edit_acte(user, acte) -> bool:
-    return can_edit_acte_in_status(user, acte.declaration.status)
+    from core.deadline import is_locked_for
+    return can_edit_acte_in_status(user, acte.declaration.status) and not is_locked_for(user, acte.declaration)
 
 
 ACTE_EDITABLE_FIELDS = ['annee', 'registre', 'feuillet', 'numero_acte', 'region', 'prefecture', 'commune_type',
@@ -72,6 +73,8 @@ def update_acte_data(user, declaration: Declaration, data: dict) -> Acte:
     secretariat. The acte is created if the dossier does not have one yet. The OFFICIAL number is never
     written here: it is attributed at validation.
     """
+    from core.deadline import assert_not_locked
+    assert_not_locked(user, declaration)
     if not can_edit_acte_in_status(user, declaration.status):
         raise PermissionDenied("Les références de l'acte ne peuvent pas être modifiées par vous ou dans l'état actuel du dossier.")
     acte = ensure_acte(declaration, user)

@@ -151,6 +151,8 @@ class DuplicateCheck(AppendOnlyModel):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
     performed_at = models.DateTimeField(auto_now_add=True, db_index=True)
     candidates_examined = models.PositiveIntegerField(default=0)
+    # True when a cap of the pre-filter was hit: the analysis was not exhaustive (the validation redoes it)
+    candidates_truncated = models.BooleanField(default=False)
     matches_found = models.PositiveIntegerField(default=0)
     highest_score = models.FloatField(default=0)
     data_quality = models.PositiveSmallIntegerField(default=0)

@@ -49,6 +49,8 @@ class SyncOperation(NoHardDeleteMixin, models.Model):
         DECLARATION_UPDATE = 'declaration.update', "Modification d'une déclaration"
         DECLARATION_TRANSMIT = 'declaration.transmit', "Transmission au secrétariat"
         DOCUMENT_UPLOAD = 'document.upload', "Ajout d'une pièce"
+        # any other step of the workflow (secretariat, validation): the rules are those of the online API
+        DECLARATION_TRANSITION = 'declaration.transition', "Changement d'étape du dossier"
 
     class Status(models.TextChoices):
         APPLIED = 'applied', 'Appliquée'

@@ -26,6 +26,7 @@ PERMISSION_CATALOG = [
     ('acte.deliver', 'Enregistrer une délivrance', 'Actes'),
     ('dossier.validate', 'Valider définitivement', 'Validation'),
     ('dossier.reject', 'Rejeter ou retourner un dossier', 'Validation'),
+    ('dossier.override_deadline', 'Traiter un dossier de plus de 6 mois (délai dépassé)', 'Validation'),
     ('document.view', 'Consulter les pièces justificatives', 'Pièces'),
     ('document.upload', 'Ajouter une pièce justificative', 'Pièces'),
     ('hospital.view', 'Consulter les établissements', 'Établissements'),
@@ -47,6 +48,7 @@ PERMISSION_CATALOG = [
     ('duplicate.view', 'Consulter le Centre de contrôle des doublons', 'Contrôle des doublons'),
     ('duplicate.investigate', 'Investiguer un dossier suspect (observations, vérifications)', 'Contrôle des doublons'),
     ('duplicate.decide', "Décider du sort d'un dossier suspect", 'Contrôle des doublons'),
+    ('duplicate.configure', "Régler les seuils et pondérations de la détection des doublons", 'Contrôle des doublons'),
 ]
 ALL_PERMISSION_CODES = [c for c, _, _ in PERMISSION_CATALOG]
 
@@ -68,7 +70,8 @@ DEFAULT_ROLES = {
             'document.view', 'document.upload',
             'hospital.view', 'hospital.create', 'hospital.update', 'hospital.archive',
             'stats.view',
-            'duplicate.view', 'duplicate.investigate',
+            'dossier.validate', 'dossier.reject',   # the secretariat also takes the final decision
+            'duplicate.view', 'duplicate.investigate', 'duplicate.decide',   # decides on duplicates like the admin
         ],
         'is_system': False,
     },
@@ -84,6 +87,14 @@ DEFAULT_ROLES = {
         'is_system': False,
     },
 }
+
+# Rights granted ONCE to an already existing default role when the application is upgraded (setup_initial_data).
+# A role the administrator has adjusted is never overwritten: the grant is recorded and not applied again, so
+# the administrator can still remove it afterwards from the roles screen.
+ROLE_UPGRADE_GRANTS = [
+    ('secretary-final-validation', 'secretary', ['dossier.validate', 'dossier.reject']),
+    ('secretary-duplicate-decision', 'secretary', ['duplicate.decide']),
+]
 
 # Permissions the 'admin' system role can never lose (lock-out protection).
 PROTECTED_ADMIN_PERMISSIONS = ['user.view', 'user.assign_roles', 'role.manage', 'role.view']

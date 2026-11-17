@@ -1,4 +1,5 @@
 """No physical deletion, append-only history, audit protection, private documents, statistics."""
+from django.utils import timezone
 import datetime
 import shutil
 import tempfile
@@ -240,7 +241,7 @@ class DocumentTests(WakaraTestCase):
 class StatisticsTests(WakaraTestCase):
     def setUp(self):
         super().setUp()
-        self.today = datetime.date.today()
+        self.today = timezone.localdate()
         # 2 drafts, 1 in progress, 1 pending, 1 validated, 1 rejected
         self.create_declaration()
         self.create_declaration(child={'first_names': 'B', 'last_name': 'B', 'gender': 'M'})

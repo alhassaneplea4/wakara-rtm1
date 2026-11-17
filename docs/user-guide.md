@@ -22,14 +22,13 @@ Vous ne voyez que vos propres déclarations. Vous ne pouvez plus modifier un dos
 ## Secrétaire d'état civil
 
 1. **Déclarations** (une seule page, pastille = dossiers à traiter) : ouvrez un dossier *Transmis*. La fiche n'offre que
-   **Modifier** et **Aperçu de l'acte**.
+   **Modifier**.
 2. **Modifier** : le formulaire commence par l'en-tête du registre (année, registre, feuillet, N° officiel, libre), la circonscription, la date de déclaration, l'officier d'état civil (pré-rempli) et les mentions ; vient
    ensuite la déclaration (enfant, **père obligatoire**, mère, déclarant).
 3. **Enregistrer et envoyer à la validation de l'administrateur** : possible seulement si **tous les champs sont
    renseignés, sauf le NPI** ; les champs manquants sont marqués en rouge. **Enregistrer les modifications** garde la
    saisie en cours sans envoyer le dossier.
-4. Après validation : **Aperçu de l'acte → Imprimer** (l'impression est enregistrée), puis **Enregistrer la délivrance**
-   (nom du bénéficiaire, qualité, pièce). Une nouvelle délivrance est marquée *Duplicata*.
+4. Après validation : l'écran d'impression et d'enregistrement de la délivrance (autrefois « Aperçu de l'acte ») a été retiré de l'application ; les délivrances déjà enregistrées restent consultables dans le menu **Délivrances**.
 
 Vous ne pouvez ni valider ni rejeter.
 
@@ -51,3 +50,13 @@ Vous ne pouvez ni valider ni rejeter.
 
 - Un document n'a de valeur qu'**après validation définitive** ; avant, l'aperçu porte la mention *ACTE INCOMPLET*.
 - L'aperçu de l'acte est **en lecture seule** et reprend la présentation de la fiche de l'état civil (volet n° 1, déclarant) : en-tête (année, registre, feuillet, n° de l'acte), puis les rubriques ENFANT, PARENTS (père, mère) et DÉCLARANT. Les cases que le dossier ne renseigne pas (commune urbaine/rurale, centre principal/secondaire, situation matrimoniale) restent vides et se cochent à la main après impression. Le modèle imprimé reste un modèle de travail, en attente de validation par la mairie.
+
+## Travailler sans connexion (tous les comptes)
+
+Tous les comptes peuvent protéger leur appareil par un code et continuer à travailler quand Internet est coupé : l'agent de collecte (saisie, photos, transmission), le secrétariat (corriger un dossier, compléter l'en-tête du registre, soumettre à la validation) et les validateurs (valider, renvoyer, rejeter).
+
+1. **Une première fois en ligne** : ouvrez Wakara avec Internet, choisissez votre code de verrouillage, puis ouvrez « Synchronisation » et vérifiez que « Établissements et règles » affiche une date. Sans cela, la liste des établissements n'est pas disponible hors connexion.
+2. **Sans connexion** : travaillez normalement. Les dossiers modifiés s'affichent avec « Modifications à envoyer ». La pastille de connexion indique ce qui attend.
+3. **Au retour d'Internet** : tout part tout seul. Si le serveur refuse une opération (numéro officiel déjà pris, dossier modifié entre-temps…), elle apparaît dans « Synchronisation » avec le motif, et vous pouvez la renvoyer ou l'abandonner.
+
+Ce qui exige la connexion : gestion des utilisateurs, des rôles et des paramètres, décisions du contrôle des doublons, délivrances, exports. Un compte peut utiliser 3 appareils au plus. Détail : [hors-ligne/tous-les-roles.md](hors-ligne/tous-les-roles.md).

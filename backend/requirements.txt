@@ -6,6 +6,9 @@ django-filter>=24.0
 # Authentication
 djangorestframework-simplejwt>=5.3,<6.0
 
+# Shared cache for the rate limits (REDIS_URL); only imported when REDIS_URL is set
+redis>=5.0
+
 # Environment variables
 python-decouple>=3.8
 

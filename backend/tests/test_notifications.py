@@ -59,8 +59,8 @@ class ChildFieldsTests(WakaraTestCase):
         r = self.client_for(self.admin).patch(f'/api/actes/{det.data["uuid"]}/', {'feuillet': '12'}, format='json')
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual(self.client_for(self.admin).get(f'/api/declarations/{d["uuid"]}/').data['status'], 'PENDING_VALIDATION')
-        # the secretary, whose work is done, no longer can
-        self.assertFalse(self.client_for(self.secretary).get(f'/api/actes/{det.data["uuid"]}/').data['can_edit'])
+        # the secretary now also takes the final decision, so she can too; the collection agent cannot
+        self.assertTrue(self.client_for(self.secretary).get(f'/api/actes/{det.data["uuid"]}/').data['can_edit'])
 
 
 class SecretariatTreatmentTests(WakaraTestCase):

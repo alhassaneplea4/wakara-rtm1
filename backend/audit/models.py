@@ -35,6 +35,7 @@ class AuditAction:
     # offline mode
     SYNC_REJECTED = 'sync_rejected'
     SYNC_CONFLICT = 'sync_conflict'
+    SYNC_DATE_ANOMALY = 'sync_date_anomaly'
     DEVICE_REGISTERED = 'device_registered'
     DEVICE_REVOKED = 'device_revoked'
     DEVICE_RESTORED = 'device_restored'

@@ -5,7 +5,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiService, errorMessage } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { AutoRefreshService } from '../../core/auto-refresh.service';
-import { CompareDoc, DecisionCode, DuplicateCaseDetail, DuplicateComparison, DuplicateFilterOptions } from '../../core/models';
+import { CompareDoc, DecisionCode, DeclarationBrief, DuplicateCaseDetail, DuplicateComparison, DuplicateFilterOptions } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { ConfirmComponent, IconComponent, PageHeaderComponent } from '../../shared/ui';
 import {
@@ -16,10 +16,10 @@ type Tab = 'analysis' | 'compare' | 'evidence' | 'decisions' | 'history';
 type Dialog = '' | 'note' | 'verify' | 'decide' | 'reopen' | 'assign';
 
 const DECISION_HELP: Record<DecisionCode, string> = {
-  CONFIRMED_DUPLICATE: "Les deux déclarations concernent la même naissance. L'une est désignée comme saisie redondante : elle est liée au dossier principal et ne pourra pas recevoir de numéro officiel. Rien n'est supprimé.",
+  CONFIRMED_DUPLICATE: "Les deux déclarations concernent la même naissance. L'une est désignée comme saisie redondante : elle est rejetée, retirée de la liste des déclarations et liée au dossier principal, qui reste valide. Rien n'est supprimé.",
   DISTINCT_CHILDREN: 'Ce sont deux enfants distincts : les deux dossiers peuvent poursuivre leur circuit.',
   MULTIPLE_BIRTH: 'Naissance multiple (jumeaux…) : deux enfants distincts de la même mère.',
-  DATA_ENTRY_ERROR: "Erreur de saisie : l'une des déclarations a été saisie à tort (double saisie). Elle est liée à l'autre et ne pourra pas recevoir de numéro officiel.",
+  DATA_ENTRY_ERROR: "Erreur de saisie : l'une des déclarations a été saisie à tort (double saisie). Elle est rejetée, retirée de la liste des déclarations et liée à l'autre, qui reste valide.",
   INSUFFICIENT_INFO: 'Les informations ne permettent pas de conclure : le dossier reste ouvert et la validation reste bloquée.',
   FURTHER_VERIFICATION: 'Une vérification complémentaire est nécessaire : le dossier reste ouvert et la validation reste bloquée.',
 };
@@ -38,7 +38,7 @@ const DECISION_HELP: Record<DecisionCode, string> = {
         @if (c.status !== 'RESOLVED') {
           <div class="alert alert-warning" style="margin-bottom:16px"><strong>Dossier non résolu.</strong> Tant qu'une décision n'est pas rendue, l'attribution d'un numéro officiel est bloquée pour les déclarations concernées. Le score est une aide : il ne vaut pas conclusion juridique.</div>
         } @else {
-          <div class="alert alert-info" style="margin-bottom:16px"><strong>{{ c.decision_label }}</strong>@if (c.duplicate) { — saisie redondante : <span class="mono">{{ c.duplicate }}</span> (dossier principal : <span class="mono">{{ c.principal }}</span>) } · le {{ c.resolved_at | date: 'dd/MM/yyyy HH:mm' }}</div>
+          <div class="alert alert-info" style="margin-bottom:16px"><strong>{{ c.decision_label }}</strong>@if (c.duplicate) { — saisie redondante : <span class="mono">{{ c.duplicate }}</span> (dossier principal : <span class="mono">{{ c.principal }}</span>)@if (redundantRejected(c)) { — rejetée, retirée de la liste des déclarations } } · le {{ c.resolved_at | date: 'dd/MM/yyyy HH:mm' }}</div>
         }
         @for (w of warnings(); track w) { <div class="alert alert-warning" style="margin-bottom:16px">{{ w }}</div> }
 
@@ -168,7 +168,17 @@ const DECISION_HELP: Record<DecisionCode, string> = {
                 <select id="dup" class="input" [(ngModel)]="duplicateUuid"><option value="">Choisir…</option>
                   <option [value]="c.declaration.uuid">{{ c.declaration.reference }} — {{ c.declaration.child_name || 'Enfant non nommé' }}</option>
                   <option [value]="c.other_declaration.uuid">{{ c.other_declaration.reference }} — {{ c.other_declaration.child_name || 'Enfant non nommé' }}</option></select>
+                @if (suggestion(); as sg) { <small class="soft">Suggestion : <strong class="mono">{{ sg.redundant.reference }}</strong> — {{ sg.why }}. <button type="button" class="btn btn-sm" (click)="duplicateUuid = sg.redundant.uuid">Appliquer</button></small> }
                 <small class="soft">L'autre déclaration devient le dossier principal. Aucune donnée n'est supprimée ; un acte déjà établi n'est jamais modifié automatiquement.</small></div>
+              @if (outcome(); as o) {
+                <div class="alert" [ngClass]="o.protected ? 'alert-warning' : 'alert-info'" style="margin-top:12px">
+                  @if (o.protected) {
+                    <strong>{{ o.redundant.reference }}</strong> {{ o.protectedWhy }} Elle ne sera pas rejetée automatiquement et restera dans la liste des déclarations ; la rectification suit la procédure légale. <strong>{{ o.principal.reference }}</strong> reste le dossier principal.
+                  } @else {
+                    <strong>{{ o.redundant.reference }}</strong> sera <strong>rejetée</strong> (statut « Rejeté ») et n'apparaîtra plus dans la liste des déclarations. <strong>{{ o.principal.reference }}</strong> reste le dossier principal : son statut ne change pas. La décision peut être rouverte, ce qui rétablit la déclaration.
+                  }
+                </div>
+              }
             }
             <div class="field" style="margin-top:12px"><label class="req" for="why">Motif de la décision</label>
               <textarea id="why" class="input" rows="3" [(ngModel)]="reason" placeholder="Pièces consultées, vérifications effectuées…"></textarea></div>
@@ -279,6 +289,28 @@ export class DuplicateCaseComponent implements OnInit {
   assign() { this.act('assign', { assignee: this.assignee }, 'Dossier attribué.'); }
 
   openDecision() { this.decision = ''; this.duplicateUuid = ''; this.reason = ''; this.decideError.set(''); this.dialog.set('decide'); }
+  /** Which of the two dossiers looks like the redundant one: never the one holding an act, else the latest entry. */
+  suggestion() {
+    const c = this.c(); if (!c) return null;
+    const a = c.declaration, b = c.other_declaration;
+    const held = (d: DeclarationBrief) => !!d.official_number || d.status === 'VALIDATED' || d.status === 'DELIVERED';
+    if (held(a) !== held(b)) return { redundant: held(a) ? b : a, why: "l'autre dossier porte déjà un acte" };
+    if (a.created_at === b.created_at) return null;
+    return { redundant: a.created_at > b.created_at ? a : b, why: "saisie la plus récente" };
+  }
+  /** What the decision will do to the dossier designated as redundant. */
+  outcome() {
+    const c = this.c(); if (!c || !this.duplicateUuid) return null;
+    const [redundant, principal] = c.declaration.uuid === this.duplicateUuid ? [c.declaration, c.other_declaration] : [c.other_declaration, c.declaration];
+    const frozen = redundant.status === 'VALIDATED' || redundant.status === 'DELIVERED';
+    const numbered = !!redundant.official_number;
+    return { redundant, principal, protected: frozen || numbered,
+      protectedWhy: numbered ? `porte déjà l'acte n° ${redundant.official_number}.` : 'est déjà validée.' };
+  }
+  redundantRejected(c: DuplicateCaseDetail) {
+    const d = c.duplicate === c.declaration.reference ? c.declaration : c.other_declaration;
+    return d.status === 'REJECTED';
+  }
   needsDuplicate() { return !!this.options()?.decisions.find(o => o.value === this.decision)?.designates_duplicate; }
   canSubmitDecision() { return !!this.decision && !!this.reason.trim() && (!this.needsDuplicate() || !!this.duplicateUuid); }
   decide() {
@@ -286,7 +318,10 @@ export class DuplicateCaseComponent implements OnInit {
     this.api.post<DuplicateCaseDetail>(`/duplicates/cases/${this.uuid}/decide/`, {
       decision: this.decision, reason: this.reason.trim(), duplicate_declaration: this.needsDuplicate() ? this.duplicateUuid : null,
     }).subscribe({
-      next: c => { this.busy.set(false); this.dialog.set(''); this.warnings.set(c.warnings ?? []); this.c.set(c); this.toast.success('Décision enregistrée (action tracée).'); },
+      next: c => {
+        this.busy.set(false); this.dialog.set(''); this.warnings.set(c.warnings ?? []); this.c.set(c);
+        this.toast.success(c.redundant_outcome === 'rejected' ? `Décision enregistrée : ${c.duplicate} est rejetée et retirée de la liste des déclarations.` : 'Décision enregistrée (action tracée).');
+      },
       error: e => { this.busy.set(false); this.decideError.set(errorMessage(e)); },
     });
   }

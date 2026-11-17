@@ -64,6 +64,11 @@ const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Statu
                   <option value="transmitted">Transmis hors ligne</option>
                   <option value="entered">Saisis hors ligne</option>
                 </select></div>
+              <div class="field"><label class="sr-only" for="ov">Délai de 6 mois</label>
+                <select id="ov" class="input" [(ngModel)]="overdue" (ngModelChange)="apply()">
+                  <option value="">Tous les délais</option>
+                  <option value="1">Plus de 6 mois (tribunal)</option>
+                </select></div>
             }
             <div class="field"><label class="sr-only" for="df">Reçues depuis</label><input id="df" type="date" class="input" [(ngModel)]="from" (ngModelChange)="apply()" title="Reçues à partir du" /></div>
             <div class="field"><label class="sr-only" for="dt">Reçues jusqu'au</label><input id="dt" type="date" class="input" [(ngModel)]="to" (ngModelChange)="apply()" title="Reçues jusqu'au" /></div>
@@ -96,7 +101,8 @@ const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Statu
                 @for (d of rows(); track d.uuid) {
                   <tr class="clickable" (click)="open(d.uuid)" tabindex="0" (keyup.enter)="open(d.uuid)">
                     <td class="mono"><a [routerLink]="['/declarations', d.uuid]" (click)="$event.stopPropagation()">{{ d.reference }}</a>
-                      @if (d.transmitted_offline) { <span class="chip-off" title="Transmis depuis l'appareil d'un agent, sans connexion, le {{ d.device_transmitted_at | date: 'dd/MM/yyyy HH:mm' }}">Hors ligne</span> }</td>
+                      @if (d.transmitted_offline) { <span class="chip-off" title="Transmis depuis l'appareil d'un agent, sans connexion, le {{ d.device_transmitted_at | date: 'dd/MM/yyyy HH:mm' }}">Hors ligne</span> }
+                      @if (d.overdue) { <span class="chip-late" title="Déclaration de plus de 6 mois non traitée : le dossier doit être traité aux tribunaux">Tribunal</span> }</td>
                     <td class="uc">{{ d.child_name || '—' }}</td><td class="uc">{{ d.hospital_name || 'Non renseigné' }}</td>
                     <td class="mono">{{ d.birth_date | date: 'dd/MM/yyyy' }}</td><td class="mono">{{ d.received_at | date: 'dd/MM/yyyy' }}</td>
                     <td>{{ d.assigned_to_name || '—' }}</td><td><wk-status [status]="d.status" /></td>
@@ -119,6 +125,7 @@ const MODE_TEXT: Record<Mode, { title: string; subtitle: string; statuses: Statu
     .scope{flex:1 1 100%;margin:4px 0 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--wk-text-soft)}
     .filters{display:flex;gap:10px;flex-wrap:wrap;padding:16px;border-bottom:1px solid var(--wk-border);align-items:center}
     .grow{flex:1;min-width:220px}
+    .chip-late{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:999px;font:600 11px/18px var(--font-sans,inherit);background:var(--wk-danger-bg,#fde8e8);color:var(--wk-danger,#b42318);white-space:nowrap}
     .chip-off{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:999px;font:600 11px/18px var(--font-sans,inherit);background:var(--wk-info-bg);color:var(--wk-royal);white-space:nowrap}
     .filters .input{min-height:40px}
     .m{margin:16px}
@@ -156,7 +163,7 @@ export class DeclarationsListComponent implements OnInit {
   labels = STATUS_LABELS;
   statusOptions: Status[] = [];
 
-  search = ''; status = ''; hospital = ''; agent = ''; offline = ''; from = ''; to = ''; ordering = '-updated_at'; page = 1;
+  search = ''; status = ''; hospital = ''; agent = ''; offline = ''; overdue = ''; from = ''; to = ''; ordering = '-updated_at'; page = 1;
   /** Several statuses at once, set by a dashboard figure (`?statuses=A,B&label=…`); a single status chosen here replaces them. */
   statuses: string[] = []; scopeLabel = '';
   rows = signal<DeclarationListItem[]>([]);
@@ -180,7 +187,7 @@ export class DeclarationsListComponent implements OnInit {
       this.statuses = (q.get('statuses') ?? '').split(',').filter(Boolean);
       this.scopeLabel = q.get('label') ?? '';
       if (this.mode === 'all') {
-        this.hospital = q.get('hospital') ?? ''; this.agent = q.get('agent') ?? ''; this.offline = q.get('offline') ?? '';
+        this.hospital = q.get('hospital') ?? ''; this.agent = q.get('agent') ?? ''; this.offline = q.get('offline') ?? ''; this.overdue = q.get('overdue') ?? '';
         this.from = q.get('from') ?? ''; this.to = q.get('to') ?? '';
       }
       this.page = Number(q.get('page') ?? 1);
@@ -204,10 +211,10 @@ export class DeclarationsListComponent implements OnInit {
     return this.hidesActes() ? "Dossiers en cours. Ceux en attente de validation ou validés sont dans « Actes de naissance », les actes remis dans « Délivrances »." : this.text.subtitle;
   }
   private defaultStatuses(): Status[] {
-    return this.hidesActes() && !this.search && !this.offline ? (Object.keys(STATUS_LABELS) as Status[]).filter(s => !MOVED_TO_ACTES.includes(s)) : this.text.statuses;
+    return this.hidesActes() && !this.search && !this.offline && !this.overdue ? (Object.keys(STATUS_LABELS) as Status[]).filter(s => !MOVED_TO_ACTES.includes(s)) : this.text.statuses;
   }
 
-  hasFilters = () => !!(this.search || this.status || this.statuses.length || this.hospital || this.agent || this.offline || this.from || this.to);
+  hasFilters = () => !!(this.search || this.status || this.statuses.length || this.hospital || this.agent || this.offline || this.overdue || this.from || this.to);
   arrow(f: string) { return this.ordering === f ? '↑' : this.ordering === '-' + f ? '↓' : ''; }
   sort(f: string) { this.ordering = this.ordering === f ? '-' + f : f; this.load(); }
   open(uuid: string) { this.router.navigate(['/declarations', uuid]); }
@@ -217,20 +224,20 @@ export class DeclarationsListComponent implements OnInit {
     this.router.navigate([], {
       queryParams: {
         search: this.search || null, status: this.status || null, statuses: this.statuses.join(',') || null, label: this.statuses.length ? this.scopeLabel || null : null,
-        hospital: this.hospital || null, agent: this.agent || null, offline: this.offline || null, from: this.from || null, to: this.to || null, page: null,
+        hospital: this.hospital || null, agent: this.agent || null, offline: this.offline || null, overdue: this.overdue || null, from: this.from || null, to: this.to || null, page: null,
       },
       queryParamsHandling: 'merge',
     });
     this.page = 1; this.load();
   }
-  reset() { this.search = this.status = this.hospital = this.agent = this.offline = this.from = this.to = this.scopeLabel = ''; this.statuses = []; this.apply(); }
+  reset() { this.search = this.status = this.hospital = this.agent = this.offline = this.overdue = this.from = this.to = this.scopeLabel = ''; this.statuses = []; this.apply(); }
   clearScope() { this.statuses = []; this.scopeLabel = ''; this.apply(); }
 
   private query() {
     return {
       search: this.search, status: this.status ? [this.status] : this.statuses.length ? this.statuses : this.defaultStatuses(), hospital: this.hospital, assigned_to: this.agent,
       received_from: this.from, received_to: this.to, ordering: this.ordering, page: this.page,
-      transmitted_offline: this.offline === 'transmitted' ? true : '', entered_offline: this.offline === 'entered' ? true : '',
+      transmitted_offline: this.offline === 'transmitted' ? true : '', entered_offline: this.offline === 'entered' ? true : '', overdue: this.overdue ? true : '',
     };
   }
 

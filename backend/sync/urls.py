@@ -1,7 +1,9 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from .views import DeviceViewSet, DocumentPushView, PingView, PullView, PushView, SyncOperationViewSet
+from .views import (
+    DeviceViewSet, DocumentPushView, PingView, PullView, PushView, ReferenceView, SyncOperationViewSet,
+)
 
 router = DefaultRouter()
 router.register('operations', SyncOperationViewSet, basename='sync-operation')
@@ -12,4 +14,5 @@ urlpatterns = [
     path('push/', PushView.as_view(), name='sync-push'),
     path('documents/', DocumentPushView.as_view(), name='sync-documents'),
     path('pull/', PullView.as_view(), name='sync-pull'),
+    path('reference/', ReferenceView.as_view(), name='sync-reference'),
 ] + router.urls

@@ -11,7 +11,7 @@ from django.db import transaction
 
 from accounts.models import Permission, Role, RolePermission, UserRole
 from core.models import DEFAULT_SETTINGS, SiteSetting
-from core.permissions import DEFAULT_ROLES, PERMISSION_CATALOG
+from core.permissions import DEFAULT_ROLES, PERMISSION_CATALOG, ROLE_UPGRADE_GRANTS
 
 User = get_user_model()
 
@@ -56,6 +56,17 @@ class Command(BaseCommand):
                 for perm in Permission.objects.exclude(role_permissions__role=role):
                     RolePermission.objects.create(role=role, permission=perm)
         self.stdout.write(f"Rôles : {', '.join(DEFAULT_ROLES)}")
+
+        # one-time grants to existing default roles (recorded in a setting so that a later removal is respected)
+        for flag, role_code, perm_codes in ROLE_UPGRADE_GRANTS:
+            marker, first_time = SiteSetting.objects.get_or_create(
+                key=f'upgrade.{flag}', defaults={'value': '1', 'description': "Droit accordé lors d'une mise à jour"})
+            if first_time:
+                role = Role.objects.get(codename=role_code)
+                for perm_code in perm_codes:
+                    RolePermission.objects.get_or_create(
+                        role=role, permission=Permission.objects.get(codename=perm_code))
+                self.stdout.write(f"Droits accordés au rôle {role_code} : {', '.join(perm_codes)}")
 
         for key, value, description, is_public in DEFAULT_SETTINGS:
             SiteSetting.objects.get_or_create(

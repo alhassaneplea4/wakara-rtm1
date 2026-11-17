@@ -34,6 +34,8 @@ export interface DeclarationListItem {
   assigned_to_name: string; official_number: string | null; can_edit?: boolean; updated_at: string; created_at: string;
   /** Offline mode: the last transmission / the entry was made on an agent's device (absent on dossiers prepared locally). */
   transmitted_offline?: boolean; entered_offline?: boolean; device_transmitted_at?: string | null;
+  /** Six-month rule: past the deadline and still to be treated (goes to the courts). */
+  overdue?: boolean;
 }
 
 export interface Child { first_names: string; last_name: string; gender: 'M' | 'F' | ''; nationality?: string; npi?: string; birth_rank?: number | null; }
@@ -56,6 +58,12 @@ export interface DeclarationDetail extends DeclarationListItem {
   status_history: StatusHistoryEntry[]; created_by_name: string;
   available_transitions: AvailableTransition[]; can_edit: boolean;
   duplicate_alert?: DuplicateAlert;
+  deadline?: DossierDeadline;
+}
+
+export interface DossierDeadline {
+  months: number; reference_date: string | null; deadline_date: string | null; applies: boolean; overdue: boolean;
+  days_over: number; message: string; can_override: boolean;
 }
 
 /** Duplicate-control status of a dossier (the case itself is only detailed for the control centre). */
@@ -77,14 +85,6 @@ export interface Acte {
   numero_acte: string | null; updated_at: string; region: string; prefecture: string; commune: string;
   commune_type: string; centre_type: string;
   centre: string; declaration_date: string | null; officer_name: string; mentions: string; can_edit: boolean;
-}
-
-export interface ActeDocument {
-  is_official: boolean; status: Status; reference: string; official_number: string | null; annee: number | null;
-  registre: string; feuillet: string; region: string; prefecture: string; commune_type: string; commune: string; centre_type: string; centre: string;
-  declaration_date: string | null; child: { first_names: string; last_name: string; gender: string; nationality?: string; npi?: string; birth_rank?: number | null; birth_date: string; birth_time: string | null; birth_place: string };
-  father: Person | null; mother: Person | null; declarant: (Person & { relationship: string }) | null;
-  hospital: string; mentions: string; officer_name: string; validated_at: string | null;
 }
 
 export interface Delivery {
@@ -140,7 +140,7 @@ export interface Dashboard {
   delays: { avg_days_transmission_to_validation: number | null };
 }
 
-export interface Inbox { total: number; items: { code: string; label: string; count: number; status: Status }[]; badges: Record<string, number>; }
+export interface Inbox { total: number; items: { code: string; label: string; count: number; status: Status | 'OVERDUE' | 'DUPLICATES' }[]; badges: Record<string, number>; }
 
 /* ── Historiques des actes (administrator) ───────── */
 
@@ -209,6 +209,8 @@ export interface DuplicateCaseDetail extends DuplicateCase {
   history: CaseHistoryEntry[]; principal: string; duplicate: string; match_uuid: string;
   permissions: { investigate: boolean; decide: boolean; documents: boolean };
   warnings?: string[];
+  /** What became of the redundant dossier after a decision: rejected / already_rejected / kept. */
+  redundant_outcome?: 'rejected' | 'already_rejected' | 'kept' | '';
 }
 
 export interface CompareRow { label: string; a: string; b: string; status: 'same' | 'similar' | 'different' | 'missing'; }

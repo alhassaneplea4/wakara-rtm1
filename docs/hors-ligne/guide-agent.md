@@ -45,7 +45,7 @@ Une photo en attente porte l'indicateur « Sur cet appareil » ; elle est suppri
 ## Quitter l'appareil
 
 - **Verrouiller l'appareil** (pastille de connexion, ou menu de votre compte) : vos déclarations restent sur l'appareil, protégées par votre code. À utiliser chaque fois que vous posez le téléphone.
-- **Déconnexion** : possible seulement quand **tout est synchronisé**. Sinon Wakara refuse, pour ne rien perdre. La déconnexion efface les données de l'appareil.
+- **Déconnexion** : toujours possible. Vos déclarations non synchronisées **restent sur l'appareil (chiffrées)** et partent à votre prochaine connexion. Le code de verrouillage se crée **une seule fois par appareil** : après une reconnexion, vous le saisissez simplement pour déverrouiller.
 - Après 15 minutes sans activité, l'appareil se verrouille tout seul.
 
 ## En cas de problème

@@ -18,6 +18,9 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from .authentication import DEVICE_REVOKED_MESSAGE, device_of_token, is_device_revoked
+from .tokens import tokens_for
+
 from audit import service as audit
 from audit.models import AuditAction
 from core.permissions import ALL_PERMISSION_CODES, PROTECTED_ADMIN_PERMISSIONS, HasWakaraPermission
@@ -104,13 +107,19 @@ class LoginView(APIView):
             audit.log(AuditAction.LOGIN_FAILED, user=user, obj=user, reason='Compte désactivé')
             return Response({"detail": "Ce compte est désactivé."}, status=status.HTTP_403_FORBIDDEN)
 
+        device_id = serializer.validated_data.get('device_id')
+        if is_device_revoked(user.pk, device_id):
+            audit.log(AuditAction.LOGIN_FAILED, user=user, obj=user, reason='Appareil révoqué')
+            return Response({'code': 'device_revoked', 'detail': DEVICE_REVOKED_MESSAGE + " Contactez l'administrateur."},
+                            status=status.HTTP_403_FORBIDDEN)
+
         user.failed_login_count = 0
         user.locked_until = None
         user.last_login = timezone.now()
         user.save(update_fields=['failed_login_count', 'locked_until', 'last_login'])
         audit.log(AuditAction.LOGIN, user=user, obj=user)
 
-        refresh = RefreshToken.for_user(user)
+        refresh = tokens_for(user, device_id)
         return Response({
             'access': str(refresh.access_token),
             'refresh': str(refresh),
@@ -167,7 +176,7 @@ class ChangePasswordView(APIView):
         request.user.save(update_fields=['password', 'must_change_password', 'updated_at'])
         # Every session opened with the old password ends; this session gets a fresh token pair.
         revoke_user_tokens(request.user)
-        refresh = RefreshToken.for_user(request.user)
+        refresh = tokens_for(request.user, device_of_token(request.auth))  # the new session stays on the same device
         audit.log(AuditAction.PASSWORD_CHANGED, user=request.user, obj=request.user)
         return Response({"detail": "Mot de passe modifié avec succès.",
                          "access": str(refresh.access_token), "refresh": str(refresh)})

@@ -59,12 +59,15 @@ const STEP_TEXT: Record<string, { title: string; help: string; icon: string; ton
           <wk-status [status]="d.status" />
           @if (gate.visible()) { <wk-sync [state]="$any(d).sync_state" /> }
           @if (d.can_edit) { <a class="btn" [routerLink]="['/declarations', d.uuid, 'edit']"><wk-icon name="edit" [size]="16" /> Modifier</a> }
-          @if (d.acte_uuid && auth.can('acte.view')) {
-            <a class="btn" [routerLink]="['/actes', d.acte_uuid, 'document']"><wk-icon name="eye" [size]="16" /> Aperçu de l'acte</a>
-          }
         </wk-page-header>
 
         @if (error()) { <div class="alert alert-danger" role="alert" style="margin-bottom:16px">{{ error() }}</div> }
+        @if (d.deadline?.overdue) {
+          <div class="alert alert-danger" role="alert" style="margin-bottom:16px">
+            <strong>Délai de {{ d.deadline!.months }} mois dépassé.</strong> {{ d.deadline!.message }}
+            @if (d.deadline!.can_override) { <span> Vous gardez la main sur ce dossier avec votre droit d'administrateur.</span> }
+          </div>
+        }
         @if (gate.visible()) {
           <wk-sync-banner [state]="$any(d).sync_state" [error]="$any(d).sync_error" [uuid]="d.uuid" [localOnly]="d.reference.startsWith('LOCAL-')" (changed)="onSyncChange($event, d)" />
         }

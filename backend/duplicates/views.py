@@ -2,11 +2,12 @@
 REST API of the Centre de contrôle des doublons (all under /api/duplicates/).
 
 Three distinct permissions: ``duplicate.view`` (consult), ``duplicate.investigate`` (take, comment, request
-verifications, attach documents), ``duplicate.decide`` (decide, reopen, assign, configure with settings.manage).
+verifications, attach documents), ``duplicate.decide`` (decide, reopen, assign), ``duplicate.configure`` (calibrate the engine).
 Declarations are visible here whatever their owner: detection must see the whole mairie.
 """
 import json
 
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
@@ -14,6 +15,7 @@ from django_filters import rest_framework as filters
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
 from accounts.models import CustomUser
@@ -153,9 +155,13 @@ class CaseViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
                             f"{r[f'{prefix}__created_by__last_name']}".strip()
                             or r[f'{prefix}__created_by__username'])
                     agents[str(r[f'{prefix}__created_by__uuid'])] = name
-        investigators = [
-            {'uuid': str(u.uuid), 'name': u.get_full_name() or u.username}
-            for u in CustomUser.objects.filter(is_active=True) if user_has_perm(u, 'duplicate.investigate')]
+        # one permission lookup per active user: kept for a minute instead of being redone at every call
+        investigators = cache.get('dup-investigators')
+        if investigators is None:
+            investigators = [
+                {'uuid': str(u.uuid), 'name': u.get_full_name() or u.username}
+                for u in CustomUser.objects.filter(is_active=True) if user_has_perm(u, 'duplicate.investigate')]
+            cache.set('dup-investigators', investigators, 60)
         return Response({
             'agents': sorted(({'uuid': k, 'name': v} for k, v in agents.items()), key=lambda a: a['name'].lower()),
             'investigators': investigators,
@@ -242,6 +248,7 @@ class CaseViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
             case, request.user, s.validated_data['decision'], s.validated_data['reason'], duplicate)
         data = self._detail(case)
         data['warnings'] = warnings
+        data['redundant_outcome'] = getattr(case, 'redundant_outcome', '')
         return Response(data)
 
     @action(detail=True, methods=['post'], url_path='reopen')
@@ -299,10 +306,16 @@ class MatchViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Ge
 
 # ── analysis, comparison, configuration, synchronisation ──
 
+class HeavyRateThrottle(UserRateThrottle):
+    """An analysis takes the global detection lock and a comparison scans identities: both are rate limited."""
+    scope = 'duplicates_heavy'
+
+
 class AnalyzeView(APIView):
     """POST {declaration: uuid} — run (or re-run) the analysis of one declaration."""
     permission_classes = [HasWakaraPermission]
     required_permission = 'duplicate.investigate'
+    throttle_classes = [HeavyRateThrottle]
 
     def post(self, request):
         value = request.data.get('declaration')
@@ -312,7 +325,8 @@ class AnalyzeView(APIView):
             declaration = _declaration_by_uuid(value)
         except ValidationError:
             return Response({'declaration': "UUID invalide."}, status=400)
-        check = DuplicateDetectionService.analyze(declaration, trigger='MANUAL', user=request.user, force=True)
+        check = DuplicateDetectionService.analyze(declaration, trigger='MANUAL', user=request.user, force=True,
+                                                  exhaustive=True)
         matches = (DuplicateMatch.objects.filter(Q(declaration=declaration) | Q(candidate=declaration))
                    .select_related('declaration__child', 'declaration__hospital', 'declaration__created_by',
                                    'declaration__acte', 'candidate__child', 'candidate__hospital',
@@ -322,7 +336,8 @@ class AnalyzeView(APIView):
         return Response({
             'check': {'uuid': str(check.uuid), 'performed_at': check.performed_at,
                       'candidates_examined': check.candidates_examined, 'matches_found': check.matches_found,
-                      'highest_score': check.highest_score, 'data_quality': check.data_quality},
+                      'highest_score': check.highest_score, 'data_quality': check.data_quality,
+                      'truncated': check.candidates_truncated},
             'matches': MatchSerializer(matches, many=True, context={'request': request}).data,
             'cases': [str(c.uuid) for c in getattr(check, 'cases', [])],
         })
@@ -332,6 +347,7 @@ class CompareView(APIView):
     """GET ?a=<uuid>&b=<uuid> — compare two declarations on the fly (score computed, nothing stored)."""
     permission_classes = [HasWakaraPermission]
     required_permission = 'duplicate.view'
+    throttle_classes = [HeavyRateThrottle]
 
     def get(self, request):
         try:
@@ -354,23 +370,38 @@ class CompareView(APIView):
 
 
 class ConfigView(APIView):
-    """GET weights and thresholds · PATCH to calibrate them (settings.manage). Audited."""
+    """
+    GET weights and thresholds · PATCH to calibrate them. Changing the rules of the control is a sensitive act:
+    it needs its own permission (``duplicate.configure``, not the general ``settings.manage``), a written reason,
+    stays inside the limits fixed in the code (duplicates.config.GUARDS) and is audited with the previous values.
+    """
     permission_classes = [HasWakaraPermission]
 
     def get_permissions(self):
-        self.required_permission = 'duplicate.view' if self.request.method == 'GET' else 'settings.manage'
+        self.required_permission = 'duplicate.view' if self.request.method == 'GET' else 'duplicate.configure'
         return super().get_permissions()
 
     def get(self, request):
-        return Response({'config': get_config(), 'defaults': default_config()})
+        from duplicates.config import GUARDS, MANDATORY_BLOCKING_LEVELS, MIN_REASON_LENGTH, config_meta
+        return Response({'config': get_config(), 'defaults': default_config(), 'meta': config_meta(),
+                         'limits': {'high_threshold': GUARDS['high_threshold'], 'medium_threshold': GUARDS['medium_threshold'],
+                                    'min_weight': GUARDS['min_weight'], 'mandatory_blocking_levels': MANDATORY_BLOCKING_LEVELS,
+                                    'min_reason_length': MIN_REASON_LENGTH}})
 
     def patch(self, request):
+        from duplicates.config import MIN_REASON_LENGTH
+        if not isinstance(request.data, dict):
+            return Response({'detail': "Corps de requête invalide."}, status=status.HTTP_400_BAD_REQUEST)
+        body = dict(request.data)
+        reason = str(body.pop('reason', '') or '').strip()
+        if len(reason) < MIN_REASON_LENGTH:
+            return Response({'reason': f"Indiquez le motif de la modification ({MIN_REASON_LENGTH} caractères au moins)."},
+                            status=status.HTTP_400_BAD_REQUEST)
         current = get_config()
-        merged = {**current, **{k: v for k, v in request.data.items()}}
-        clean = validate_config(merged)
+        clean = validate_config({**current, **body})
         SiteSetting.objects.update_or_create(
-            key=CONFIG_KEY, defaults={'value': json.dumps(clean), 'description': "Paramètres de détection des doublons",
+            key=CONFIG_KEY, defaults={'value': json.dumps(clean), 'description': f"Modifié : {reason}"[:255],
                                       'is_public': False, 'updated_by': request.user})
         audit.log(AuditAction.UPDATE, user=request.user, object_type='SiteSetting', object_id=CONFIG_KEY,
-                  changes={'from': current, 'to': clean})
-        return Response({'config': clean, 'defaults': default_config()})
+                  changes={'from': current, 'to': clean}, reason=reason)
+        return self.get(request)

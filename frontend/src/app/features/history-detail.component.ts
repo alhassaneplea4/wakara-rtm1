@@ -30,9 +30,6 @@ const FLOW = [
         <wk-page-header [title]="h.dossier.reference" [subtitle]="(h.dossier.child_name || 'Enfant non renseigné') + (h.dossier.hospital_name ? ' · ' + h.dossier.hospital_name : '')"
           back="/history" backLabel="Retour aux historiques">
           <a class="btn" [routerLink]="['/declarations', h.dossier.uuid]"><wk-icon name="file" [size]="16" /> Voir le dossier</a>
-          @if (h.dossier.acte_uuid && ['VALIDATED','DELIVERED'].includes(h.dossier.status)) {
-            <a class="btn" [routerLink]="['/actes', h.dossier.acte_uuid, 'document']"><wk-icon name="certificate" [size]="16" /> Voir l'acte</a>
-          }
           <button class="btn" (click)="exportCsv(h)"><wk-icon name="download" [size]="16" /> Exporter (CSV)</button>
         </wk-page-header>
 

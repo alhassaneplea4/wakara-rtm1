@@ -85,6 +85,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'core.middleware.ApiSecurityHeadersMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -231,7 +232,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # ──────────────────────────────────────────────
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'accounts.authentication.DeviceAwareJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -246,8 +247,18 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%S%z',
     'NUM_PROXIES': NUM_PROXIES,
+    # Flood guard on every endpoint (per user, per address when anonymous) + tighter limits on the costly ones
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ),
     'DEFAULT_THROTTLE_RATES': {
         'login': config('LOGIN_THROTTLE_RATE', default='10/min'),
+        'anon': config('ANON_THROTTLE_RATE', default='120/min'),
+        'user': config('USER_THROTTLE_RATE', default='1200/min'),
+        'sync': config('SYNC_THROTTLE_RATE', default='240/min'),            # push, photos, pull of one agent
+        'sync_ping': config('SYNC_PING_THROTTLE_RATE', default='60/min'),   # public reachability probe
+        'duplicates_heavy': config('DUPLICATES_HEAVY_THROTTLE_RATE', default='20/min'),  # analyses and comparisons
     },
     'EXCEPTION_HANDLER': 'core.exceptions.wakara_exception_handler',
 }
@@ -337,11 +348,19 @@ STATS_SHOW_GENDER = config('STATS_SHOW_GENDER', default=True, cast=bool)
 SYNC_MAX_BATCH = config('SYNC_MAX_BATCH', default=20, cast=int)
 # Difference tolerated between the device clock and the server before the device times are corrected.
 SYNC_CLOCK_TOLERANCE_SECONDS = config('SYNC_CLOCK_TOLERANCE_SECONDS', default=300, cast=int)
+# Beyond this skew (hours) between the device clock and the server the device time is not trusted at all.
+SYNC_MAX_CLOCK_SKEW_HOURS = config('SYNC_MAX_CLOCK_SKEW_HOURS', default=48, cast=int)
+# An entry older than this (days) keeps the date of the device but is flagged for the secretariat to check.
+SYNC_LATE_ENTRY_DAYS = config('SYNC_LATE_ENTRY_DAYS', default=7, cast=int)
 # A device date older than this is not trusted: the server date is used and the anomaly is recorded.
 SYNC_MAX_DEVICE_AGE_DAYS = config('SYNC_MAX_DEVICE_AGE_DAYS', default=30, cast=int)
 # Dossiers sent to the device per pull, and how far back the first pull goes.
 SYNC_PULL_PAGE_SIZE = config('SYNC_PULL_PAGE_SIZE', default=50, cast=int)
 SYNC_PULL_INITIAL_DAYS = config('SYNC_PULL_INITIAL_DAYS', default=90, cast=int)
+# Devices (browsers / phones) a user may have registered at the same time; revoke the old ones to free a place.
+SYNC_MAX_DEVICES_PER_USER = config('SYNC_MAX_DEVICES_PER_USER', default=3, cast=int)
+# Months during which the mairie may treat a declaration (counted from the declaration date); then it goes to the courts.
+DOSSIER_DEADLINE_MONTHS = config('DOSSIER_DEADLINE_MONTHS', default=6, cast=int)
 
 # ──────────────────────────────────────────────
 # CORS
@@ -385,4 +404,10 @@ X_FRAME_OPTIONS = 'DENY'
 # ──────────────────────────────────────────────
 # Cache (throttling). Use Redis/Memcached in production with several workers.
 # ──────────────────────────────────────────────
-CACHES = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}
+# REDIS_URL (redis://… or rediss://…) shares the counters between instances; without it each instance counts alone
+# (see core.checks: the deployment check warns about it).
+REDIS_URL = config('REDIS_URL', default='')
+if REDIS_URL:
+    CACHES = {'default': {'BACKEND': 'django.core.cache.backends.redis.RedisCache', 'LOCATION': REDIS_URL}}
+else:
+    CACHES = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}

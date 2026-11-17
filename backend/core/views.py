@@ -83,6 +83,13 @@ class InboxView(APIView):
             items.append({'code': 'to_correct_collection', 'label': 'Déclarations à corriger',
                           'count': mine.count(), 'status': Status.TO_CORRECT_COLLECTION})
 
+        # six-month rule: dossiers past the deadline, to be sent to the courts (not treatable at the mairie any more)
+        from core.deadline import months, overdue_filter
+        late = qs.filter(overdue_filter()).count()
+        if late:
+            items.append({'code': 'overdue', 'label': f"Dossiers de plus de {months()} mois : à traiter aux tribunaux",
+                          'count': late, 'status': 'OVERDUE'})
+
         # Badges of the side menu: number of dossiers waiting for THIS user, per menu entry.
         badges = {}
 
