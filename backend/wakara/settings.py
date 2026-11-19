@@ -265,6 +265,7 @@ REST_FRAMEWORK = {
         'public_hit': config('PUBLIC_HIT_THROTTLE_RATE', default='30/min'),  # audience counter (public pages)
         'recovery': config('RECOVERY_THROTTLE_RATE', default='10/min'),     # reading a recovery code (admin)
         'two_factor': config('TWO_FACTOR_THROTTLE_RATE', default='10/min'), # second-factor codes
+        'forgot': config('FORGOT_THROTTLE_RATE', default='10/hour'),        # "mot de passe oublié" requests, per address
         'duplicates_heavy': config('DUPLICATES_HEAVY_THROTTLE_RATE', default='20/min'),  # analyses and comparisons
     },
     'EXCEPTION_HANDLER': 'core.exceptions.wakara_exception_handler',

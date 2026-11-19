@@ -142,7 +142,10 @@ export interface Dashboard {
   delays: { avg_days_transmission_to_validation: number | null };
 }
 
-export interface Inbox { total: number; items: { code: string; label: string; count: number; status: Status | 'OVERDUE' | 'DUPLICATES' }[]; badges: Record<string, number>; }
+export interface Inbox { total: number; items: { code: string; label: string; count: number; status: Status | 'OVERDUE' | 'DUPLICATES' | 'PASSWORD' }[]; badges: Record<string, number>; }
+
+/** « Mot de passe oublié » request waiting for an administrator (GET /users/reset-requests/). */
+export interface PasswordRequest { id: number; user: string; username: string; full_name: string; created_at: string; last_requested_at: string; request_count: number; can_handle: boolean; }
 
 /* ── Historiques des actes (administrator) ───────── */
 

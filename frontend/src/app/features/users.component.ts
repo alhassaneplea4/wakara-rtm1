@@ -3,7 +3,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService, errorMessage, fieldErrors } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
-import { AuditEntry, Page, PermissionDef, Role, UserRow } from '../core/models';
+import { AuditEntry, Page, PasswordRequest, PermissionDef, Role, UserRow } from '../core/models';
 import { ToastService } from '../core/toast.service';
 import { ConfirmComponent, IconComponent, PageHeaderComponent, PaginationComponent } from '../shared/ui';
 
@@ -15,6 +15,22 @@ import { ConfirmComponent, IconComponent, PageHeaderComponent, PaginationCompone
       <wk-page-header title="Utilisateurs" subtitle="Comptes, rôles et accès. Un compte n'est jamais supprimé : il est désactivé.">
         @if (auth.can('user.create')) { <button class="btn btn-primary" (click)="openCreate()"><wk-icon name="plus" [size]="16" /> Nouvel utilisateur</button> }
       </wk-page-header>
+      @if (requests().length) {
+        <section class="card requests" aria-label="Demandes de mot de passe en attente">
+          <h2>Mots de passe oubliés : {{ requests().length }} demande(s) en attente</h2>
+          <p class="soft">Ces personnes ne peuvent pas se connecter. Vérifiez leur identité (en personne ou par téléphone), puis remettez-leur le mot de passe temporaire : elles le changeront à leur première connexion.</p>
+          @for (r of requests(); track r.id) {
+            <div class="req">
+              <div><strong>{{ r.full_name || r.username }}</strong> <span class="mono muted">{{ r.username }}</span><br />
+                <small class="muted">Demandé le {{ r.created_at | date: 'dd/MM/yyyy HH:mm' }}@if (r.request_count > 1) { · {{ r.request_count }} fois }</small></div>
+              <span class="spacer"></span>
+              @if (r.can_handle) { <button class="btn btn-sm btn-primary" [disabled]="busy()" (click)="handleRequest(r)">Réinitialiser le mot de passe</button> }
+              @else { <small class="muted">Un autre administrateur doit le traiter</small> }
+              <button class="btn btn-sm" [disabled]="busy()" (click)="dismissRequest(r)">Écarter</button>
+            </div>
+          }
+        </section>
+      }
       <section class="card flush">
         <div class="filters">
           <input class="input" [(ngModel)]="search" (keyup.enter)="reload()" placeholder="Nom, identifiant, e-mail…" aria-label="Recherche" />
@@ -139,6 +155,10 @@ import { ConfirmComponent, IconComponent, PageHeaderComponent, PaginationCompone
     .chip{display:inline-flex;gap:8px;align-items:center;padding:7px 12px;border:1px solid var(--wk-border);border-radius:999px;cursor:pointer}
     .chip.on{background:var(--wk-info-bg);border-color:var(--wk-royal);color:var(--wk-royal-dark)}
     .ov{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--wk-border);margin-top:6px}
+    .requests{padding:16px;margin-bottom:16px;border-left:4px solid var(--wk-warning,#d98a00)}
+    .requests h2{font-size:16px;margin:0 0 4px}
+    .req{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--wk-border);margin-top:8px}
+    .req .spacer{flex:1}
   `]
 })
 export class UsersComponent implements OnInit {
@@ -157,9 +177,11 @@ export class UsersComponent implements OnInit {
   ovCode = '';
   edit = { first_name: '', last_name: '', email: '', phone: '' };
   history = signal<AuditEntry[]>([]);
+  requests = signal<PasswordRequest[]>([]);
 
   ngOnInit() {
     this.load();
+    this.loadRequests();
     if (this.auth.can('role.view')) {
       this.api.get<Page<Role>>('/roles/', { page_size: 100 }).subscribe(p => this.roles.set(p.results));
       this.api.get<PermissionDef[]>('/permissions/').subscribe(p => this.perms.set(p));
@@ -220,6 +242,24 @@ export class UsersComponent implements OnInit {
     });
   }
   reset(u: UserRow) {
-    this.api.post<{ temporary_password: string }>(`/users/${u.uuid}/reset-password/`).subscribe({ next: r => this.tempPassword.set(r.temporary_password), error: e => this.formError.set(errorMessage(e)) });
+    this.api.post<{ temporary_password: string }>(`/users/${u.uuid}/reset-password/`).subscribe({ next: r => { this.tempPassword.set(r.temporary_password); this.loadRequests(); }, error: e => this.formError.set(errorMessage(e)) });
+  }
+
+  /** « Mot de passe oublié » requests waiting for an administrator. */
+  loadRequests() {
+    if (!this.auth.can('user.reset_password')) return;
+    this.api.get<PasswordRequest[]>('/users/reset-requests/').subscribe({ next: r => this.requests.set(r), error: () => this.requests.set([]) });
+  }
+  /** Resets the password of the person who asked: the temporary password is shown once, on the account sheet. */
+  handleRequest(r: PasswordRequest) {
+    this.openDetail({ uuid: r.user } as UserRow);
+    this.reset({ uuid: r.user } as UserRow);
+  }
+  dismissRequest(r: PasswordRequest) {
+    this.busy.set(true);
+    this.api.post(`/users/${r.user}/dismiss-reset-request/`).subscribe({
+      next: () => { this.busy.set(false); this.toast.success('Demande écartée.'); this.loadRequests(); },
+      error: e => { this.busy.set(false); this.toast.error(errorMessage(e)); },
+    });
   }
 }

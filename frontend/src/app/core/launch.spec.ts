@@ -1,3 +1,4 @@
+import { LoginComponent } from '../features/login.component';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
@@ -114,5 +115,44 @@ describe('Inactivity timeout', () => {
     spyOn(auth, 'expire');
     TestBed.inject(IdleService).check(Date.now() + 5 * IDLE_LIMIT_MS);
     expect(auth.expire).not.toHaveBeenCalled();
+  });
+});
+
+describe('Mot de passe oublié', () => {
+  it('leaves the request to the administrators and shows that it is waiting', () => {
+    const { http } = setup();
+    const c = TestBed.createComponent(LoginComponent).componentInstance;
+    c.username = ' agent ';
+    c.openForgot();
+    expect(c.forgotId).toBe('agent');                                  // what was typed in the form is reused
+    c.sendForgot();
+    const req = http.expectOne(r => r.url.endsWith('/auth/forgot-password/'));
+    expect(req.request.body).toEqual({ username: 'agent', website: '' });
+    req.flush({ detail: 'Votre demande est en attente.' }, { status: 202, statusText: 'Accepted' });
+    expect(c.sent()).toContain('en attente');
+    expect(localStorage.getItem('wakara.forgot-password')).toBeTruthy();
+    c.openForgot();
+    expect(c.sent()).toBe('');
+    expect(c.waitingSince()).not.toBe('');                             // told that a request is already waiting
+  });
+
+  it('asks for the identifier before sending anything', () => {
+    const { http } = setup();
+    const c = TestBed.createComponent(LoginComponent).componentInstance;
+    c.openForgot();
+    c.sendForgot();
+    http.expectNone(r => r.url.endsWith('/auth/forgot-password/'));
+    expect(c.forgotError()).toContain('identifiant');
+  });
+
+  it('tells the person when the request could not be sent', () => {
+    const { http } = setup();
+    const c = TestBed.createComponent(LoginComponent).componentInstance;
+    c.forgotId = 'agent';
+    c.sendForgot();
+    http.expectOne(r => r.url.endsWith('/auth/forgot-password/')).flush({}, { status: 500, statusText: 'Server Error' });
+    expect(c.sent()).toBe('');
+    expect(c.forgotError()).not.toBe('');
+    expect(c.forgotBusy()).toBeFalse();
   });
 });

@@ -167,4 +167,12 @@ class InboxView(APIView):
                 items.append({'code': 'duplicates', 'label': 'Dossiers suspects (doublons)',
                               'count': open_cases, 'status': 'DUPLICATES'})
                 badges['/duplicates'] = open_cases
+        # forgotten passwords: requests waiting for the people allowed to reset them
+        if has('user.reset_password'):
+            from accounts.models import PasswordResetRequest
+            asked = PasswordResetRequest.objects.filter(status=PasswordResetRequest.PENDING).count()
+            if asked:
+                items.append({'code': 'password_requests', 'label': 'Demandes de mot de passe oublié',
+                              'count': asked, 'status': 'PASSWORD'})
+                badges['/users'] = asked
         return Response({'total': sum(i['count'] for i in items), 'items': items, 'badges': badges})

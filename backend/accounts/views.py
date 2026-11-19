@@ -32,9 +32,9 @@ from core.permissions import (
     ALL_PERMISSION_CODES, PROTECTED_ADMIN_PERMISSIONS, HasWakaraPermission, get_user_permissions, permissions_of,
 )
 
-from .models import LoginAttempt, RevokedAccessToken, Permission, Role, RolePermission, UserPermission, UserRole
+from .models import LoginAttempt, PasswordResetRequest, RevokedAccessToken, Permission, Role, RolePermission, UserPermission, UserRole
 from .serializers import (
-    ChangePasswordSerializer, LoginSerializer, MeSerializer, PermissionSerializer,
+    ChangePasswordSerializer, ForgotPasswordSerializer, LoginSerializer, MeSerializer, PermissionSerializer,
     RoleSerializer, UserCreateSerializer, UserDetailSerializer, UserListSerializer,
     UserPermissionSerializer, UserRoleSerializer, UserUpdateSerializer,
 )
@@ -200,6 +200,49 @@ class LoginView(APIView):
                 User.objects.filter(pk=user.pk).update(locked_until=now + window, failed_login_count=0)
 
 
+class ForgotPasswordThrottle(AnonRateThrottle):
+    scope = 'forgot'
+
+
+# The same answer whatever the identifier is: nobody learns which accounts exist.
+FORGOT_ANSWER = {"detail": "Votre demande a été transmise à l'administrateur. Elle reste en attente : il vous remettra un "
+                           "mot de passe temporaire, que vous changerez à votre première connexion."}
+
+
+class ForgotPasswordView(APIView):
+    """POST /api/auth/forgot-password/ — "mot de passe oublié": a request is left to the administrators, who are notified."""
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [ForgotPasswordThrottle]
+    serializer_class = ForgotPasswordSerializer
+
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        identifier = serializer.validated_data['username'].strip()
+        answer = Response(FORGOT_ANSWER, status=status.HTTP_202_ACCEPTED)
+        if serializer.validated_data.get('website'):
+            return answer                                    # a bot: answered like anybody, nothing recorded
+        user = _find_user(identifier) if identifier else None
+        if user is None or not user.is_active:
+            # kept in the audit log with a short fingerprint only (what was typed may be a password)
+            fingerprint = hashlib.sha256(identifier.lower().encode()).hexdigest()[:12]
+            audit.log(AuditAction.PASSWORD_RESET_REQUESTED, username=f'inconnu:{fingerprint}', object_type='User',
+                      reason='Identifiant inconnu ou compte désactivé')
+            return answer
+        with transaction.atomic():
+            pending = PasswordResetRequest.objects.select_for_update().filter(
+                user=user, status=PasswordResetRequest.PENDING).first()
+            if pending is None:
+                PasswordResetRequest.objects.create(user=user)
+                audit.log(AuditAction.PASSWORD_RESET_REQUESTED, user=user, obj=user)
+            else:
+                pending.request_count = F('request_count') + 1
+                pending.last_requested_at = timezone.now()
+                pending.save(update_fields=['request_count', 'last_requested_at'])
+        return answer
+
+
 class LogoutView(APIView):
     """POST /api/auth/logout/ — blacklists the refresh token."""
     permission_classes = [IsAuthenticated]
@@ -296,6 +339,7 @@ class UserViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.Upd
         'permission_overrides': 'user.assign_roles',
         'reset_password': 'user.reset_password',
         'reset_two_factor': 'user.reset_two_factor',
+        'reset_requests': 'user.reset_password', 'dismiss_reset_request': 'user.reset_password',
     }
 
     def get_serializer_class(self):
@@ -476,7 +520,38 @@ class UserViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.Upd
         LoginAttempt.objects.filter(user=user).delete()
         revoke_user_tokens(user)
         audit.log(AuditAction.PASSWORD_RESET, user=request.user, obj=user)
+        self._close_requests(user, request.user, PasswordResetRequest.HANDLED)
         return Response({'temporary_password': temp})
+
+    @staticmethod
+    def _close_requests(user, by, outcome):
+        PasswordResetRequest.objects.filter(user=user, status=PasswordResetRequest.PENDING).update(
+            status=outcome, handled_by=by, handled_at=timezone.now())
+
+    @action(detail=False, methods=['get'], url_path='reset-requests')
+    def reset_requests(self, request):
+        """The "mot de passe oublié" requests still waiting, oldest first."""
+        mine = get_user_permissions(request.user)
+        rows = []
+        for r in PasswordResetRequest.objects.filter(status=PasswordResetRequest.PENDING).select_related('user'):
+            u = r.user
+            rows.append({
+                'id': r.pk, 'user': str(u.uuid), 'username': u.username, 'full_name': u.get_full_name(),
+                'created_at': r.created_at, 'last_requested_at': r.last_requested_at, 'request_count': r.request_count,
+                # nobody resets the password of an account that holds rights he does not have, nor his own
+                'can_handle': u.pk != request.user.pk and not (permissions_of(u) - mine),
+            })
+        return Response(rows)
+
+    @action(detail=True, methods=['post'], url_path='dismiss-reset-request')
+    def dismiss_reset_request(self, request, uuid=None):
+        """The request is judged unfounded (the person was reached otherwise, or it is not them): it leaves the list."""
+        user = self.get_object()
+        if not PasswordResetRequest.objects.filter(user=user, status=PasswordResetRequest.PENDING).exists():
+            raise ValidationError({'detail': "Aucune demande en attente pour ce compte."})
+        self._close_requests(user, request.user, PasswordResetRequest.DISMISSED)
+        audit.log(AuditAction.PASSWORD_RESET_DISMISSED, user=request.user, obj=user)
+        return Response({'detail': "Demande écartée."})
 
 
 # ── Roles & permissions ───────────────────────────

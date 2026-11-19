@@ -23,6 +23,8 @@ class AuditAction:
     LOGOUT = 'logout'
     PASSWORD_CHANGED = 'password_changed'
     PASSWORD_RESET = 'password_reset'
+    PASSWORD_RESET_REQUESTED = 'password_reset_requested'
+    PASSWORD_RESET_DISMISSED = 'password_reset_dismissed'
     ACCOUNT_ACTIVATED = 'account_activated'
     ACCOUNT_DEACTIVATED = 'account_deactivated'
     ROLE_ASSIGNED = 'role_assigned'

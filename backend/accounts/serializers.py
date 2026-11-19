@@ -23,6 +23,11 @@ class LoginSerializer(serializers.Serializer):
     website = serializers.CharField(required=False, allow_blank=True, max_length=200, default='')
 
 
+class ForgotPasswordSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=254)
+    website = serializers.CharField(required=False, allow_blank=True, max_length=200, default='')   # anti-spam trap
+
+
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(write_only=True, trim_whitespace=False)
     new_password = serializers.CharField(write_only=True, trim_whitespace=False)

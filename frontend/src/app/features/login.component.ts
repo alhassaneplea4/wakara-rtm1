@@ -12,6 +12,8 @@ import { IconComponent } from '../shared/ui';
 
 interface PublicSettings { [key: string]: string; }
 
+const PENDING_KEY = 'wakara.forgot-password';   // time of the last "mot de passe oublié" request sent from this browser
+
 const FALLBACK: PublicSettings = {
   'login.tag': 'ÉTAT CIVIL',
   'login.headline': 'Des naissances\nmieux *enregistrées*\npour un *avenir plus sûr.*',
@@ -58,7 +60,7 @@ const FALLBACK: PublicSettings = {
             <div class="trap" aria-hidden="true"><label>Ne pas remplir <input name="website" [(ngModel)]="website" tabindex="-1" autocomplete="off" /></label></div>
             <div class="opts">
               <label class="check"><input type="checkbox" name="remember" [(ngModel)]="remember" /> Se souvenir de moi</label>
-              <button type="button" class="link" (click)="forgot.set(true)">Mot de passe oublié ?</button>
+              <button type="button" class="link" (click)="openForgot()">Mot de passe oublié ?</button>
             </div>
             <button class="btn btn-primary submit" type="submit" [disabled]="loading()">
               @if (loading()) { <span class="spinner"></span> Connexion… } @else { <span class="go"><wk-icon name="arrow" [size]="16" /></span> Se connecter }
@@ -110,8 +112,22 @@ const FALLBACK: PublicSettings = {
       <div class="modal-backdrop" (click)="forgot.set(false)">
         <div class="modal" role="dialog" aria-modal="true" aria-label="Mot de passe oublié" (click)="$event.stopPropagation()">
           <h2>Mot de passe oublié</h2>
-          <p class="soft">La réinitialisation en libre-service n'est pas activée. Contactez l'administrateur technique de Wakara : il vous remettra un mot de passe temporaire que vous devrez changer à la première connexion.</p>
-          <div class="modal-actions"><button class="btn btn-primary" (click)="forgot.set(false)">Compris</button></div>
+          @if (!sent()) {
+            <p class="soft">Indiquez votre identifiant : l'administrateur sera prévenu. Votre demande reste en attente jusqu'à ce qu'il vous remette un mot de passe temporaire, que vous changerez à votre première connexion.</p>
+            @if (waitingSince(); as since) { <div class="alert alert-info" role="status" style="margin:10px 0">Une demande est déjà en attente depuis le {{ since }}. Inutile d'en envoyer une autre : contactez l'administrateur si c'est urgent.</div> }
+            @if (forgotError()) { <div class="alert alert-danger" role="alert" style="margin:10px 0">{{ forgotError() }}</div> }
+            <form (ngSubmit)="sendForgot()" novalidate>
+              <div class="control" [class.invalid]="forgotError() && !forgotId.trim()">
+                <wk-icon name="user" [size]="20" />
+                <input name="forgotId" [(ngModel)]="forgotId" autocomplete="username" placeholder="Identifiant ou email" aria-label="Identifiant ou email" autofocus />
+              </div>
+              <div class="modal-actions"><button type="button" class="btn" (click)="forgot.set(false)">Annuler</button><button type="submit" class="btn btn-primary" [disabled]="forgotBusy()">Envoyer la demande à l'administrateur</button></div>
+            </form>
+          } @else {
+            <div class="alert alert-success" role="status" style="margin:10px 0">{{ sent() }}</div>
+            <p class="soft">Demande <strong>en attente</strong>. Vous pouvez fermer cette fenêtre.</p>
+            <div class="modal-actions"><button class="btn btn-primary" (click)="forgot.set(false)">Fermer</button></div>
+          }
         </div>
       </div>
     }
@@ -149,6 +165,7 @@ const FALLBACK: PublicSettings = {
     .tag i{width:8px;height:8px;border-radius:50%;background:var(--wk-sky)}
     h2{color:#fff;font-size:clamp(28px,3.4vw,46px);line-height:1.12;font-weight:800;letter-spacing:-.02em}
     h2 .accent{color:#6aa9ff}
+    .modal h2{color:var(--wk-text);font-size:20px;line-height:1.3;letter-spacing:0;margin:0 0 8px}
     .desc{max-width:560px;color:rgba(255,255,255,.86);font-size:15px;line-height:1.6}
     .features{list-style:none;margin:24px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px}
     .features li{display:flex;flex-direction:column;gap:6px}
@@ -201,6 +218,13 @@ export class LoginComponent implements OnInit {
   loading = signal(false);
   error = signal('');
   forgot = signal(false);
+  forgotId = '';
+  forgotBusy = signal(false);
+  forgotError = signal('');
+  /** Answer of the server once the request is left to the administrators ('' while the form is shown). */
+  sent = signal('');
+  /** Date of the request still waiting from this browser, if any (a convenience only: the server holds the truth). */
+  waitingSince = signal('');
   expired = signal(false);
   blocked = signal(false);
   /** Agent whose offline data are kept (encrypted) on this device, if any. */
@@ -229,6 +253,37 @@ export class LoginComponent implements OnInit {
   }
 
   unlock(e: Event) { e.preventDefault(); this.router.navigate(['/verrouillage']); }
+
+  openForgot() {
+    this.forgotId = this.username.trim();       // what was typed in the sign-in form is reused
+    this.forgotError.set('');
+    this.sent.set('');
+    this.waitingSince.set(this.pendingDate());
+    this.forgot.set(true);
+  }
+
+  /** « Mot de passe oublié »: leaves a request to the administrators (they are notified); it waits until they handle it. */
+  sendForgot() {
+    const id = this.forgotId.trim();
+    if (!id) { this.forgotError.set('Saisissez votre identifiant ou votre e-mail.'); return; }
+    this.forgotBusy.set(true);
+    this.forgotError.set('');
+    this.http.post<{ detail: string }>(`${environment.apiUrl}/auth/forgot-password/`, { username: id, website: this.website }).subscribe({
+      next: r => { this.forgotBusy.set(false); this.sent.set(r.detail); this.rememberPending(); },
+      error: err => { this.forgotBusy.set(false); this.forgotError.set(errorMessage(err, "Envoi impossible pour le moment. Réessayez plus tard ou contactez l'administrateur.")); },
+    });
+  }
+
+  private rememberPending() {
+    try { localStorage.setItem(PENDING_KEY, new Date().toISOString()); } catch { /* storage refused: the request is sent anyway */ }
+  }
+  private pendingDate(): string {
+    try {
+      const at = new Date(localStorage.getItem(PENDING_KEY) ?? '');
+      if (isNaN(at.getTime()) || Date.now() - at.getTime() > 7 * 86_400_000) return '';
+      return at.toLocaleDateString('fr-FR') + ' à ' + at.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    } catch { return ''; }
+  }
 
   submit() {
     this.submitted = true;

@@ -200,3 +200,32 @@ class TwoFactorBackupCode(models.Model):
         verbose_name = "Code de secours"
         verbose_name_plural = "Codes de secours"
         constraints = [models.UniqueConstraint(fields=['user', 'code_hash'], name='uniq_backup_code')]
+
+
+class PasswordResetRequest(models.Model):
+    """
+    "Mot de passe oublié": a person who cannot sign in asks the administration for a new password. The request waits
+    here (and in the notifications of the people allowed to reset passwords) until one of them handles it: a
+    temporary password is then given in person or by phone, or the request is dismissed. One pending request per
+    account: asking again only counts one more ask.
+    """
+    PENDING, HANDLED, DISMISSED = 'pending', 'handled', 'dismissed'
+    STATUS = [(PENDING, "En attente"), (HANDLED, "Traitée"), (DISMISSED, "Écartée")]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reset_requests')
+    status = models.CharField("État", max_length=10, choices=STATUS, default=PENDING, db_index=True)
+    request_count = models.PositiveIntegerField("Nombre de demandes", default=1)
+    created_at = models.DateTimeField("Demandée le", auto_now_add=True)
+    last_requested_at = models.DateTimeField("Dernière demande", default=timezone.now)
+    handled_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    handled_at = models.DateTimeField("Traitée le", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Demande de mot de passe"
+        verbose_name_plural = "Demandes de mot de passe"
+        ordering = ['created_at']
+        constraints = [models.UniqueConstraint(fields=['user'], condition=models.Q(status='pending'),
+                                               name='uniq_pending_password_request')]
+
+    def __str__(self):
+        return f"{self.user.username} — {self.get_status_display()}"

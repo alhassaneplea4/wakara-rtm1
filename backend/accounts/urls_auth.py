@@ -3,12 +3,13 @@ from django.urls import path
 
 from .tokens import DeviceAwareTokenRefreshView
 from .views import (
-    ChangePasswordView, LoginView, LogoutView, MeView, TwoFactorBackupCodesView, TwoFactorDisableView, TwoFactorEnableView,
+    ChangePasswordView, ForgotPasswordView, LoginView, LogoutView, MeView, TwoFactorBackupCodesView, TwoFactorDisableView, TwoFactorEnableView,
     TwoFactorSetupView, TwoFactorStatusView,
 )
 
 urlpatterns = [
     path('login/', LoginView.as_view(), name='auth-login'),
+    path('forgot-password/', ForgotPasswordView.as_view(), name='auth-forgot-password'),
     path('logout/', LogoutView.as_view(), name='auth-logout'),
     path('refresh/', DeviceAwareTokenRefreshView.as_view(), name='auth-refresh'),
     path('me/', MeView.as_view(), name='auth-me'),
