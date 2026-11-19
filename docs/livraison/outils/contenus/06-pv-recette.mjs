@@ -101,6 +101,38 @@ export default {
       sc('E5', 'Faire exécuter une sauvegarde puis une restauration sur un environnement de test (document 04).', 'Les données restaurées sont identiques à celles sauvegardées.'),
     ] }),
 
+    h2('F. Travail hors connexion et appareils (à faire sur un Android et sur un iPhone)'),
+    table({ ...SCEN, rows: [
+      sc('F1', 'Installer l\'application (Chrome sur Android ; Safari → « Sur l\'écran d\'accueil » sur iPhone), se connecter avec Internet, choisir le code de verrouillage, attendre 10 secondes.', 'L\'icône Wakara apparaît ; l\'application s\'ouvre depuis l\'icône sur l\'écran de code.'),
+      sc('F2', 'Passer en mode avion, fermer complètement l\'application, la rouvrir.', 'L\'application s\'ouvre sur l\'écran de code ; avec le bon code, les dossiers déjà reçus sont visibles.'),
+      sc('F3', 'Hors connexion : créer une déclaration, la photographier, l\'enregistrer puis la transmettre.', 'Référence `LOCAL-…` et indicateur orange « Sur cet appareil » ; le dossier est « Transmis » mais pas encore sur le serveur.'),
+      sc('F4', 'Rétablir le réseau.', 'En quelques secondes le dossier passe « En ligne » avec une référence `WKR-…` ; le secrétariat le voit dans sa liste ; un seul dossier existe (aucun doublon).'),
+      sc('F5', 'Saisir 5 fois un mauvais code de verrouillage.', 'L\'appareil se bloque quelques minutes, avec un message clair.'),
+      sc('F6', 'Verrouiller l\'appareil avec une saisie en attente, puis se déconnecter ; tenter de se connecter avec un autre compte.', 'La déconnexion est possible ; l\'autre compte est refusé tant que la saisie n\'est pas envoyée.'),
+      sc('F7', 'Modifier le même dossier sur deux appareils, l\'un hors connexion, puis synchroniser.', 'Conflit signalé sur le dossier ; l\'utilisateur choisit sa version ou celle du serveur ; rien n\'est écrasé sans son choix.'),
+      sc('F8', 'Administrateur : ouvrir « Appareils hors connexion ».', 'Les appareils des agents sont listés (dernier contact, dernière synchronisation) ; la colonne « Code de récupération » indique « Enregistré ».'),
+      sc('F9', 'Agent : « Code oublié ? » → « J\'ai un code de récupération ». Administrateur : « Code de récupération » (motif + son mot de passe), dicter le code.', 'L\'agent ouvre l\'appareil avec le code, ses saisies non envoyées sont intactes ; un nouveau code est enregistré ; le journal d\'audit montre la lecture avec son motif.'),
+      sc('F10', 'Administrateur : révoquer l\'appareil, puis resynchroniser côté agent.', 'Message « appareil révoqué » ; l\'agent ne peut plus synchroniser ; ses saisies restent chiffrées sur l\'appareil ; rétablir l\'appareil reprend l\'envoi.'),
+      sc('F11', 'Un quatrième appareil pour le même compte.', 'Refusé avec un message qui invite à demander la révocation d\'un ancien appareil.'),
+      sc('F12', 'Mettre le paramètre `offline.enabled` à `false`.', 'À leur prochain contact les appareils reviennent au fonctionnement en ligne ; les opérations en attente restent envoyables.'),
+    ] }),
+    h2('G. Double authentification'),
+    table({ ...SCEN, rows: [
+      sc('G1', 'Activer la double authentification depuis « Mon profil » avec une application d\'authentification.', 'Le code à 6 chiffres est accepté ; 8 codes de secours sont affichés une seule fois.'),
+      sc('G2', 'Se déconnecter puis se reconnecter.', 'Après le mot de passe, le code est demandé ; un mauvais code est refusé ; le même code ne peut pas être réutilisé.'),
+      sc('G3', 'Se connecter avec un code de secours, puis tenter de le réutiliser.', 'Le premier usage réussit, le second est refusé.'),
+      sc('G4', 'Exiger la double authentification pour un rôle (paramètre `security.two_factor_roles`), puis se connecter avec un compte de ce rôle qui ne l\'a pas configurée.', 'Seul le profil est accessible tant qu\'elle n\'est pas activée ; elle ne peut plus être désactivée par ce rôle.'),
+      sc('G5', 'Un autre administrateur réinitialise la double authentification d\'un compte (motif obligatoire).', 'Les sessions du compte prennent fin ; l\'événement figure au journal ; l\'administrateur ne peut pas le faire sur son propre compte.'),
+    ] }),
+    h2('H. Contrôle des doublons'),
+    table({ ...SCEN, rows: [
+      sc('H1', 'Saisir deux déclarations quasi identiques (même mère, même date de naissance, enfants au nom proche).', 'Un dossier d\'investigation DUP-AAAA-NNNN apparaît dans le Centre de contrôle des doublons avec un score ; le circuit normal continue.'),
+      sc('H2', 'Tenter de valider définitivement l\'une des deux avant toute décision.', 'L\'attribution du numéro officiel est refusée tant qu\'un responsable n\'a pas décidé.'),
+      sc('H3', 'Décider « Deux enfants distincts » puis « Doublon confirmé » sur un autre cas, avec motif.', 'Décision enregistrée avec auteur, date et motif ; une saisie redondante confirmée est rejetée avec motif ; un acte déjà numéroté n\'est pas modifié.'),
+      sc('H4', 'Avec le profil agent de collecte, rechercher une alerte de doublon sur sa fiche.', 'Aucune alerte n\'est visible.'),
+      sc('H5', 'Sur un dossier de plus de 6 mois, tenter de le modifier (secrétariat) puis de le traiter (administrateur).', 'Modification bloquée pour le secrétariat ; l\'administrateur peut le traiter.'),
+    ] }),
+
     h1('Anomalies constatées'),
     table({
       head: ['N°', 'Scénario', 'Description de l\'anomalie', 'Gravité', 'Correction prévue le'],

@@ -2,7 +2,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
-    DeviceViewSet, DocumentPushView, PingView, PullView, PushView, ReferenceView, SyncOperationViewSet,
+    DeviceViewSet, DocumentPushView, PingView, PullView, PushView, RecoveryRegisterView, ReferenceView, SyncOperationViewSet,
 )
 
 router = DefaultRouter()
@@ -15,4 +15,5 @@ urlpatterns = [
     path('documents/', DocumentPushView.as_view(), name='sync-documents'),
     path('pull/', PullView.as_view(), name='sync-pull'),
     path('reference/', ReferenceView.as_view(), name='sync-reference'),
+    path('recovery/', RecoveryRegisterView.as_view(), name='sync-recovery'),
 ] + router.urls

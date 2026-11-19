@@ -3,7 +3,7 @@
 ## Vue d'ensemble
 
 - **Backend** Django 5 + DRF, authentification JWT (SimpleJWT, rotation + liste noire des refresh tokens).
-- **Frontend** Angular 17 (composants autonomes, chargement différé par route, signaux), Chart.js.
+- **Frontend** Angular 21 (composants autonomes, chargement différé par route, signaux), Chart.js.
 - **Base** SQLite (dev) / PostgreSQL (prod). Migrations versionnées dans chaque application.
 - Les services métier (`declarations/services.py`, `actes/services.py`) sont séparés des vues ;
   le frontend n'implémente **aucune** règle critique : il affiche ce que l'API autorise
@@ -78,14 +78,16 @@ porté par l'acte).
 - Jetons côté navigateur : `sessionStorage` par défaut ; « Se souvenir de moi » utilise `localStorage`
   (refresh token à durée limitée côté serveur et mis en liste noire à la déconnexion).
 
-## Mode hors connexion (branche `wakara-hors-ligne`)
+## Mode hors connexion, doublons, sécurité renforcée (version 1.1)
 
-Hors périmètre de la version 1.0 livrée, le travail hors connexion des agents de collecte est développé sur la branche
-`wakara-hors-ligne` : saisie, photos et transmission sans Internet, données locales chiffrées par un code de verrouillage,
-synchronisation idempotente qui rejoue les services métier existants. Validation, numéro officiel et délivrance restent
-des opérations centrales. Documentation : [architecture](hors-ligne/architecture.md), [exploitation](hors-ligne/exploitation.md),
-[guide de l'agent](hors-ligne/guide-agent.md). Le cahier des charges livré à la mairie mentionne encore le hors-ligne comme
-hors périmètre : un avenant est à prévoir avant la mise en production.
+Le travail hors connexion (saisie, photos, transmission et décisions sans Internet), le contrôle des doublons, la double
+authentification et le code de récupération des appareils sont **dans la version livrée** (fusionnés dans `main`).
+Données locales chiffrées par un code de verrouillage, synchronisation idempotente qui rejoue les services métier existants.
+Documentation : [architecture](hors-ligne/architecture.md), [exploitation](hors-ligne/exploitation.md),
+[guide de l'agent](hors-ligne/guide-agent.md), [guide d'installation sur ordinateur, Android et iPhone](hors-ligne/guide-installation-appareils.pdf),
+[contrôle des doublons](duplicates.md), [sécurité et déploiement](securite-deploiement.md).
+Le cahier des charges du dossier de livraison (version 1.1) inclut ce périmètre ; un avenant reste à formaliser avec la mairie
+(voir le procès-verbal de livraison).
 
 ## Hors périmètre de la v1
 

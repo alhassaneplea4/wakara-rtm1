@@ -93,3 +93,12 @@ Les quatre points « à corriger avant la mise en production » sont corrigés e
 4. Erreurs 500, même mot de passe, identifiant dans l'audit, jeton d'accès à 15-30 minutes (#5 à #8).
 5. Verrouiller les versions Python (#9).
 6. Migration d'Angular vers une version maintenue (#1) : chantier à part, la tentative vers la version 21 a échoué à la compilation.
+
+## Suites (19/11/2026)
+
+- **Double authentification** (TOTP, facultative, exigible par rôle) : réalisée, avec codes de secours, réinitialisation par un autre administrateur et tests (`tests/test_two_factor.py`, 30).
+- **Code de récupération des appareils** : réalisé (lecture par l'administrateur habilité, motif et mot de passe, journalisé ; `tests/test_device_recovery.py`, 25).
+- **Secrets en base** chiffrés (`core/secretbox.py`, Fernet) ; `FIELD_ENCRYPTION_KEY` à définir.
+- **Rapport de préparation** (`check_production`) étendu : clé de chiffrement, rôles personnalisés sans `document.archive`, volume de la base.
+- **Tests de bout en bout** remis à jour (code du coffre, limite d'appareils, déconnexion toujours possible) et complétés (code oublié) : 7 scénarios.
+- Reste à faire hors du code : réglages Vercel (`SECRET_KEY`, `FIELD_ENCRYPTION_KEY`, `REDIS_URL`), essais sur Android et iPhone, restauration d'une sauvegarde Neon, décisions de la mairie.

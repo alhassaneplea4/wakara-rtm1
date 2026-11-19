@@ -6,6 +6,9 @@ import { environment } from '@env/environment';
 import { Me } from './models';
 import { deviceId, readVaultHeader } from './offline/vault-header';
 
+/** The server accepted the password and now wants the code of the authentication application. */
+export function needsTwoFactorCode(err: any): boolean { return err?.status === 403 && err?.error?.code === 'two_factor_required'; }
+
 /** Requests flagged with this context skip the bearer/refresh/redirect logic of the interceptor. */
 export const SKIP_AUTH = new HttpContextToken<boolean>(() => false);
 
@@ -69,8 +72,9 @@ export class AuthService {
   can(code: string): boolean { return this.permissions().has(code); }
   canAny(...codes: string[]): boolean { return codes.some(c => this.can(c)); }
 
-  login(username: string, password: string, remember: boolean): Observable<Me> {
-    return this.http.post<{ access: string; refresh: string; user: Me }>(`${this.api}/auth/login/`, { username, password, device_id: deviceId() }).pipe(
+  /** `code`: the six digits of the authentication application (or a backup code), only when the account uses the second factor. */
+  login(username: string, password: string, remember: boolean, code = ''): Observable<Me> {
+    return this.http.post<{ access: string; refresh: string; user: Me }>(`${this.api}/auth/login/`, { username, password, device_id: deviceId(), ...(code.trim() ? { code: code.trim() } : {}) }).pipe(
       tap(r => {
         this.signedOut = false; this.sessionExpired.set(false); this.offlineSession.set(false);
         this.user.set(r.user); this.save(r.access, r.refresh, remember);

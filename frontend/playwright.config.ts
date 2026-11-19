@@ -18,7 +18,7 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     baseURL: 'http://localhost:4311',
-    channel: 'chrome',
+    channel: process.env['E2E_CHANNEL'] ?? 'chrome',   // E2E_CHANNEL=msedge to use Edge instead
     serviceWorkers: 'allow',
     viewport: { width: 1280, height: 900 },
     locale: 'fr-FR',

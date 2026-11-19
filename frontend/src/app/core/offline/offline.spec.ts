@@ -2,14 +2,17 @@ import { HttpErrorResponse, HttpParams, HttpRequest, HttpResponse } from '@angul
 import { signal } from '@angular/core';
 import { Subject, firstValueFrom, of, throwError } from 'rxjs';
 import { BackupError, backupFileName, exportBackup, restoreBackup } from './backup';
-import { decryptJson, encryptJson, sha256Hex } from './crypto';
+import { decryptJson, encryptJson, generateRecoveryCode, normalizeRecoveryCode, sha256Hex } from './crypto';
 import { OfflineDb, countUnsynced, deleteDb } from './db';
 import { LocalApi } from './local-api';
 import { WORKFLOW, localReference, materialize, mergeWrite, missingForTransmission, syncStateOf, userTransitions } from './materialize';
 import { OfflineStore } from './store';
 import { SyncEngine } from './sync';
 import { LocalDeclaration, Op, PushResult } from './types';
-import { PinError, changeVaultPin, clearVaultSession, createVault, destroyVault, loadVaultSession, openVault, pinProblem, saveVaultSession } from './vault';
+import {
+  PinError, RecoveryError, changeVaultPin, clearVaultSession, createVault, destroyVault, loadVaultSession, openVault, pendingRecoveryCode, pinProblem,
+  recoverVault, recoveryMissing, recoveryRegistered, saveVaultSession,
+} from './vault';
 import { readVaultHeader, writeVaultHeader } from './vault-header';
 
 const API = '/api';
@@ -81,7 +84,7 @@ describe('Offline vault (PIN)', () => {
     await changeVaultPin('482915', '739264');
     await expectAsync(openVault('482915')).toBeRejected();
     expect(await decryptJson<any>(await openVault('739264'), secret)).toEqual({ hello: 'monde' });
-  });
+  }, 60_000);   // a new code brings the key derivation up to the current cost (600 000 iterations, three times here)
 
   it('the data key cannot be exported', async () => {
     const key = await createVault('482915', USER, FAST);
@@ -104,6 +107,128 @@ describe('Offline vault (PIN)', () => {
     expect(readVaultHeader()?.user.uuid).toBe(USER.uuid);            // same code, no new set-up
     expect(await loadVaultSession(key)).toBeNull();                  // data cannot be reopened without a new sign-in
     await expectAsync(openVault('482915')).toBeResolved();           // the code still unlocks the device
+  });
+});
+
+/* ───────────────────────── recovery code ───────────────────────── */
+
+describe('Recovery code of the vault', () => {
+  beforeEach(() => writeVaultHeader(null));
+  afterAll(() => writeVaultHeader(null));
+
+  it('generates long, readable, valid codes', () => {
+    const code = generateRecoveryCode();
+    expect(code).toMatch(/^([0-9A-HJKMNP-TV-Z]{4}-){5}[0-9A-HJKMNP-TV-Z]{4}$/);
+    expect(normalizeRecoveryCode(code)).toBe(code);
+    expect(normalizeRecoveryCode(code.toLowerCase().replace(/-/g, ' '))).toBe(code);
+    expect(new Set(Array.from({ length: 20 }, generateRecoveryCode)).size).toBe(20);
+    expect(normalizeRecoveryCode('1234')).toBe('');
+    expect(normalizeRecoveryCode('U'.repeat(24))).toBe('');
+    expect(normalizeRecoveryCode('ABCD-EFGH-JKMN-PQRS-TVWX-OIL3')).toBe('ABCD-EFGH-JKMN-PQRS-TVWX-0113');
+  });
+
+  it('a new vault makes a recovery code, kept encrypted until the server has it', async () => {
+    const key = await createVault('482915', USER, FAST);
+    const header = readVaultHeader()!;
+    expect(header.rec).toBeDefined();
+    expect(header.recPending).toBeDefined();
+    const code = (await pendingRecoveryCode(key))!;
+    expect(normalizeRecoveryCode(code)).toBe(code);
+    expect(JSON.stringify(header)).not.toContain(code);                 // never readable on the device without the data key
+    expect(JSON.stringify(header)).not.toContain(code.replace(/-/g, ''));
+  });
+
+  it('the recovery code opens the vault, keeps the data, replaces the PIN and is replaced itself', async () => {
+    const key = await createVault('482915', USER, FAST);
+    const secret = await encryptJson(key, { hello: 'monde' });
+    const code = (await pendingRecoveryCode(key))!;
+    const reopened = await recoverVault(code, '739264', FAST);
+    expect(await decryptJson<any>(reopened, secret)).toEqual({ hello: 'monde' });      // same data key: nothing re-encrypted
+    expect(reopened.extractable).toBeFalse();
+    await expectAsync(openVault('482915')).toBeRejectedWithError(PinError);             // the forgotten code is gone
+    expect(await decryptJson<any>(await openVault('739264'), secret)).toEqual({ hello: 'monde' });
+    const next = (await pendingRecoveryCode(reopened))!;
+    expect(next).not.toBe(code);                                                         // the code the administrator read is of no use any more
+    await expectAsync(recoverVault(code, '555666', FAST)).toBeRejectedWithError(RecoveryError, /pas le bon/);
+  });
+
+  it('a wrong or malformed code is refused and touches nothing', async () => {
+    const key = await createVault('482915', USER, FAST);
+    const secret = await encryptJson(key, { a: 1 });
+    await expectAsync(recoverVault('AAAA-AAAA-AAAA-AAAA-AAAA-AAAA', '739264', FAST)).toBeRejectedWithError(RecoveryError, /pas le bon/);
+    await expectAsync(recoverVault('1234', '739264', FAST)).toBeRejectedWithError(RecoveryError, /invalide/);
+    expect(await decryptJson<any>(await openVault('482915'), secret)).toEqual({ a: 1 });   // the old code still works
+  });
+
+  it('a device without recovery code cannot be recovered', async () => {
+    await createVault('482915', USER, FAST);
+    const { rec: _rec, recPending: _pending, ...bare } = readVaultHeader()!;
+    writeVaultHeader(bare);
+    await expectAsync(recoverVault(generateRecoveryCode(), '739264', FAST)).toBeRejectedWithError(RecoveryError, /pas de code de récupération/);
+  });
+
+  it('a vault made before the recovery code gets one at its next unlock, without disturbing it', async () => {
+    const key = await createVault('482915', USER, FAST);
+    const secret = await encryptJson(key, { old: true });
+    const { rec: _rec, recPending: _pending, ...bare } = readVaultHeader()!;
+    writeVaultHeader(bare);
+    const reopened = await openVault('482915');
+    expect(readVaultHeader()!.rec).toBeDefined();
+    const code = (await pendingRecoveryCode(reopened))!;
+    expect(code).toBeTruthy();
+    expect(await decryptJson<any>(await recoverVault(code, '739264', FAST), secret)).toEqual({ old: true });
+  });
+
+  it('changing the PIN keeps the recovery code valid', async () => {
+    const key = await createVault('482915', USER, FAST);
+    const secret = await encryptJson(key, { x: 2 });
+    const code = (await pendingRecoveryCode(key))!;
+    await changeVaultPin('482915', '739264');
+    expect(await decryptJson<any>(await recoverVault(code, '888777', FAST), secret)).toEqual({ x: 2 });
+  }, 60_000);
+
+  it('the code waits until the server confirms, then nothing is kept', async () => {
+    const key = await createVault('482915', USER, FAST);
+    expect(await pendingRecoveryCode(key)).toBeTruthy();
+    recoveryRegistered();
+    expect(readVaultHeader()!.recPending).toBeUndefined();
+    expect(readVaultHeader()!.rec).toBeDefined();                         // the wrapping itself stays: the server holds the code
+    expect(await pendingRecoveryCode(key)).toBeNull();
+  });
+
+  it('a server that lost the code makes the device generate a new one at the next unlock', async () => {
+    const key = await createVault('482915', USER, FAST);
+    const first = (await pendingRecoveryCode(key))!;
+    recoveryRegistered();
+    recoveryMissing();
+    expect(readVaultHeader()!.recRenew).toBeTrue();
+    const reopened = await openVault('482915');
+    const second = (await pendingRecoveryCode(reopened))!;
+    expect(second).not.toBe(first);
+    expect(readVaultHeader()!.recRenew).toBeUndefined();
+    await expectAsync(recoverVault(first, '739264', FAST)).toBeRejectedWithError(RecoveryError);   // the lost code no longer opens it
+    await expectAsync(recoverVault(second, '739264', FAST)).toBeResolved();
+  });
+
+  it('does not ask for a new code while one is still waiting to be sent', async () => {
+    await createVault('482915', USER, FAST);
+    recoveryMissing();                                                    // the server has nothing, but the device still holds the code to send
+    expect(readVaultHeader()!.recRenew).toBeUndefined();
+  });
+
+  it('a restored backup makes a fresh recovery code (the original one may have been replaced since)', async () => {
+    const key = await createVault('482915', USER, FAST);
+    const db = new OfflineDb(USER.uuid);
+    await db.open();
+    const text = await (await exportBackup(db)).text();
+    db.close();
+    writeVaultHeader(null);
+    await restoreBackup(text);
+    expect(readVaultHeader()!.rec).toBeUndefined();
+    const reopened = await openVault('482915');
+    expect(await pendingRecoveryCode(reopened)).toBeTruthy();
+    expect(await decryptJson<any>(reopened, await encryptJson(key, { z: 1 }))).toEqual({ z: 1 });
+    await deleteDb(USER.uuid);
   });
 });
 
@@ -365,6 +490,26 @@ describe('Offline queue and synchronisation', () => {
     await call('GET', '/declarations/');
     expect(store.decryptions).toBe(6);
   });
+
+  it('measures a secretariat reading thousands of dossiers on the device (first read decrypts, the next ones do not)', async () => {
+    const N = 2000;
+    const writing = performance.now();
+    for (let i = 0; i < N; i++) await store.putServer(serverRow({ uuid: `perf${i}`, reference: `WKR-2026-${String(i).padStart(5, '0')}`, child_name: `Enfant ${i}`, child: { first_names: `Enfant${i}`, last_name: 'Essai', gender: 'F' } }) as any);
+    const written = Math.round(performance.now() - writing);
+    store.decryptions = 0;
+    const cold = performance.now();
+    expect((await call('GET', '/declarations/')).body.count).toBe(N);
+    const first = Math.round(performance.now() - cold);
+    expect(store.decryptions).toBe(N);
+    const warm = performance.now();
+    await call('GET', '/declarations/');
+    await call('GET', '/inbox/');
+    const next = Math.round(performance.now() - warm);
+    expect(store.decryptions).toBe(N);                                // nothing is decrypted again
+    console.log(`[perf] ${N} dossiers: written ${written} ms, first read ${first} ms, next two reads ${next} ms`);
+    expect(next).toBeLessThan(2000);                                  // generous: a CI machine is not a phone
+    expect(first).toBeLessThan(60_000);
+  }, 180_000);
 
   it('a draft of the entry form is kept encrypted, forgotten after a week, and cleared once saved', async () => {
     await store.saveDraft('new', { m: { notes: 'Observation confidentielle' } });
@@ -639,6 +784,52 @@ describe('Offline queue and synchronisation', () => {
     expect([rules.required_for_submission, rules.max_batch]).toEqual([['child.nationality'], 5]);
     expect(await store.referenceAt()).not.toBeNull();
     expect(host.messages.at(-1)).toContain('interrompue');       // the pull failed, the reference data are kept anyway
+  });
+
+  it('gives the server the recovery code once, and keeps it for the next cycle when the server does not answer', async () => {
+    online.set(true);
+    const sent: any[] = [];
+    let registered = 0;
+    let pending: string | null = 'ABCD-EFGH-JKMN-PQRS-TVWX-0123';
+    let down = true;
+    const plain = server.post;
+    server.post = ((url: string, body: any) => {
+      if (url.endsWith('/sync/recovery/')) {
+        if (down) return throwError(() => new HttpErrorResponse({ status: 0 }));
+        sent.push(body);
+        return of({ registered: true });
+      }
+      return plain(url, body);
+    }) as any;
+    const engine = new SyncEngine(store, server as any, conn, {
+      syncing: () => undefined, synced: () => undefined, failed: () => undefined, deviceRevoked: () => undefined, deviceLimit: () => undefined,
+      accessLost: () => undefined, signInRequired: () => undefined, changed: () => undefined, sessionExpired: () => false,
+      recoveryPending: async () => pending, recoveryRegistered: () => { registered++; pending = null; }, recoveryMissing: () => undefined,
+    }, { apiUrl: API, deviceId: 'device-1', deviceLabel: 'Test', userUuid });
+    await engine.run();
+    expect(registered).toBe(0);                                          // the server did not answer: the code is still waiting
+    expect(pending).not.toBeNull();
+    down = false;
+    await engine.run();
+    expect(sent).toEqual([{ device_id: 'device-1', device_label: 'Test', code: 'ABCD-EFGH-JKMN-PQRS-TVWX-0123' }]);
+    expect(registered).toBe(1);
+    await engine.run();
+    expect(sent.length).toBe(1);                                         // nothing waits any more: not sent again
+    engine.stop();
+  });
+
+  it('learns from the server that it holds no recovery code', async () => {
+    online.set(true);
+    let missing = 0;
+    (server as any).get = () => of({ server_time: new Date().toISOString(), offline_enabled: true, cursor: null, has_more: false, declarations: [], hospitals: [], rules: { required_for_transmission: [], max_upload_size: 1, max_batch: 1 }, recovery_registered: false });
+    const engine = new SyncEngine(store, server as any, conn, {
+      syncing: () => undefined, synced: () => undefined, failed: () => undefined, deviceRevoked: () => undefined, deviceLimit: () => undefined,
+      accessLost: () => undefined, signInRequired: () => undefined, changed: () => undefined, sessionExpired: () => false,
+      recoveryMissing: () => { missing++; },
+    }, { apiUrl: API, deviceId: 'device-1', deviceLabel: 'Test', userUuid });
+    await engine.run();
+    expect(missing).toBeGreaterThan(0);
+    engine.stop();
   });
 
   it('an empty list from the server never blanks the facilities already on the device', async () => {

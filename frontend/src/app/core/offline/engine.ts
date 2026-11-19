@@ -12,9 +12,12 @@ import { LocalApi } from './local-api';
 import { OfflineStore } from './store';
 import { SyncEngine } from './sync';
 import { LocalDeclaration, LogRow, OpView } from './types';
-import { VaultSession, changeVaultPin, clearVaultSession, createVault, destroyVault, loadVaultSession, openVault, pinProblem, saveVaultSession } from './vault';
+import {
+  VaultSession, changeVaultPin, clearVaultSession, createVault, destroyVault, loadVaultSession, openVault, pendingRecoveryCode, pinProblem,
+  recoverVault, recoveryMissing, recoveryRegistered, saveVaultSession,
+} from './vault';
 
-export { PinError, pinProblem, PIN_MIN_LENGTH } from './vault';
+export { PinError, RecoveryError, pinProblem, PIN_MIN_LENGTH } from './vault';
 
 export interface EngineHost {
   counts(waiting: number, problems: number, oldest: string | null): void;
@@ -39,7 +42,7 @@ export interface EngineDeps {
   apiUrl: string; deviceId: string; deviceLabel: string;
 }
 
-export const vault = { create: createVault, open: openVault, changePin: changeVaultPin, destroy: destroyVault, clearSession: clearVaultSession, pinProblem };
+export const vault = { create: createVault, open: openVault, recover: recoverVault, changePin: changeVaultPin, destroy: destroyVault, clearSession: clearVaultSession, pinProblem };
 export const storage = { countUnsynced, deleteDb };
 export const backup = { restore: restoreBackup };
 export { backupFileName, BackupError } from './backup';
@@ -60,6 +63,7 @@ export class OfflineEngine {
     this.sync = new SyncEngine(this.store, deps.http, conn, {
       syncing: v => host.syncing(v), synced: at => host.synced(at), failed: m => host.failed(m),
       deviceRevoked: () => host.deviceRevoked(), deviceLimit: () => host.deviceLimit(), accessLost: m => host.accessLost(m), signInRequired: () => auth.expire(), changed: () => this.refresh(), sessionExpired: () => auth.sessionExpired(),
+      recoveryPending: () => pendingRecoveryCode(key), recoveryRegistered: () => recoveryRegistered(), recoveryMissing: () => recoveryMissing(),
     }, { apiUrl: deps.apiUrl, deviceId: deps.deviceId, deviceLabel: deps.deviceLabel, userUuid });
     this.api = new LocalApi(this.store, conn, {
       apiUrl: deps.apiUrl, userName: () => auth.fullName(), sessionExpired: () => auth.sessionExpired(),

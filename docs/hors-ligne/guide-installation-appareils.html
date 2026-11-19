@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wakara hors ligne - Guide d'installation</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #1a2233; font-size: 11pt; line-height: 1.45; margin: 0; background: #fff; }
+  .page { max-width: 190mm; margin: 0 auto; padding: 12px 16px; }
+  header { border-bottom: 3px solid #0b2b6b; padding-bottom: 8px; margin-bottom: 14px; }
+  header h1 { margin: 0; color: #0b2b6b; font-size: 22pt; }
+  header p { margin: 2px 0 0; color: #4a5568; }
+  h2 { color: #0b2b6b; font-size: 15pt; margin: 20px 0 6px; padding-bottom: 3px; border-bottom: 1px solid #c9d3e6; break-after: avoid; }
+  h3 { font-size: 12pt; margin: 12px 0 4px; break-after: avoid; }
+  ol, ul { margin: 6px 0 6px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  .box { border-left: 5px solid #0b2b6b; background: #eef3fc; padding: 8px 12px; margin: 10px 0; break-inside: avoid; }
+  .warn { border-left-color: #c05621; background: #fff4e8; }
+  .stop { border-left-color: #b91c1c; background: #fdecec; }
+  .ok { border-left-color: #2f855a; background: #edf8f1; }
+  .box strong.t { display: block; margin-bottom: 2px; }
+  code { background: #eef0f4; padding: 1px 5px; border-radius: 3px; font-size: 10.5pt; }
+  .url { font-size: 14pt; font-weight: 700; color: #0b2b6b; text-align: center; margin: 8px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10pt; break-inside: avoid; }
+  th, td { border: 1px solid #b8c3d9; padding: 5px 8px; text-align: left; vertical-align: top; }
+  th { background: #0b2b6b; color: #fff; }
+  .check li { list-style: none; margin-left: -22px; }
+  .check li::before { content: "\2610  "; font-size: 13pt; }
+  section { break-inside: auto; }
+  .newpage { break-before: page; }
+  footer { margin-top: 18px; padding-top: 6px; border-top: 1px solid #c9d3e6; font-size: 9pt; color: #6b7280; }
+  @media print { .page { padding: 0; max-width: none; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <h1>Wakara - Travailler sans Internet</h1>
+  <p>Guide d'installation pour ordinateur, Android et iPhone. Pas de connaissance technique n&eacute;cessaire.</p>
+</header>
+
+<section>
+<h2>1. Ce qu'il faut savoir avant de commencer</h2>
+<p>Wakara n'est <strong>pas</strong> &agrave; t&eacute;l&eacute;charger dans le Play Store ou l'App Store. C'est un site web qui peut s'installer comme une application. Une fois install&eacute;, il garde une copie de lui-m&ecirc;me sur votre appareil et peut s'ouvrir <strong>sans Internet</strong>.</p>
+<p>L'adresse &agrave; utiliser, toujours la m&ecirc;me :</p>
+<div class="url">https://wakara-rtm.vercel.app</div>
+
+<div class="box stop">
+  <strong class="t">Les 3 r&egrave;gles &agrave; ne jamais oublier</strong>
+  <ol>
+    <li><strong>La toute premi&egrave;re ouverture se fait AVEC Internet.</strong> C'est l&agrave; que l'appareil t&eacute;l&eacute;charge l'application et que vous cr&eacute;ez votre code.</li>
+    <li><strong>Pas de navigation priv&eacute;e</strong> : le navigateur effacerait tout &agrave; la fermeture.</li>
+    <li><strong>Notez votre code de verrouillage</strong> dans un endroit s&ucirc;r (pas sur le t&eacute;l&eacute;phone). Si vous l'oubliez, <strong>appelez l'administrateur</strong> : il peut vous communiquer un <em>code de r&eacute;cup&eacute;ration</em> qui rouvre l'appareil sans rien perdre (voir la section 7).</li>
+  </ol>
+</div>
+
+<h3>Ce que vous pourrez faire sans Internet</h3>
+<ul>
+  <li>Cr&eacute;er une d&eacute;claration de naissance, la modifier, l'enregistrer en brouillon.</li>
+  <li>Photographier la fiche physique.</li>
+  <li>La transmettre au secr&eacute;tariat (elle partira quand le r&eacute;seau reviendra).</li>
+  <li>Consulter vos dossiers d&eacute;j&agrave; re&ccedil;us.</li>
+</ul>
+</section>
+
+<section>
+<h2>2. Pr&eacute;paration (administrateur, une seule fois)</h2>
+<ol>
+  <li>Se connecter en administrateur sur le site.</li>
+  <li>Menu <strong>Param&egrave;tres</strong> : v&eacute;rifier que <code>offline.enabled</code> vaut <code>true</code> (sinon le mode hors ligne est coup&eacute; pour tout le monde).</li>
+  <li>Menu <strong>Utilisateurs</strong> : cr&eacute;er le compte de chaque agent avec le r&ocirc;le <strong>Agent de collecte</strong>.</li>
+  <li><strong>Agent qui a oubli&eacute; son code</strong> : v&eacute;rifier son identit&eacute; (rappel sur un num&eacute;ro connu), puis menu <strong>Appareils hors connexion</strong> &rarr; <strong>Code de r&eacute;cup&eacute;ration</strong> de son appareil &rarr; saisir un motif et son propre mot de passe &rarr; dicter le code. Chaque lecture est inscrite au journal. Jamais pour un appareil vol&eacute; : le r&eacute;voquer.</li>
+  <li>Retenir la limite : <strong>3 appareils au maximum par compte</strong>. Le quatri&egrave;me est refus&eacute; tant qu'un ancien appareil n'est pas r&eacute;voqu&eacute; (menu <strong>Appareils hors connexion</strong>).</li>
+</ol>
+</section>
+
+<section class="newpage">
+<h2>3. Sur ordinateur (Windows, Mac, Linux)</h2>
+<p>Navigateur conseill&eacute; : <strong>Chrome</strong> ou <strong>Edge</strong>.</p>
+<ol>
+  <li>Ouvrez <code>https://wakara-rtm.vercel.app</code> <strong>avec Internet</strong>.</li>
+  <li>Connectez-vous avec votre identifiant et votre mot de passe.</li>
+  <li>L'&eacute;cran <strong>&laquo; Prot&eacute;gez cet appareil &raquo;</strong> appara&icirc;t. Choisissez un code de verrouillage : 8 caract&egrave;res minimum m&ecirc;lant lettres et chiffres, ou une phrase de 14 caract&egrave;res. Les codes &eacute;vidents (<code>123456</code>) sont refus&eacute;s.</li>
+  <li><strong>Laissez la page ouverte environ 10 secondes</strong> : l'application se copie sur l'appareil en t&acirc;che de fond.</li>
+  <li><em>(Conseill&eacute;)</em> Installez l'application : cliquez sur l'ic&ocirc;ne &laquo; Installer &raquo; &agrave; droite de la barre d'adresse, ou menu <strong>&#8942; &rarr; Installer Wakara</strong>. Wakara s'ouvre alors dans sa propre fen&ecirc;tre, avec une ic&ocirc;ne sur le bureau.</li>
+  <li>Faites le <strong>test final</strong> (section 6).</li>
+</ol>
+<div class="box warn">
+  <strong class="t">Ordinateur partag&eacute;</strong>
+  Choisissez &laquo; Continuer sans le mode hors connexion &raquo; : vous travaillerez uniquement en ligne et rien ne restera sur la machine.
+</div>
+
+<h2>4. Sur t&eacute;l&eacute;phone Android (Chrome)</h2>
+<ol>
+  <li>Ouvrez <strong>Chrome</strong> et allez sur <code>https://wakara-rtm.vercel.app</code>, <strong>avec Internet</strong> (Wi-Fi ou donn&eacute;es mobiles).</li>
+  <li>Connectez-vous, puis cr&eacute;ez votre <strong>code de verrouillage</strong> (m&ecirc;mes r&egrave;gles que ci-dessus).</li>
+  <li>Restez environ <strong>10 secondes</strong> sur l'application.</li>
+  <li>Installez-la :
+    <ul>
+      <li>Touchez le menu <strong>&#8942;</strong> (en haut &agrave; droite de Chrome).</li>
+      <li>Touchez <strong>&laquo; Installer l'application &raquo;</strong> (ou <strong>&laquo; Ajouter &agrave; l'&eacute;cran d'accueil &raquo;</strong>).</li>
+      <li>Confirmez avec <strong>Installer</strong>. L'ic&ocirc;ne Wakara appara&icirc;t avec vos autres applications.</li>
+    </ul>
+  </li>
+  <li><strong>&Agrave; partir de maintenant, ouvrez Wakara depuis cette ic&ocirc;ne.</strong></li>
+  <li>Si le t&eacute;l&eacute;phone demande l'autorisation d'utiliser la <strong>cam&eacute;ra</strong>, acceptez : elle sert &agrave; photographier la fiche.</li>
+  <li>Faites le <strong>test final</strong> (section 6).</li>
+</ol>
+<div class="box warn">
+  <strong class="t">&Agrave; &eacute;viter sur Android</strong>
+  <ul>
+    <li>Ne videz pas les donn&eacute;es de Chrome (&laquo; Effacer les donn&eacute;es de navigation &raquo;) : cela supprimerait le code et les saisies non envoy&eacute;es.</li>
+    <li>V&eacute;rifiez que l'&eacute;conomiseur de batterie ne bloque pas Chrome en arri&egrave;re-plan.</li>
+  </ul>
+</div>
+</section>
+
+<section class="newpage">
+<h2>5. Sur iPhone / iPad (Safari)</h2>
+<div class="box stop">
+  <strong class="t">Sur iPhone, l'installation est obligatoire</strong>
+  Dans Safari, le navigateur peut <strong>effacer les donn&eacute;es d'un site apr&egrave;s 7 jours sans visite</strong>. Install&eacute;e sur l'&eacute;cran d'accueil, l'application est prot&eacute;g&eacute;e de cet effacement.
+</div>
+<ol>
+  <li>Ouvrez <strong>Safari</strong> (pas un autre navigateur) et allez sur <code>https://wakara-rtm.vercel.app</code>, <strong>avec Internet</strong>.</li>
+  <li>Touchez le bouton <strong>Partager</strong> (le carr&eacute; avec une fl&egrave;che vers le haut, en bas de l'&eacute;cran).</li>
+  <li>Faites d&eacute;filer la liste et touchez <strong>&laquo; Sur l'&eacute;cran d'accueil &raquo;</strong>, puis <strong>Ajouter</strong>.</li>
+  <li><strong>Fermez Safari. Ouvrez Wakara depuis la nouvelle ic&ocirc;ne.</strong></li>
+  <li>Dans l'application ouverte depuis l'ic&ocirc;ne : <strong>connectez-vous</strong>, <strong>cr&eacute;ez votre code de verrouillage</strong>, puis attendez environ 10 secondes. L'application install&eacute;e a son propre espace de stockage : ce que vous feriez dans Safari ne serait pas retrouv&eacute; dans l'ic&ocirc;ne.</li>
+  <li>Faites le <strong>test final</strong> (section 6).</li>
+</ol>
+<div class="box warn">
+  <strong class="t">&Agrave; &eacute;viter sur iPhone</strong>
+  <ul>
+    <li>Ne supprimez pas l'ic&ocirc;ne Wakara : cela supprime aussi les donn&eacute;es locales.</li>
+    <li>M&ecirc;me install&eacute;e, synchronisez r&eacute;guli&egrave;rement.</li>
+  </ul>
+</div>
+
+<h2>6. Test final : v&eacute;rifier que &ccedil;a marche</h2>
+<p>&Agrave; faire <strong>une fois sur chaque appareil</strong>, avec un compte de test, avant le travail r&eacute;el.</p>
+<ul class="check">
+  <li>Appareil connect&eacute;, Wakara ouvert et charg&eacute; depuis au moins 10 secondes.</li>
+  <li><strong>Coupez tout le r&eacute;seau</strong> : mode avion (ou Wi-Fi et donn&eacute;es coup&eacute;s). Sur ordinateur : touche <code>F12</code>, onglet <em>R&eacute;seau</em>, case <em>Hors connexion</em>.</li>
+  <li><strong>Fermez compl&egrave;tement</strong> Wakara puis rouvrez-le : il doit s'ouvrir sur l'&eacute;cran de code.</li>
+  <li>Saisissez le code : vos dossiers d&eacute;j&agrave; re&ccedil;us sont visibles.</li>
+  <li>Cr&eacute;ez une d&eacute;claration (date, heure, lieu, sexe de l'enfant au minimum), ajoutez une photo, enregistrez. Elle porte une r&eacute;f&eacute;rence <code>LOCAL-&hellip;</code> et l'indicateur orange <strong>&laquo; Sur cet appareil &raquo;</strong>.</li>
+  <li>Touchez <strong>&laquo; Transmettre au secr&eacute;tariat &raquo;</strong> : le dossier passe en &laquo; Transmis &raquo;.</li>
+  <li><strong>R&eacute;tablissez le r&eacute;seau.</strong> Apr&egrave;s quelques secondes, l'indicateur passe au <strong>vert &laquo; En ligne &raquo;</strong> et la r&eacute;f&eacute;rence devient <code>WKR-&hellip;</code>.</li>
+  <li>Le secr&eacute;tariat voit bien le dossier dans sa liste.</li>
+</ul>
+<div class="box">
+  <strong class="t">Si &laquo; &eacute;tape 3 &raquo; &eacute;choue (page blanche hors ligne)</strong>
+  L'application n'avait pas fini de se copier. Reconnectez-vous, attendez plus longtemps sur la page, puis recommencez le test.
+</div>
+</section>
+
+<section class="newpage">
+<h2>7. Les bons r&eacute;flexes au quotidien</h2>
+<ul>
+  <li><strong>Synchronisez d&egrave;s que vous avez du r&eacute;seau</strong>, et au moins une fois par jour. Un appareil verrouill&eacute; ou une page ferm&eacute;e n'envoie rien.</li>
+  <li>En haut de l'&eacute;cran, la pastille indique <strong>En ligne</strong> ou <strong>Hors connexion</strong> et le nombre d'op&eacute;rations en attente.</li>
+  <li>Le t&eacute;l&eacute;phone se <strong>verrouille seul apr&egrave;s 15 minutes</strong> d'inactivit&eacute;. Le code est redemand&eacute; &agrave; chaque ouverture, m&ecirc;me sans Internet.</li>
+  <li>Une <strong>banni&egrave;re rouge</strong> appara&icirc;t si des saisies attendent depuis plus de 24 heures.</li>
+  <li>Page <strong>Synchronisation</strong> : bouton de <strong>sauvegarde de secours</strong>. Gardez le fichier ailleurs que sur le t&eacute;l&eacute;phone (par exemple envoy&eacute; par courriel &agrave; vous-m&ecirc;me).</li>
+  <li>Gardez la <strong>date et l'heure</strong> du t&eacute;l&eacute;phone en r&eacute;glage automatique : le serveur corrige ou &eacute;carte les dates trop fausses.</li>
+  <li><strong>Code de verrouillage oubli&eacute;</strong> : &eacute;cran de code &rarr; <strong>&laquo; Code oubli&eacute; ? &raquo;</strong> &rarr; <strong>appelez l'administrateur</strong>. Apr&egrave;s avoir v&eacute;rifi&eacute; qui vous &ecirc;tes, il vous dicte un <strong>code de r&eacute;cup&eacute;ration</strong> (24 caract&egrave;res, par groupes de 4). Touchez &laquo; J'ai un code de r&eacute;cup&eacute;ration &raquo;, saisissez-le et choisissez un nouveau code : toutes vos d&eacute;clarations non envoy&eacute;es sont conserv&eacute;es. Le code ne sert qu'une fois.</li>
+  <li><strong>Double authentification</strong> (si votre compte l'utilise) : apr&egrave;s le mot de passe, saisissez le code &agrave; 6 chiffres de votre application d'authentification, ou un code de secours. T&eacute;l&eacute;phone perdu : contactez l'administrateur.</li>
+  <li>Quand un bandeau propose <strong>&laquo; Recharger &raquo;</strong>, une nouvelle version est pr&ecirc;te : rechargez &agrave; un moment calme, avec du r&eacute;seau.</li>
+  <li><strong>T&eacute;l&eacute;phone perdu ou vol&eacute;</strong> : pr&eacute;venez tout de suite l'administrateur, qui r&eacute;voque l'appareil.</li>
+</ul>
+
+<h3>Que veulent dire les indicateurs sur un dossier ?</h3>
+<table>
+  <tr><th style="width:32%">Indicateur</th><th>Signification et action</th></tr>
+  <tr><td>En ligne (vert)</td><td>Le dossier est sur le serveur. Rien &agrave; faire.</td></tr>
+  <tr><td>Sur cet appareil (orange)</td><td>Le dossier n'existe que sur votre appareil (r&eacute;f&eacute;rence <code>LOCAL-</code>). Il partira au retour du r&eacute;seau.</td></tr>
+  <tr><td>Modifications &agrave; envoyer (orange)</td><td>Vos derniers changements n'ont pas encore &eacute;t&eacute; envoy&eacute;s. Ils partiront au retour du r&eacute;seau.</td></tr>
+  <tr><td>Envoi en cours (bleu)</td><td>Patientez.</td></tr>
+  <tr><td>Refus&eacute;e par le serveur (rouge)</td><td>Information manquante par exemple. Ouvrez le dossier : le motif est affich&eacute;. Corrigez puis &laquo; Renvoyer &raquo;.</td></tr>
+  <tr><td>Conflit &agrave; r&eacute;soudre (rouge)</td><td>Le dossier a chang&eacute; sur le serveur pendant votre travail hors ligne. Choisissez la version &agrave; garder : rien n'est &eacute;cras&eacute; sans votre choix.</td></tr>
+</table>
+
+<h2>8. Probl&egrave;mes fr&eacute;quents</h2>
+<table>
+  <tr><th style="width:30%">Sympt&ocirc;me</th><th style="width:32%">Cause probable</th><th>Solution</th></tr>
+  <tr><td>Page blanche hors ligne</td><td>Jamais ouvert assez longtemps en ligne</td><td>Se reconnecter, attendre 10 s, refaire le test</td></tr>
+  <tr><td>&laquo; Session expir&eacute;e &raquo;</td><td>La connexion a expir&eacute;</td><td>Toucher &laquo; Se reconnecter &raquo; : vos saisies sont intactes</td></tr>
+  <tr><td>Bandeau rouge &agrave; la premi&egrave;re synchronisation</td><td>D&eacute;j&agrave; 3 appareils sur ce compte</td><td>L'administrateur r&eacute;voque un ancien appareil</td></tr>
+  <tr><td>Code oubli&eacute;</td><td>Le code ne peut pas &ecirc;tre retrouv&eacute; par l'agent</td><td>L'administrateur communique le code de r&eacute;cup&eacute;ration : rien n'est perdu. Sans code de r&eacute;cup&eacute;ration (appareil jamais ouvert avec Internet depuis la mise en service) : effacement des donn&eacute;es avec le mot de passe, saisies non envoy&eacute;es perdues</td></tr>
+  <tr><td>Donn&eacute;es disparues sur iPhone</td><td>Application non install&eacute;e, plus de 7 jours sans usage</td><td>Installer sur l'&eacute;cran d'accueil (section 5)</td></tr>
+  <tr><td>Plus de mode hors ligne du tout</td><td>R&eacute;glage <code>offline.enabled</code> &agrave; <code>false</code></td><td>L'administrateur le remet &agrave; <code>true</code></td></tr>
+  <tr><td>Appareil r&eacute;voqu&eacute;</td><td>D&eacute;cision de l'administrateur</td><td>Le contacter. Vos d&eacute;clarations restent sur l'appareil en attendant</td></tr>
+</table>
+
+<div class="box ok">
+  <strong class="t">Pour l'&eacute;quipe : &agrave; v&eacute;rifier avant le d&eacute;ploiement</strong>
+  Les tests automatiques couvrent Chrome sur ordinateur. Les t&eacute;l&eacute;phones r&eacute;els (Android et iPhone) ne sont pas test&eacute;s automatiquement : faites le test final de la section 6 sur au moins un Android et un iPhone avant de remettre les appareils aux agents. Les libell&eacute;s des menus peuvent varier l&eacute;g&egrave;rement selon la version d'Android ou d'iOS.
+</div>
+</section>
+
+<footer>Wakara - &Eacute;tat civil de Ratoma. Guide d'installation du mode hors connexion. Compl&egrave;te le guide de l'agent (<code>docs/hors-ligne/guide-agent.md</code>) et la documentation d'exploitation.</footer>
+
+</div>
+</body>
+</html>

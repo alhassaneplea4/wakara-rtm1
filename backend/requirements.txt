@@ -14,6 +14,11 @@ PyJWT==2.15.1
 # Shared cache for the rate limits (REDIS_URL); only imported when REDIS_URL is set
 redis==7.4.1
 
+# Encryption of the recovery codes of the offline devices (Fernet) — sync/recovery.py
+cryptography==50.0.2
+cffi==2.1.1
+pycparser==3.12
+
 # Environment variables
 python-decouple==3.8
 

@@ -64,7 +64,9 @@ Connectez-vous en `agent.collecte`, une fois **avec Internet** : l'écran « Pro
 12. **Conflit** : ouvrez le dossier « Mariama Diallo » hors ligne, modifiez-le ; sans fermer l'onglet, ouvrez un second profil de navigateur, connectez-vous en `agent.collecte` (avec un autre code, c'est un autre appareil), modifiez le même dossier et laissez-le synchroniser ; revenez au premier onglet, remettez le réseau : **Conflit à résoudre**.
 13. **Dossier à corriger** : « Aissatou Camara » est modifiable hors ligne puis retransmissible ; le dossier validé n'est jamais modifiable.
 14. **Administrateur** : connectez-vous en `admin` (fenêtre privée) → *Appareils hors connexion* : l'appareil de l'agent y apparaît ; *Révoquer* puis resynchroniser côté agent : le message « appareil révoqué » s'affiche.
-15. **Interrupteur à distance** : `admin` → *Paramètres* : le réglage `offline.enabled` figure dans la liste. Mis à `false` puis enregistré, l'appareil de l'agent revient au mode en ligne à son prochain contact.
+15. **Code oublié** : connectez-vous en `admin` (fenêtre privée) → *Appareils* : la colonne « Code de récupération » indique « Enregistré » (après une synchronisation). Côté agent : verrouillez, « Code oublié ? » → « J'ai un code de récupération ». Côté admin : « Code de récupération » (motif + mot de passe) → dictez le code, saisissez-le côté agent avec un nouveau code : les dossiers en attente sont conservés. Le journal d'audit montre la lecture (`device_recovery_revealed`).
+16. **Double authentification** : `agent.collecte` → Mon profil → Double authentification → Activer (la clé se saisit dans une application d'authentification) ; reconnectez-vous : le code est demandé. `admin` → Utilisateurs → l'agent → « Réinitialiser la double authentification ».
+17. **Interrupteur à distance** : `admin` → *Paramètres* : le réglage `offline.enabled` figure dans la liste. Mis à `false` puis enregistré, l'appareil de l'agent revient au mode en ligne à son prochain contact.
 
 ## Deux appareils sur la même machine
 
@@ -78,7 +80,7 @@ DevTools → *Application* → *Stockage* → *Effacer les données du site* : e
 
 ```bash
 npm run test:ci      # tests unitaires
-npm run e2e          # 6 scénarios de bout en bout (base temporaire, indépendante du banc d'essai)
+npm run e2e          # 7 scénarios de bout en bout (E2E_CHANNEL=msedge pour Edge) (base temporaire, indépendante du banc d'essai)
 ```
 
 ## Limites de ce banc d'essai

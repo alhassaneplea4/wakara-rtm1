@@ -12,6 +12,8 @@ from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework.views import APIView
 
 from accounts.authentication import device_of_token
+from audit import service as audit
+from audit.models import AuditAction
 from core.models import get_setting
 from core.permissions import AnyOf, HasWakaraPermission, user_has_perm
 
@@ -30,7 +32,8 @@ class AccessLostMixin:
 
     def permission_denied(self, request, message=None, code=None):
         user = request.user
-        if user and user.is_authenticated and user.is_active and not getattr(user, 'must_change_password', False):
+        if (user and user.is_authenticated and user.is_active and not getattr(user, 'must_change_password', False)
+                and not getattr(user, 'must_set_up_two_factor', False)):
             raise PermissionDenied({
                 'code': 'access_lost',
                 'detail': "Vos droits ne permettent plus de travailler sur cet appareil : les copies de dossiers vont être effacées."})
@@ -43,6 +46,10 @@ class SyncRateThrottle(UserRateThrottle):
 
 class PingRateThrottle(AnonRateThrottle):
     scope = 'sync_ping'
+
+
+class RecoveryRateThrottle(UserRateThrottle):
+    scope = 'recovery'
 
 
 def offline_enabled() -> bool:
@@ -220,6 +227,37 @@ class DocumentPushView(AccessLostMixin, APIView):
         return Response({'server_time': timezone.now().isoformat(), 'result': result})
 
 
+class RecoveryRegisterSerializer(serializers.Serializer):
+    device_id = serializers.UUIDField()
+    device_label = serializers.CharField(required=False, allow_blank=True, max_length=120, default='')
+    code = serializers.CharField(max_length=64, trim_whitespace=True)
+
+
+class RecoveryRegisterView(AccessLostMixin, APIView):
+    """
+    POST /api/sync/recovery/ — the device gives the recovery code that can open its vault (see sync/recovery.py).
+    The administrator can read it back to an agent who forgot his PIN. A new code replaces the previous one.
+    """
+    permission_classes = [HasWakaraPermission]
+    required_permission = 'declaration.view'
+    parser_classes = [JSONParser]
+    throttle_classes = [SyncRateThrottle]
+
+    def post(self, request):
+        serializer = RecoveryRegisterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        device, refusal = _device_or_refusal(request, data['device_id'], data['device_label'])
+        if refusal:
+            return refusal
+        try:
+            services.register_recovery(device, data['code'])
+        except services.RecoveryCodeInvalid:
+            return Response({'code': 'invalid_recovery_code', 'detail': "Code de récupération invalide."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        return Response({'registered': True})
+
+
 # ── Pull ──────────────────────────────────────────
 
 class PullView(AccessLostMixin, APIView):
@@ -246,6 +284,7 @@ class PullView(AccessLostMixin, APIView):
             'cursor': cursor.isoformat() if cursor else None,
             'has_more': has_more,
             'declarations': declarations,
+            'recovery_registered': services.recovery_registered(request.user, device_of_token(request.auth)),
             **services.reference_data(request.user),
         })
         response['Cache-Control'] = 'private, no-store'
@@ -267,6 +306,7 @@ class ReferenceView(AccessLostMixin, APIView):
             return refusal
         response = Response({
             'server_time': timezone.now().isoformat(), 'offline_enabled': offline_enabled(),
+            'recovery_registered': services.recovery_registered(request.user, device_of_token(request.auth)),
             **services.reference_data(request.user),
         })
         response['Cache-Control'] = 'private, no-store'
@@ -314,22 +354,34 @@ class SyncOperationViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 class DeviceSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     user_name = serializers.SerializerMethodField()
+    # whether a code is registered (never the code) and when it was last given to the agent
+    has_recovery = serializers.SerializerMethodField()
+    recovery_revealed_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Device
         fields = ['id', 'device_id', 'username', 'user_name', 'label', 'user_agent', 'created_at',
-                  'last_seen_at', 'last_sync_at', 'is_revoked', 'revoked_at']
+                  'last_seen_at', 'last_sync_at', 'is_revoked', 'revoked_at',
+                  'has_recovery', 'recovery_set_at', 'recovery_revealed_at', 'recovery_revealed_by_name']
 
     def get_user_name(self, obj):
         return obj.user.get_full_name() or obj.user.username
 
+    def get_has_recovery(self, obj):
+        return bool(obj.recovery_blob)
+
+    def get_recovery_revealed_by_name(self, obj):
+        who = obj.recovery_revealed_by
+        return (who.get_full_name() or who.username) if who else ''
+
 
 class DeviceViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     """Devices known to the server. Revoking one makes the server refuse everything it sends."""
-    queryset = Device.objects.select_related('user')
+    queryset = Device.objects.select_related('user', 'recovery_revealed_by')
     serializer_class = DeviceSerializer
     permission_classes = [HasWakaraPermission]
-    permission_map = {'list': 'audit.view', 'revoke': 'user.manage_status', 'restore': 'user.manage_status'}
+    permission_map = {'list': 'audit.view', 'revoke': 'user.manage_status', 'restore': 'user.manage_status',
+                      'recovery': 'device.recover'}
     filterset_fields = ['is_revoked']
     search_fields = ['label', 'user__username']
 
@@ -342,3 +394,28 @@ class DeviceViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     def restore(self, request, pk=None):
         device = services.set_device_revoked(self.get_object(), False, request.user)
         return Response(self.get_serializer(device).data)
+
+    @action(detail=True, methods=['post'], throttle_classes=[RecoveryRateThrottle])
+    def recovery(self, request, pk=None):
+        """
+        The recovery code of the device, for an agent who forgot his PIN. The administrator confirms with his own
+        password and gives a reason (both required); the reading is audited, the code is never logged.
+        """
+        device = self.get_object()
+        reason = str(request.data.get('reason') or '').strip()
+        password = request.data.get('password')
+        if len(reason) < 10:
+            return Response({'code': 'reason_required', 'detail':
+                             "Indiquez le motif (10 caractères au moins) : il est inscrit au journal d'audit."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if not isinstance(password, str) or not request.user.check_password(password):
+            audit.log(AuditAction.DEVICE_RECOVERY_DENIED, user=request.user, object_type='Device',
+                      object_id=str(device.device_id), object_repr=f"{device.label or device.device_id} — {device.user.username}",
+                      reason='Mot de passe incorrect')
+            return Response({'code': 'wrong_password', 'detail': "Mot de passe incorrect."},
+                            status=status.HTTP_403_FORBIDDEN)
+        try:
+            code = services.reveal_recovery(device, request.user, reason)
+        except services.RecoveryUnavailable as exc:
+            return Response({'code': exc.code, 'detail': exc.detail}, status=status.HTTP_409_CONFLICT)
+        return Response({'code': code, 'recovery_set_at': device.recovery_set_at, 'device': self.get_serializer(device).data})

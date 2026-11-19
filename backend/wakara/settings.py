@@ -259,6 +259,8 @@ REST_FRAMEWORK = {
         'user': config('USER_THROTTLE_RATE', default='1200/min'),
         'sync': config('SYNC_THROTTLE_RATE', default='240/min'),            # push, photos, pull of one agent
         'sync_ping': config('SYNC_PING_THROTTLE_RATE', default='60/min'),   # public reachability probe
+        'recovery': config('RECOVERY_THROTTLE_RATE', default='10/min'),     # reading a recovery code (admin)
+        'two_factor': config('TWO_FACTOR_THROTTLE_RATE', default='10/min'), # second-factor codes
         'duplicates_heavy': config('DUPLICATES_HEAVY_THROTTLE_RATE', default='20/min'),  # analyses and comparisons
     },
     'EXCEPTION_HANDLER': 'core.exceptions.wakara_exception_handler',
@@ -369,9 +371,16 @@ SYNC_PULL_PAGE_SIZE = config('SYNC_PULL_PAGE_SIZE', default=50, cast=int)
 SYNC_PULL_INITIAL_DAYS = config('SYNC_PULL_INITIAL_DAYS', default=90, cast=int)
 # Devices (browsers / phones) a user may have registered at the same time; revoke the old ones to free a place.
 SYNC_MAX_DEVICES_PER_USER = config('SYNC_MAX_DEVICES_PER_USER', default=3, cast=int)
+# Key under which the small secrets kept in the database are encrypted: the recovery codes of the devices
+# (sync/recovery.py) and the second-factor secrets (accounts/two_factor.py). Without it a key derived from SECRET_KEY
+# is used: changing SECRET_KEY then makes them unreadable (the devices register a new recovery code at their next
+# unlock; the second factor of an account must be reset). Define it once, keep it, and they survive a change of SECRET_KEY.
+FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY', default='')
 # Separation of duties ("four eyes"): the person who submitted a dossier to validation cannot validate it herself.
 # Switch off only in a very small office where one person does both (docs/securite-deploiement.md).
 DOSSIER_SEPARATE_SUBMIT_AND_VALIDATE = config('DOSSIER_SEPARATE_SUBMIT_AND_VALIDATE', default=True, cast=bool)
+# Size of the PostgreSQL database (MB) above which `check_production` warns (Neon free plan: 512 MB; photos live in the database).
+DATABASE_SIZE_WARN_MB = config('DATABASE_SIZE_WARN_MB', default=350, cast=int)
 # Months during which the mairie may treat a declaration (counted from the declaration date); then it goes to the courts.
 DOSSIER_DEADLINE_MONTHS = config('DOSSIER_DEADLINE_MONTHS', default=6, cast=int)
 

@@ -59,7 +59,7 @@ function architecture() {
 
   b += `<rect x="330" y="30" width="400" height="380" rx="14" fill="#F7FAFF" stroke="${C.blue}" stroke-width="1.8" stroke-dasharray="8 5"/>`;
   b += lines(530, 60, 'Vercel — un seul domaine (HTTPS)', { size: 16, weight: 700, fill: C.navy });
-  b += box(360, 90, 340, 120, ['Interface Angular 17', 'fichiers statiques'], ['Écrans, formulaires, tableau de bord', "Aucune règle critique côté navigateur"], { size: 16 });
+  b += box(360, 90, 340, 120, ['Interface Angular 21', 'fichiers statiques'], ['Écrans, formulaires, tableau de bord', "Aucune règle critique côté navigateur"], { size: 16 });
   b += box(360, 260, 340, 130, ['API Django 5.2 + REST', 'chemin /api/…'], ['Authentification JWT · permissions', 'workflow · audit · statistiques'], { size: 16, fill: C.greenL, stroke: C.green });
 
   b += `<rect x="820" y="130" width="230" height="240" rx="14" fill="${C.orangeL}" stroke="${C.orange}" stroke-width="1.6"/>`;

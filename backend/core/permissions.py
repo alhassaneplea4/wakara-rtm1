@@ -46,6 +46,8 @@ PERMISSION_CATALOG = [
     ('data.export', 'Exporter les données', 'Statistiques'),
     ('audit.view', "Consulter les journaux d'audit", 'Audit'),
     ('settings.manage', 'Gérer les paramètres', 'Administration'),
+    ('device.recover', "Communiquer le code de récupération d'un appareil (agent qui a oublié son code)", 'Administration'),
+    ('user.reset_two_factor', "Réinitialiser la double authentification d'un compte", 'Administration'),
     ('duplicate.view', 'Consulter le Centre de contrôle des doublons', 'Contrôle des doublons'),
     ('duplicate.investigate', 'Investiguer un dossier suspect (observations, vérifications)', 'Contrôle des doublons'),
     ('duplicate.decide', "Décider du sort d'un dossier suspect", 'Contrôle des doublons'),
@@ -142,6 +144,12 @@ def permissions_of(user) -> set:
     return perms
 
 
+def permissions_of_role(role) -> set:
+    """The permission codenames a role gives."""
+    from accounts.models import RolePermission
+    return set(RolePermission.objects.filter(role=role).values_list('permission__codename', flat=True))
+
+
 def user_has_perm(user, codename: str) -> bool:
     return codename in get_user_permissions(user)
 
@@ -161,6 +169,9 @@ class HasWakaraPermission(BasePermission):
         if getattr(user, 'must_change_password', False) and not getattr(
             view, 'allow_password_change_pending', False
         ):
+            return False
+        # an account whose roles must use the second factor does nothing else until it is set up (profile page)
+        if getattr(user, 'must_set_up_two_factor', False) and not getattr(view, 'allow_two_factor_setup_pending', False):
             return False
 
         codename = getattr(view, 'required_permission', None)

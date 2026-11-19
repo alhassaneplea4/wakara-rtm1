@@ -40,6 +40,18 @@ const PERMS = [
 const SECRETARY = new Set(['declaration.view', 'declaration.view_all', 'acte.view', 'acte.complete', 'acte.update', 'acte.submit', 'acte.print', 'acte.deliver', 'document.view', 'document.upload', 'hospital.view', 'hospital.create', 'hospital.update', 'hospital.archive', 'stats.view']);
 const AGENT = new Set(['declaration.view', 'declaration.create', 'declaration.update', 'declaration.transmit', 'document.view', 'document.upload', 'hospital.view']);
 const Y = '✔', N = '—';
+// Permissions ajoutées depuis la version 1.0 (copie de backend/core/permissions.py)
+PERMS.push(
+  ['dossier.override_deadline', 'Traiter un dossier de plus de 6 mois', 'Validation'],
+  ['document.archive', 'Retirer une pièce déjà envoyée', 'Pièces'],
+  ['duplicate.view', 'Consulter le Centre de contrôle des doublons', 'Contrôle des doublons'],
+  ['duplicate.investigate', 'Investiguer un dossier suspect', 'Contrôle des doublons'],
+  ['duplicate.decide', 'Décider du sort d\'un dossier suspect', 'Contrôle des doublons'],
+  ['duplicate.configure', 'Régler les seuils de la détection des doublons', 'Contrôle des doublons'],
+  ['device.recover', 'Communiquer le code de récupération d\'un appareil', 'Administration'],
+  ['user.reset_two_factor', 'Réinitialiser la double authentification d\'un compte', 'Administration'],
+);
+for (const c of ['dossier.validate', 'dossier.reject', 'document.archive', 'duplicate.view', 'duplicate.investigate', 'duplicate.decide']) SECRETARY.add(c);
 
 const dico = dictionary(table, h3);
 if (missing.length) console.log('⚠ dictionnaire : descriptions manquantes →', missing.join(', '));
@@ -87,11 +99,14 @@ export default {
 │   ├── documents/           pièces justificatives (stockage privé)
 │   ├── audit/               journal d'audit, historiques par dossier
 │   ├── stats/               tableau de bord
-│   ├── tests/               161 tests automatisés
+│   ├── sync/                mode hors connexion : appareils, opérations, synchronisation, code de récupération
+│   ├── duplicates/          contrôle des doublons (identités, correspondances, dossiers d'investigation)
+│   ├── tests/               483 tests automatisés
 │   └── build.py             étape de build Vercel (migrations)
-├── frontend/                interface Angular 17
+├── frontend/                interface Angular 21 (PWA)
 │   └── src/app/
 │       ├── core/            API, authentification, gardes, intercepteur, modèles
+│       │   └── offline/     coffre (code), chiffrement, base locale, file, synchronisation
 │       ├── shared/          composants et directives réutilisables
 │       ├── layout/          structure (menu latéral, en-tête)
 │       └── features/        un composant par écran
@@ -108,6 +123,8 @@ export default {
         ['`documents`', 'Pièces justificatives en stockage privé, téléchargement authentifié et tracé'],
         ['`audit`', 'Journal d\'audit en ajout seul, contexte de requête, historiques par dossier'],
         ['`stats`', 'Tableau de bord calculé depuis la base'],
+        ['`sync`', 'Appareils hors connexion (enregistrement, révocation, code de récupération chiffré), opérations reçues et rejouées par les services métier, récupération des dossiers'],
+        ['`duplicates`', 'Identité normalisée de chaque naissance, comparaison, dossiers d\'investigation, décisions motivées, réglages protégés'],
       ],
     }),
 
@@ -116,28 +133,32 @@ export default {
       head: ['Composant', 'Version', 'Usage'], widths: [3.3, 2.2, 4.5], small: true,
       rows: [
         ['Python', '3.12 ou plus (testé avec 3.14)', 'Langage du backend'],
-        ['Django', '5.2.19', 'Cadre web, ORM, migrations, administration'],
+        ['Django', '5.2.18', 'Cadre web, ORM, migrations, administration'],
         ['Django REST Framework', '3.18.3', 'API REST, sérialisation, permissions'],
-        ['djangorestframework-simplejwt', '≥ 5.3, < 6.0', 'Jetons JWT (rotation, liste noire)'],
+        ['djangorestframework-simplejwt', '5.5.1', 'Jetons JWT (rotation, liste noire)'],
         ['django-filter', '26.2', 'Filtres des listes'],
         ['django-cors-headers', '4.9.0', 'Échanges entre origines (développement)'],
-        ['psycopg', '3.3.8', 'Pilote PostgreSQL'],
+        ['psycopg', '3.3.6', 'Pilote PostgreSQL'],
         ['Pillow', '13.0.0', 'Contrôle des images'],
         ['django-storages', '1.14.6', 'Stockage S3 privé des pièces (option)'],
         ['drf-spectacular', '0.30.0', 'Documentation OpenAPI (développement)'],
         ['python-decouple', '3.8', 'Lecture des variables d\'environnement'],
-        ['Angular', '17.3', 'Interface (composants autonomes, signaux, routes à chargement différé)'],
-        ['TypeScript', '5.3', 'Langage de l\'interface'],
+        ['Angular', '21.2', 'Interface (composants autonomes, signaux, routes à chargement différé)'],
+        ['TypeScript', '5.9', 'Langage de l\'interface'],
         ['Chart.js', '4.4', 'Graphiques du tableau de bord'],
         ['RxJS', '7.8', 'Flux de données asynchrones'],
         ['Karma, Jasmine', '6.4, 5.1', 'Tests unitaires de l\'interface'],
+        ['Dexie', '4.4', 'Base locale de l\'appareil (IndexedDB) pour le mode hors connexion'],
+        ['Playwright', '1.65', 'Tests de bout en bout avec le réseau réellement coupé'],
+        ['cryptography', '50.0', 'Chiffrement Fernet des codes de récupération et des secrets de double authentification'],
+        ['redis (option)', '7.4', 'Cache partagé des compteurs de limitation de débit (`REDIS_URL`)'],
         ['PostgreSQL (Neon)', '15 ou plus', 'Base de données de production (SQLite en développement)'],
       ],
     }),
-    note('Les versions sont celles installées lors de la livraison. Le fichier `backend/requirements.txt` fixe des plages de versions ; `frontend/package-lock.json` fixe les versions exactes de l\'interface.', 'info'),
+    note('Les versions sont celles installées lors de la livraison. Le fichier `backend/requirements.txt` fixe les versions exactes (testées ensemble) ; `frontend/package-lock.json` fixe les versions exactes de l\'interface.', 'info'),
 
     h1('Architecture fonctionnelle'),
-    p('Wakara se compose de huit modules fonctionnels. Chacun correspond à un ou plusieurs écrans de l\'interface, à des points d\'accès de l\'API et à des tables de la base.'),
+    p('Wakara se compose de dix modules fonctionnels. Chacun correspond à un ou plusieurs écrans de l\'interface, à des points d\'accès de l\'API et à des tables de la base.'),
     table({
       head: ['Module', 'Fonctions', 'Écrans (chemins)', 'Application'], widths: [2.2, 3.8, 2.6, 1.4], small: true,
       rows: [
@@ -149,6 +170,8 @@ export default {
         ['**Validation administrative**', 'File de validation, décision finale, numérotation', '`/validation`', 'declarations, actes'],
         ['**Statistiques**', 'Tableau de bord, filtres, cartes cliquables', '`/dashboard`', 'stats'],
         ['**Traçabilité et audit**', 'Journal d\'activité, historiques des actes, exports', '`/audit`, `/history`, `/history/:id`', 'audit'],
+        ['**Mode hors connexion**', 'Verrouillage par code, file d\'opérations, synchronisation, appareils, sauvegarde de secours', '`/verrouillage`, `/sync`, `/devices`', 'sync'],
+        ['**Contrôle des doublons**', 'Détection, investigation, décision motivée, réglages', '`/duplicates`', 'duplicates'],
       ],
     }),
     p('Autres écrans : connexion (`/login`), paramètres (`/settings`), accès refusé et page introuvable.'),
@@ -162,6 +185,8 @@ export default {
       '**Verrouillage** : après 5 échecs, le compte est bloqué 15 minutes (réglable) ; le compteur est tenu en base, de façon atomique.',
       '**Mot de passe** : validateurs Django (longueur, mot de passe courant, similarité) ; changement obligatoire à la première connexion et après une réinitialisation.',
       '**Stockage des jetons côté navigateur** : `sessionStorage` par défaut ; « se souvenir de moi » utilise `localStorage`.',
+      '**Session liée à l\'appareil** : à la connexion, l\'identifiant de l\'appareil est inscrit dans les deux jetons ; la synchronisation refuse toute session qui n\'est pas liée à l\'appareil qui envoie ; révoquer un appareil coupe ses sessions à la requête suivante.',
+      '**Double authentification (TOTP)** : facultative ou exigée par rôle (`security.two_factor_roles`) ; code à 6 chiffres à usage unique, huit codes de secours, activation et désactivation avec mot de passe et code ; un compte dont le rôle l\'exige n\'accède qu\'à son profil tant qu\'elle n\'est pas configurée ; réinitialisation par un **autre** administrateur (ou `manage.py reset_two_factor`).',
     ]),
     h2('Rôles et permissions'),
     p('Les droits de chaque utilisateur sont la **somme des permissions de ses rôles actifs**, plus les permissions accordées individuellement, moins celles retirées individuellement. Le drapeau « superutilisateur » de Django n\'accorde **aucun** droit métier : il sert seulement à la maintenance technique.'),
@@ -246,6 +271,9 @@ export default {
       E('POST', '/api/auth/change-password/', 'Changement de mot de passe (retourne un nouveau couple de jetons)', 'Connecté'),
       E('GET', '/api/public/settings/', 'Textes de la page de connexion', null),
       E('GET', '/api/inbox/', 'Compteurs de travail en attente (pastilles du menu)', 'declaration.view'),
+      E('GET', '/api/auth/two-factor/', 'État de la double authentification de l\'utilisateur', 'Connecté'),
+      E('POST', '/api/auth/two-factor/setup/ · enable/', 'Prépare puis active la double authentification (mot de passe, puis premier code)', 'Connecté'),
+      E('POST', '/api/auth/two-factor/disable/ · backup-codes/', 'Désactive (si le rôle ne l\'exige pas) ; renouvelle les codes de secours', 'Connecté'),
     ]),
     h2('Utilisateurs, rôles et permissions'),
     API([
@@ -259,6 +287,7 @@ export default {
       E('POST', '/api/users/{uuid}/roles/remove/', 'Retire un rôle', 'user.assign_roles'),
       E('GET, POST, DELETE', '/api/users/{uuid}/permissions/', 'Ajustements individuels de permissions', 'user.assign_roles'),
       E('POST', '/api/users/{uuid}/reset-password/', 'Réinitialise le mot de passe (temporaire)', 'user.reset_password'),
+      E('POST', '/api/users/{uuid}/reset-two-factor/', 'Réinitialise la double authentification d\'un autre compte (motif obligatoire)', 'user.reset_two_factor'),
       E('GET', '/api/roles/', 'Liste des rôles', 'role.view'),
       E('POST, PATCH, PUT', '/api/roles/ et /api/roles/{id}/', 'Crée ou modifie un rôle', 'role.manage'),
       E('PUT', '/api/roles/{id}/permissions/', 'Définit les permissions d\'un rôle', 'role.manage'),
@@ -312,6 +341,54 @@ export default {
       E('GET, PATCH', '/api/settings/', 'Paramètres modifiables', 'settings.manage'),
     ]),
 
+    h1('Mode hors connexion'),
+    p('Le mode hors connexion fait de Wakara une application installable (PWA) qui continue de fonctionner sans Internet, sur ordinateur comme sur téléphone. Il repose sur trois éléments : un **service worker** qui garde l\'application sur l\'appareil, une **base locale chiffrée** qui garde les données et une **file d\'opérations** envoyée au serveur au retour du réseau.'),
+    h2('Principe'),
+    ul([
+      '**Rejouer, ne rien dupliquer** : chaque opération reçue (création, modification, transmission, changement d\'étape, pièce) est rejouée par les **mêmes services métier** que l\'API en ligne, au nom de l\'utilisateur ; droits, circuit et champs obligatoires sont donc vérifiés exactement comme en ligne (`sync/services.py`).',
+      '**Idempotence** : chaque opération porte un identifiant créé sur l\'appareil (`op_id`, unique en base) ; la rejouer ne produit jamais un second effet. Une réponse perdue, un double envoi ou deux onglets ne créent pas de doublon.',
+      '**Conflits** : chaque modification serveur incrémente `sync_version` ; une modification préparée sur une version dépassée est refusée (`conflict`) et le serveur renvoie son état ; l\'utilisateur choisit entre ses modifications et la version du serveur.',
+      '**Dates** : la date de saisie de l\'appareil fait foi, sous contrôle de l\'horloge (corrigée de l\'écart mesuré, écartée si future, trop ancienne ou antérieure à la naissance, saisie de plus de 7 jours signalée).',
+      '**Aucun contenu conservé côté serveur** dans la trace des opérations : seule l\'empreinte est gardée ; les données personnelles restent dans les tables métier.',
+    ]),
+    h2('Sécurité des données de l\'appareil'),
+    table({
+      head: ['Élément', 'Mesure'], widths: [2.4, 7.6], small: true,
+      rows: [
+        ['Chiffrement', 'Clé de données aléatoire AES-GCM 256, non exportable, gardée en mémoire seulement ; sur l\'appareil elle est enveloppée par une clé dérivée du code de verrouillage (PBKDF2-SHA256, 600 000 itérations, sel par appareil)'],
+        ['Code de verrouillage', '8 caractères minimum mêlant lettres et chiffres, ou phrase de 14 ; codes triviaux refusés ; blocage temporaire croissant après 5 erreurs ; verrouillage automatique après 15 minutes'],
+        ['Code de récupération', 'La clé de données est enveloppée une seconde fois par un code aléatoire de 120 bits généré sur l\'appareil (jamais affiché à l\'agent) et enregistré chiffré (Fernet) sur le serveur. L\'administrateur habilité (`device.recover`) le lit avec son mot de passe et un motif obligatoire ; chaque lecture, refus compris, est journalisée ; il est remplacé dès qu\'il a servi. Il ne sert qu\'avec l\'appareil lui-même.'],
+        ['Appareils', 'Identifiés, 3 au plus par compte (`SYNC_MAX_DEVICES_PER_USER`), révocables : la révocation coupe les sessions immédiatement et ne peut pas être contournée par un nouvel identifiant'],
+        ['Session', 'Jetons chiffrés dans le coffre ; session expirée : la file se met en pause sans rien effacer ; déconnexion toujours possible, les saisies restent chiffrées sur l\'appareil'],
+        ['Cache de l\'application', 'Le service worker met en cache l\'interface seulement ; **l\'API n\'est jamais mise en cache** ; les pages lues sont gardées chiffrées avec leur date (7 jours au plus, jamais l\'audit, les utilisateurs ni les droits)'],
+        ['Interrupteur à distance', 'Paramètre `offline.enabled` : à `false`, chaque appareil retire son service worker et revient au fonctionnement en ligne ; les opérations en attente restent synchronisables'],
+      ],
+    }),
+    h2('Interfaces'),
+    API([
+      E('GET', '/api/sync/ping/', 'Le serveur répond-il ? heure du serveur, mode hors connexion actif ?', null),
+      E('POST', '/api/sync/push/', 'Lot d\'opérations (20 au plus) ; un résultat par opération', 'Droits de l\'étape'),
+      E('POST', '/api/sync/documents/', 'Une photo ou un scan préparé hors connexion', 'document.upload'),
+      E('GET', '/api/sync/pull/', 'Dossiers modifiés depuis le curseur + établissements et règles', 'declaration.view'),
+      E('GET', '/api/sync/reference/', 'Établissements et règles seulement (reçus en premier à chaque cycle)', 'declaration.view'),
+      E('POST', '/api/sync/recovery/', 'L\'appareil donne son code de récupération', 'declaration.view'),
+      E('GET', '/api/sync/operations/', 'Historique des opérations (les siennes, ou toutes avec audit.view)', 'declaration.view'),
+      E('GET', '/api/sync/devices/', 'Appareils enregistrés', 'audit.view'),
+      E('POST', '/api/sync/devices/{id}/revoke/ · restore/', 'Révoque ou rétablit un appareil', 'user.manage_status'),
+      E('POST', '/api/sync/devices/{id}/recovery/', 'Lit le code de récupération (mot de passe + motif, journalisé)', 'device.recover'),
+    ]),
+
+    h1('Contrôle des doublons'),
+    p('Une même naissance ne doit jamais produire deux actes officiels. À chaque création ou modification d\'une déclaration (en ligne ou reçue par la synchronisation), le serveur construit une **identité normalisée** et la compare aux autres déclarations de Ratoma. Le score sur 100 est **une aide à la décision**, jamais une conclusion : rien n\'est supprimé, fusionné ni annulé automatiquement.'),
+    ul([
+      '**Normalisation** : casse, accents, espaces, ponctuation, inversion nom/prénoms, formes phonétiques, téléphones, lieux ; les données saisies ne sont jamais modifiées.',
+      '**Score** : mère 30, date de naissance 25, lieu 15, heure 10, père 10, compléments 10 ; un critère non renseigné d\'un côté est exclu du calcul ; des garde-fous évitent de conclure à tort (données insuffisantes, jumeaux, mères différentes).',
+      '**Blocage** : un dossier d\'investigation (DUP-AAAA-NNNN) est ouvert pour une correspondance moyenne ou élevée ; **aucun numéro officiel n\'est attribué tant qu\'une décision humaine motivée n\'est pas prise** ; le circuit normal n\'est pas interrompu.',
+      '**Décisions** (motif obligatoire, auteur, date, ligne non modifiable) : doublon confirmé, enfants distincts, naissance multiple, erreur de saisie, informations insuffisantes, vérification complémentaire.',
+      '**Réglage protégé** : droit à part (`duplicate.configure`), motif écrit, limites fixées dans le code ; le niveau élevé bloque toujours.',
+      '**Confidentialité** : un agent de collecte ne voit jamais qu\'une ressemblance a été trouvée (sinon il pourrait sonder le registre).',
+    ]),
+
     h1('Sécurité'),
     table({
       head: ['Domaine', 'Mesures en place'], widths: [2.2, 7.8], small: true,
@@ -325,13 +402,18 @@ export default {
         ['Adresse IP du client', 'L\'en-tête `X-Forwarded-For` n\'est lu qu\'avec le nombre de relais de confiance déclaré (`NUM_PROXIES`) ; une valeur invalide est écartée'],
         ['Exports', 'Réservés à la permission `data.export` ; cellules CSV neutralisées contre l\'injection de formules'],
         ['Secrets', 'Aucun secret dans le code ni dans le dépôt ; tout passe par des variables d\'environnement'],
+        ['Secrets en base', 'Codes de récupération et secrets de double authentification chiffrés (Fernet) sous `FIELD_ENCRYPTION_KEY` ; codes de secours conservés sous forme d\'empreinte ; jamais écrits dans le journal'],
+        ['En-têtes et navigateur', 'Politique de sécurité du contenu stricte (aucun script en ligne), anti-affichage dans un cadre, pas de référent, HSTS, fichiers du service worker jamais mis en cache'],
+        ['Débit', 'Limites par utilisateur (API générale 1200/min, synchronisation 240/min, analyses de doublons 20/min, lecture d\'un code de récupération 10/min), compteurs partagés par Redis (`REDIS_URL`)'],
+        ['Séparation des tâches', 'Qui soumet un dossier à la validation ne peut pas le valider ; délai de 6 mois appliqué par le serveur'],
       ],
     }),
     h2('Limites connues'),
     ul([
       'La limitation du débit utilise un cache mémoire propre à chaque instance : en environnement sans serveur, elle est moins stricte (le verrouillage de compte, lui, est fiable car tenu en base). Un cache partagé (Redis) est recommandé.',
       'Un administrateur de la base de données peut contourner l\'ajout seul du journal par une requête SQL directe. En production, retirer les droits de modification et de suppression à l\'utilisateur applicatif : `REVOKE UPDATE, DELETE, TRUNCATE ON audit_auditlog, declarations_statushistory FROM <utilisateur_applicatif>;`',
-      'Axes d\'audit encore à approfondir : cycle de vie des jetons, limitation de débit générale, ordre d\'écriture du journal, vulnérabilités des bibliothèques de l\'interface (voir le rapport de tests).',
+      'Le jeton de rafraîchissement reste, chiffré, dans le coffre de l\'appareil (nécessaire pour reprendre sans mot de passe) ; il est lié à l\'appareil et révocable. Un appareil volé se révoque, et le compte se désactive si le code de verrouillage était faible.',
+      'Essais sur téléphones réels (Android, iPhone), restauration d\'une sauvegarde PostgreSQL et audit externe : à faire en recette (voir le rapport de tests).',
     ]),
 
     h1('Hébergement'),
@@ -359,7 +441,7 @@ export default {
     h1('Maintenance'),
     h2('Mises à jour'),
     ul([
-      '**Dépendances** : surveiller les avis de sécurité de Django, Django REST Framework et Angular ; planifier la montée de version d\'Angular 17 (des vulnérabilités sont signalées par `npm audit`).',
+      '**Dépendances** : surveiller les avis de sécurité de Django, Django REST Framework et Angular ; relancer `npm audit --omit=dev` et `pip-audit -r backend/requirements.txt` avant chaque mise en production (Angular 21, versions Python verrouillées).',
       '**Procédure de modification** : modifier le code, lancer l\'ensemble des contrôles (`python manage.py test tests`, `makemigrations --check`, `npm run build`, `tsc -p tsconfig.spec.json`), puis envoyer sur `main` : Vercel déploie et applique les migrations.',
       '**Base de données** : toute évolution de structure passe par une migration versionnée ; ne jamais modifier la base à la main.',
     ]),
@@ -394,7 +476,11 @@ export default {
         ['`python manage.py backup_wakara --output-dir <dossier> --keep 30`', 'Sauvegarde la base et les pièces dans une archive datée'],
         ['`python manage.py restore_wakara <archive> --yes`', 'Restaure une archive (arrêter l\'application avant)'],
         ['`python manage.py check --deploy`', 'Contrôle des réglages de production'],
-        ['`python manage.py test tests`', 'Lance les 161 tests automatisés'],
+        ['`python manage.py check_production`', 'Rapport de préparation à la production : réglages, base, comptes, rôles, volume de la base ; code de sortie 1 si un point bloquant échoue (`--warn` : affichage seul)'],
+        ['`python manage.py reset_two_factor <identifiant> --reason "…"`', 'Réinitialise la double authentification d\'un compte (seul administrateur ayant perdu son téléphone) ; sessions terminées, journalisé'],
+        ['`python manage.py analyze_duplicates`', 'Calcule les identités et analyse les déclarations existantes (une fois, à la mise en service du contrôle des doublons)'],
+        ['`python manage.py reject_confirmed_duplicates [--apply]`', 'Rejette (avec motif) les saisies redondantes des doublons déjà confirmés ; sans `--apply`, simple aperçu'],
+        ['`python manage.py test tests`', 'Lance les 483 tests automatisés'],
       ],
     }),
     h2('Annexe C — Glossaire'),
@@ -405,11 +491,17 @@ export default {
         ['Déclaration', 'Dossier saisi à partir de la fiche reçue de l\'hôpital ; une déclaration = un enfant'],
         ['Acte', 'Acte de naissance établi à partir de la déclaration, avec son numéro officiel'],
         ['Référence', 'Numéro de suivi interne `WKR-AAAA-NNNN`, différent du numéro officiel de l\'acte'],
-        ['NPI', 'Numéro personnel d\'identification (texte libre dans la version 1.0)'],
+        ['NPI', 'Numéro personnel d\'identification (texte libre à ce jour)'],
         ['Duplicata', 'Délivrance d\'un acte déjà délivré auparavant'],
         ['JWT', 'Jeton signé qui prouve l\'identité de l\'utilisateur pendant une durée limitée'],
         ['Migration', 'Fichier versionné qui fait évoluer la structure de la base de données'],
         ['Ajout seul', 'Table où l\'on peut seulement ajouter des lignes, jamais les modifier ni les effacer'],
+        ['PWA', 'Application web installable sur l\'écran d\'accueil, qui fonctionne aussi sans Internet'],
+        ['Code de verrouillage', 'Code choisi par l\'utilisateur sur un appareil ; il chiffre les données locales et ne quitte jamais l\'appareil'],
+        ['Code de récupération', 'Code aléatoire généré par l\'appareil, lisible seulement par l\'administrateur habilité, qui ouvre l\'appareil si le code de verrouillage est oublié'],
+        ['Synchronisation', 'Envoi au serveur des opérations faites hors connexion, et réception des dossiers modifiés'],
+        ['Idempotent', 'Qui produit le même effet qu\'on l\'applique une ou plusieurs fois (aucun doublon)'],
+        ['TOTP', 'Code à 6 chiffres qui change toutes les 30 secondes, calculé par une application d\'authentification'],
       ],
     }),
     h2('Annexe D — Références'),

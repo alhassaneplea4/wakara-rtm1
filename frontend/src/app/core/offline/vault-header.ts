@@ -8,6 +8,12 @@ export interface VaultHeader {
   user: { uuid: string; username: string; name: string };
   salt: string; iterations: number; wrapIv: string; wrapped: string;
   fails: number; lockedUntil: number; createdAt: string;
+  /** The data key wrapped a second time under a recovery code (see crypto.ts): the server holds the code, the agent never sees it. */
+  rec?: { salt: string; iv: string; wrapped: string };
+  /** The recovery code, encrypted with the data key, until the server has confirmed it holds it. */
+  recPending?: { iv: string; ct: string };
+  /** The server holds no readable code for this device: a new one is made at the next unlock. */
+  recRenew?: boolean;
 }
 
 export const VAULT_KEY = 'wk_vault';
@@ -28,6 +34,12 @@ export function writeVaultHeader(header: VaultHeader | null) {
     if (header) localStorage.setItem(VAULT_KEY, JSON.stringify(header));
     else { localStorage.removeItem(VAULT_KEY); localStorage.removeItem(VAULT_SESSION_KEY); }
   } catch { /* storage unavailable: the offline mode cannot be used on this browser */ }
+}
+
+/** Changes some fields of the header in place (nothing when there is no vault). */
+export function patchVaultHeader(change: (h: VaultHeader) => VaultHeader) {
+  const h = readVaultHeader();
+  if (h) writeVaultHeader(change(h));
 }
 
 /** Offline mode needs IndexedDB, Web Crypto (secure context) and localStorage. */

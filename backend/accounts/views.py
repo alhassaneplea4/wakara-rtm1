@@ -15,12 +15,13 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from . import two_factor
 from .authentication import DEVICE_REVOKED_MESSAGE, device_of_token, is_device_revoked
 from .tokens import tokens_for
 
@@ -118,6 +119,19 @@ class LoginView(APIView):
             audit.log(AuditAction.LOGIN_FAILED, user=user, obj=user, reason='Appareil révoqué')
             return Response({'code': 'device_revoked', 'detail': DEVICE_REVOKED_MESSAGE + " Contactez l'administrateur."},
                             status=status.HTTP_403_FORBIDDEN)
+
+        if user.two_factor_enabled:
+            code = (serializer.validated_data.get('code') or '').strip()
+            if not code:
+                # the password is right: the client now asks for the code (nothing is counted as a failure)
+                return Response({'code': 'two_factor_required',
+                                 'detail': "Saisissez le code de votre application d'authentification."},
+                                status=status.HTTP_403_FORBIDDEN)
+            if not two_factor.verify_login_code(user, code):
+                self._record_failure(user, ip)       # a wrong code counts like a wrong password
+                audit.log(AuditAction.TWO_FACTOR_FAILED, user=user, obj=user, reason='Code de vérification incorrect')
+                return Response({'code': 'two_factor_invalid', 'detail': "Code de vérification incorrect ou déjà utilisé."},
+                                status=status.HTTP_401_UNAUTHORIZED)
 
         LoginAttempt.objects.filter(user=user, ip_address=ip).delete()
         user.failed_login_count = 0
@@ -277,6 +291,7 @@ class UserViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.Upd
         'roles': 'user.assign_roles', 'remove_role': 'user.assign_roles',
         'permission_overrides': 'user.assign_roles',
         'reset_password': 'user.reset_password',
+        'reset_two_factor': 'user.reset_two_factor',
     }
 
     def get_serializer_class(self):
@@ -424,6 +439,22 @@ class UserViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.Upd
                       changes={perm.codename: 'surcharge retirée'})
         return Response(UserPermissionSerializer(user.permission_overrides.all(), many=True).data)
 
+    @action(detail=True, methods=['post'], url_path='reset-two-factor')
+    def reset_two_factor(self, request, uuid=None):
+        """The second factor of an account whose phone is lost: switched off, the sessions end, the user sets it up again."""
+        user = self.get_object()
+        self._forbid_self(request, user, "réinitialisation de la double authentification (demandez à un autre administrateur)")
+        self._forbid_superior(request, user, "Réinitialisation impossible")
+        reason = str(request.data.get('reason') or '').strip()
+        if len(reason) < 10:
+            raise ValidationError({'reason': "Indiquez le motif (10 caractères au moins) : il est inscrit au journal d'audit."})
+        if not user.two_factor_enabled and not user.totp_secret:
+            raise ValidationError({'detail': "La double authentification n'est pas activée sur ce compte."})
+        two_factor.clear(user)
+        revoke_user_tokens(user)
+        audit.log(AuditAction.TWO_FACTOR_RESET, user=request.user, obj=user, reason=reason)
+        return Response({'detail': "Double authentification réinitialisée : le compte devra la configurer de nouveau."})
+
     @action(detail=True, methods=['post'], url_path='reset-password')
     def reset_password(self, request, uuid=None):
         """Sets a temporary password (returned once) and forces a change at next login."""
@@ -522,3 +553,108 @@ class PermissionViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [HasWakaraPermission]
     pagination_class = None
     permission_map = {'list': 'role.view', 'retrieve': 'role.view'}
+
+
+# ── Second factor (self-service) ──────────────────
+
+class TwoFactorRateThrottle(UserRateThrottle):
+    scope = 'two_factor'
+
+
+class _TwoFactorView(APIView):
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [TwoFactorRateThrottle]
+    allow_two_factor_setup_pending = True
+
+
+def _two_factor_state(user):
+    return {
+        'enabled': user.two_factor_enabled,
+        'required': two_factor.required_for(user),
+        'enabled_at': user.two_factor_enabled_at,
+        'backup_codes_left': two_factor.backup_codes_left(user) if user.two_factor_enabled else 0,
+    }
+
+
+class TwoFactorStatusView(_TwoFactorView):
+    """GET /api/auth/two-factor/ — is the second factor on, is it required of this account, how many backup codes are left."""
+
+    def get(self, request):
+        return Response(_two_factor_state(request.user))
+
+
+class TwoFactorSetupView(_TwoFactorView):
+    """POST /api/auth/two-factor/setup/ {password} — a new secret (to type or scan into the application) waits for its first code."""
+
+    def post(self, request):
+        user = request.user
+        if user.two_factor_enabled:
+            return Response({'detail': "La double authentification est déjà activée."}, status=status.HTTP_400_BAD_REQUEST)
+        if not user.check_password(str(request.data.get('password') or '')):
+            return Response({'code': 'wrong_password', 'detail': "Mot de passe incorrect."}, status=status.HTTP_403_FORBIDDEN)
+        secret = two_factor.begin_setup(user)
+        return Response({'secret': ' '.join(secret[i:i + 4] for i in range(0, len(secret), 4)),
+                         'otpauth_uri': two_factor.otpauth_uri(user, secret)})
+
+
+class TwoFactorEnableView(_TwoFactorView):
+    """POST /api/auth/two-factor/enable/ {code} — the first code from the application turns the second factor on."""
+
+    def post(self, request):
+        user = request.user
+        if user.two_factor_enabled or not two_factor.pending_secret(user):
+            return Response({'detail': "Aucune configuration en attente : recommencez la configuration."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        backup = two_factor.confirm_setup(user, str(request.data.get('code') or ''))
+        if backup is None:
+            audit.log(AuditAction.TWO_FACTOR_FAILED, user=user, obj=user, reason="Code incorrect à l'activation")
+            return Response({'code': 'two_factor_invalid', 'detail': "Code incorrect. Vérifiez l'heure de votre téléphone et réessayez."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        audit.log(AuditAction.TWO_FACTOR_ENABLED, user=user, obj=user)
+        return Response({'backup_codes': backup, **_two_factor_state(user)})
+
+
+class _ConfirmedTwoFactorView(_TwoFactorView):
+    """A change of the second factor asks for the password AND a current code."""
+
+    def confirmed(self, request):
+        user = request.user
+        if not user.check_password(str(request.data.get('password') or '')):
+            return Response({'code': 'wrong_password', 'detail': "Mot de passe incorrect."}, status=status.HTTP_403_FORBIDDEN)
+        if not two_factor.verify_login_code(user, str(request.data.get('code') or '')):
+            audit.log(AuditAction.TWO_FACTOR_FAILED, user=user, obj=user, reason='Code de vérification incorrect')
+            return Response({'code': 'two_factor_invalid', 'detail': "Code de vérification incorrect ou déjà utilisé."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        return None
+
+
+class TwoFactorDisableView(_ConfirmedTwoFactorView):
+    """POST /api/auth/two-factor/disable/ {password, code} — refused when the roles of the account must use it."""
+
+    def post(self, request):
+        user = request.user
+        if not user.two_factor_enabled:
+            return Response({'detail': "La double authentification n'est pas activée."}, status=status.HTTP_400_BAD_REQUEST)
+        if two_factor.required_for(user):
+            return Response({'code': 'two_factor_required',
+                             'detail': "La double authentification est exigée pour votre rôle : elle ne peut pas être désactivée."},
+                            status=status.HTTP_403_FORBIDDEN)
+        refusal = self.confirmed(request)
+        if refusal:
+            return refusal
+        two_factor.clear(user)
+        audit.log(AuditAction.TWO_FACTOR_DISABLED, user=user, obj=user)
+        return Response(_two_factor_state(user))
+
+
+class TwoFactorBackupCodesView(_ConfirmedTwoFactorView):
+    """POST /api/auth/two-factor/backup-codes/ {password, code} — eight new one-time codes; the old ones stop working."""
+
+    def post(self, request):
+        user = request.user
+        if not user.two_factor_enabled:
+            return Response({'detail': "La double authentification n'est pas activée."}, status=status.HTTP_400_BAD_REQUEST)
+        refusal = self.confirmed(request)
+        if refusal:
+            return refusal
+        return Response({'backup_codes': two_factor.generate_backup_codes(user), **_two_factor_state(user)})

@@ -42,6 +42,10 @@ DEFAULT_SETTINGS = [
     # service worker at the next contact; pending operations can still be synchronised.
     ('offline.enabled', 'true', "Mode hors connexion pour les agents de collecte (true ou false)", True),
     ('acte.default_officer', 'AMADOU KONIA CAMARA', "Officier d'état civil pré-rempli sur les actes", False),
+    # Roles that must sign in with a second factor (authentication application): codes separated by commas, e.g.
+    # « admin,secretary », or « all ». Empty = optional for everybody. An account concerned that has not set it up yet
+    # can only reach its profile page until it does.
+    ('security.two_factor_roles', '', "Rôles qui doivent utiliser la double authentification (codes séparés par des virgules, ex. admin,secretary ; « all » pour tous ; vide = facultative)", False),
 ]
 
 

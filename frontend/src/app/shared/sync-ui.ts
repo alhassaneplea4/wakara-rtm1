@@ -2,6 +2,7 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { Component, EventEmitter, HostListener, Input, Output, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { needsTwoFactorCode } from '../core/auth.service';
 import { OfflineGate } from '../core/offline/offline-gate.service';
 import { SYNC_HELP, SYNC_LABELS, SyncState } from '../core/offline/types';
 import { ToastService } from '../core/toast.service';
@@ -206,6 +207,10 @@ export class ConnectionIndicatorComponent {
         @if (error()) { <div class="alert alert-danger" role="alert">{{ error() }}</div> }
         <div class="field"><label for="reauth-pw">Mot de passe</label>
           <input id="reauth-pw" class="input" type="password" name="password" autocomplete="current-password" [(ngModel)]="password" required /></div>
+        @if (needCode()) {
+          <div class="field"><label for="reauth-otp">Code de l'application d'authentification</label>
+            <input id="reauth-otp" class="input" type="text" name="otp" autocomplete="one-time-code" [(ngModel)]="otp" /></div>
+        }
         <div class="row end">
           <button type="button" class="btn" (click)="done.emit()">Plus tard</button>
           <button type="submit" class="btn btn-primary" [disabled]="busy() || !password">{{ busy() ? 'Connexion…' : 'Se reconnecter' }}</button>
@@ -223,6 +228,8 @@ export class ReauthComponent {
   private toast = inject(ToastService);
   @Output() done = new EventEmitter<void>();
   password = '';
+  otp = '';
+  needCode = signal(false);
   busy = signal(false);
   error = signal('');
 
@@ -230,10 +237,11 @@ export class ReauthComponent {
     if (!this.password) return;
     this.busy.set(true); this.error.set('');
     try {
-      await this.gate.reauthenticate(this.password);
+      await this.gate.reauthenticate(this.password, this.otp);
       this.toast.success('Session rétablie : la synchronisation reprend.');
       this.done.emit();
     } catch (e: any) {
+      if (needsTwoFactorCode(e)) { this.needCode.set(true); this.error.set(''); return; }
       this.error.set(e?.status === 0 ? 'Serveur injoignable : réessayez quand la connexion sera revenue.'
         : e?.error?.detail ?? e?.message ?? 'Connexion impossible.');
     } finally { this.busy.set(false); }

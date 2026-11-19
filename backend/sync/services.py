@@ -29,6 +29,7 @@ from declarations.serializers import DeclarationDetailSerializer, DeclarationWri
 from documents import services as document_services
 from documents.models import SupportingDocument
 
+from . import recovery
 from .models import Device, SyncOperation
 
 OpStatus = SyncOperation.Status
@@ -92,6 +93,66 @@ def set_device_revoked(device, revoked: bool, by):
               object_repr=f"{device.label or device.device_id} — {device.user.username}",
               changes={'sessions_closed': cut} if revoked else None)
     return device
+
+
+# ── Recovery code of a device (sync/recovery.py) ──
+
+class RecoveryCodeInvalid(Exception):
+    """The code sent by a device is not a recovery code (wrong length or characters)."""
+
+
+class RecoveryUnavailable(Exception):
+    """No recovery code is registered for this device, or it can no longer be read."""
+
+    def __init__(self, code, detail):
+        super().__init__(detail)
+        self.code, self.detail = code, detail
+
+
+def register_recovery(device, raw_code: str):
+    """The device gives the code that can open its vault. A new code replaces the previous one."""
+    code = recovery.normalize(raw_code)
+    if not code:
+        raise RecoveryCodeInvalid()
+    device.recovery_blob = recovery.encrypt(code)
+    device.recovery_set_at = timezone.now()
+    device.recovery_revealed_at = None
+    device.recovery_revealed_by = None
+    device.save(update_fields=['recovery_blob', 'recovery_set_at', 'recovery_revealed_at', 'recovery_revealed_by'])
+    # the code itself is never written anywhere but its encrypted column
+    audit.log(AuditAction.DEVICE_RECOVERY_REGISTERED, user=device.user, object_type='Device',
+              object_id=str(device.device_id), object_repr=f"{device.label or device.device_id} — {device.user.username}")
+    return device
+
+
+def recovery_registered(user, device_id) -> bool:
+    """Does the server hold a readable recovery code for this device? (The device registers a new one when not.)"""
+    if not device_id:
+        return False
+    device = Device.objects.filter(user=user, device_id=device_id).only('recovery_blob').first()
+    return bool(device and recovery.decrypt(device.recovery_blob))
+
+
+def reveal_recovery(device, by, reason: str) -> str:
+    """
+    The code, for the administrator to give to the agent who forgot his PIN. The reading is audited with its reason
+    and marked on the device. Raises RecoveryUnavailable when there is nothing to read.
+    """
+    if not device.recovery_blob:
+        raise RecoveryUnavailable(
+            'no_recovery', "Cet appareil n'a pas enregistré de code de récupération : l'agent doit le déverrouiller "
+                           "avec son code, avec Internet, pour qu'il en enregistre un.")
+    code = recovery.decrypt(device.recovery_blob)
+    if code is None:
+        raise RecoveryUnavailable(
+            'recovery_unreadable', "Le code de récupération de cet appareil ne peut plus être lu (clé de chiffrement "
+                                   "modifiée). L'appareil en enregistrera un nouveau à son prochain déverrouillage avec Internet.")
+    device.recovery_revealed_at = timezone.now()
+    device.recovery_revealed_by = by
+    device.save(update_fields=['recovery_revealed_at', 'recovery_revealed_by'])
+    audit.log(AuditAction.DEVICE_RECOVERY_REVEALED, user=by, object_type='Device', object_id=str(device.device_id),
+              object_repr=f"{device.label or device.device_id} — {device.user.username}", reason=reason)
+    return code
 
 
 # ── Device clock ──────────────────────────────────

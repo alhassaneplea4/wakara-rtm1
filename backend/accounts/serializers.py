@@ -17,6 +17,8 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, trim_whitespace=False)
     # identifier of the browser / phone (random UUID kept on the device): the session is bound to it
     device_id = serializers.UUIDField(required=False, allow_null=True, default=None)
+    # second factor: the six digits of the application, or a backup code (only asked when the account uses it)
+    code = serializers.CharField(required=False, allow_blank=True, max_length=32, default='')
 
 
 class ChangePasswordSerializer(serializers.Serializer):
@@ -54,7 +56,7 @@ class UserListSerializer(serializers.ModelSerializer):
         fields = [
             'uuid', 'username', 'email', 'first_name', 'last_name', 'phone',
             'is_active', 'hospital', 'hospital_name', 'roles', 'date_joined',
-            'last_login', 'is_locked',
+            'last_login', 'is_locked', 'two_factor_enabled',
         ]
         read_only_fields = fields
 
@@ -143,12 +145,13 @@ class MeSerializer(serializers.ModelSerializer):
         fields = [
             'uuid', 'username', 'email', 'first_name', 'last_name', 'phone', 'address',
             'hospital', 'hospital_name', 'roles', 'permissions', 'must_change_password',
-            'date_joined', 'last_login',
+            'two_factor_enabled', 'must_set_up_two_factor', 'date_joined', 'last_login',
         ]
         read_only_fields = [
             'uuid', 'username', 'hospital', 'roles', 'permissions',
-            'must_change_password', 'date_joined', 'last_login',
+            'must_change_password', 'two_factor_enabled', 'must_set_up_two_factor', 'date_joined', 'last_login',
         ]
+    must_set_up_two_factor = serializers.BooleanField(read_only=True)
 
     def get_roles(self, obj):
         return [

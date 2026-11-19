@@ -22,7 +22,7 @@ export default {
     ]),
 
     h1('Périmètre'),
-    h2('Inclus dans la version 1.0'),
+    h2('Inclus dans la version 1.1'),
     ul([
       'Saisie des déclarations de naissance par les agents de collecte, avec photo ou scan de la fiche physique.',
       'Circuit de traitement : brouillon, transmission, prise en charge, complément de l\'acte, validation, retour pour correction, rejet, délivrance.',
@@ -32,10 +32,14 @@ export default {
       'Tableau de bord et statistiques.',
       'Journal d\'activité, historiques par dossier, exports.',
       'Paramétrage des textes de la page de connexion et des valeurs par défaut des actes.',
+      'Travail hors connexion pour tous les profils : saisie, photos, transmission et décisions préparées sur l\'appareil (ordinateur, Android, iPhone), données locales chiffrées par un code de verrouillage, synchronisation automatique sans doublon ni perte.',
+      'Gestion des appareils hors connexion (révocation, limite par compte) et code de récupération communiqué par l\'administrateur à un agent qui a oublié son code de verrouillage.',
+      'Centre de contrôle des doublons : détection des déclarations qui ressemblent à une autre, investigation et décision motivée avant tout numéro officiel.',
+      'Délai de 6 mois pour traiter une déclaration, séparation des tâches entre qui soumet et qui valide.',
+      'Double authentification par application (facultative, ou exigée pour certains profils) et protections de sécurité renforcées.',
     ]),
-    h2('Hors périmètre de la version 1.0'),
+    h2('Hors périmètre de la version 1.1'),
     ul([
-      'Travail hors connexion.',
       'Signature électronique de l\'acte.',
       'Réinitialisation du mot de passe par e-mail (l\'administrateur remet un mot de passe temporaire).',
       'Génération d\'un fichier PDF de l\'acte par le serveur (l\'acte est rendu en page imprimable).',
@@ -53,14 +57,14 @@ export default {
         ['**Administrateur technique**', 'Contrôle et décide', 'Valide définitivement (numéro officiel), retourne ou rejette ; gère utilisateurs, rôles, permissions, paramètres ; consulte statistiques, historiques et journaux', 'Modifier son propre compte, rôles et permissions ; supprimer quoi que ce soit'],
       ],
     }),
-    p('Les droits de chaque profil sont **granulaires** (32 permissions) et ajustables par l\'administrateur, rôle par rôle ou utilisateur par utilisateur.'),
+    p('Les droits de chaque profil sont **granulaires** (40 permissions) et ajustables par l\'administrateur, rôle par rôle ou utilisateur par utilisateur.'),
 
     h1('Circuit d\'un dossier'),
     img('schema-circuit.png', 'Circuit d\'un dossier : qui agit à chaque étape, et les retours possibles', 100),
     p('Les statuts, les retours et les rejets sont des **propositions de travail** à confirmer par la mairie (voir le chapitre « Points à valider »). Le circuit est appliqué par le serveur : aucun écran ne peut le contourner.'),
 
     h1('Exigences fonctionnelles'),
-    p('Chaque exigence a un identifiant (EF) repris dans les tests et la recette. La colonne « État » indique si elle est livrée dans la version 1.0.'),
+    p('Chaque exigence a un identifiant (EF) repris dans les tests et la recette. La colonne « État » indique si elle est livrée dans la version 1.1.'),
     h2('Accès et comptes'),
     table({
       head: ['Réf.', 'Exigence', 'État'], widths: [0.9, 8, 1.1], small: true,
@@ -113,6 +117,23 @@ export default {
       ],
     }),
 
+    h2('Travail hors connexion, doublons et sécurité renforcée'),
+    table({
+      head: ['Réf.', 'Exigence', 'État'], widths: [0.9, 8, 1.1], small: true,
+      rows: [
+        ['EF-40', 'Travail sans Internet pour tous les profils : l\'agent crée, modifie, transmet et joint des photos ; le secrétariat complète l\'en-tête du registre et soumet ; les validateurs décident. Tout est enregistré sur l\'appareil, chiffré, puis envoyé au retour du réseau.', 'Livré'],
+        ['EF-41', 'Code de verrouillage choisi par l\'utilisateur (8 caractères mêlant lettres et chiffres, ou phrase de 14), demandé à chaque ouverture, verrouillage automatique après 15 minutes, blocage temporaire après des erreurs.', 'Livré'],
+        ['EF-42', 'Synchronisation sans doublon ni perte (une réponse perdue ne crée jamais deux dossiers) ; conflit signalé, rien n\'est écrasé sans le choix de l\'utilisateur ; date de saisie de l\'appareil retenue sous contrôle de l\'horloge.', 'Livré'],
+        ['EF-43', 'Appareils enregistrés (3 au plus par compte), révocables par l\'administrateur qui coupe aussitôt leurs sessions ; sauvegarde de secours des saisies non envoyées ; interrupteur à distance du mode hors connexion.', 'Livré'],
+        ['EF-44', 'Code de récupération : l\'appareil en génère un (jamais montré à l\'agent) que seul l\'administrateur habilité peut lire, avec son mot de passe et un motif, chaque lecture étant journalisée ; il ouvre l\'appareil d\'un agent qui a oublié son code sans perdre ses saisies.', 'Livré'],
+        ['EF-45', 'Contrôle des doublons : comparaison à chaque saisie (en ligne ou synchronisée), dossier d\'investigation, aucun numéro officiel tant qu\'une décision humaine motivée n\'est pas prise.', 'Livré'],
+        ['EF-46', 'Double authentification par application (code à 6 chiffres, codes de secours), facultative ou exigée pour des rôles choisis par l\'administrateur ; réinitialisation par un autre administrateur.', 'Livré'],
+        ['EF-47', 'Séparation des tâches : celui qui soumet un dossier à la validation ne peut pas le valider lui-même.', 'Livré'],
+        ['EF-48', 'Délai de 6 mois : au-delà, un dossier non traité est bloqué, seul l\'administrateur peut le traiter.', 'Livré'],
+        ['EF-49', 'Statistiques des dossiers transmis hors connexion et filtre « origine » dans les listes.', 'Livré'],
+      ],
+    }),
+
     h1('Règles de gestion principales'),
     table({
       head: ['Réf.', 'Règle'], widths: [0.9, 9.1], small: true,
@@ -127,6 +148,11 @@ export default {
         ['RG-08', 'Un établissement utilisé par des dossiers ne peut qu\'être désactivé ou archivé.'],
         ['RG-09', 'Le droit d\'agir est vérifié **par le serveur** à chaque requête ; l\'interface ne fait qu\'afficher ce qui est permis.'],
         ['RG-10', 'Le code d\'un établissement suit le format WH-0001-26 (numéro d\'ordre, année sur deux chiffres) et repart à 0001 chaque année.'],
+        ['RG-11', 'Une déclaration se traite dans les **6 mois** qui suivent sa date de déclaration ; passé ce délai, elle est bloquée (sauf décision de l\'administrateur).'],
+        ['RG-12', 'La personne qui a soumis un dossier à la validation ne peut pas le valider.'],
+        ['RG-13', 'Une opération faite hors connexion est rejouée par le serveur avec **les mêmes règles** que si elle avait été faite en ligne (droits, circuit, champs obligatoires) ; elle n\'est jamais appliquée deux fois.'],
+        ['RG-14', 'Un dossier suspect de doublon ne reçoit **aucun numéro officiel** tant qu\'un responsable n\'a pas décidé ; le score est une aide, jamais une décision automatique.'],
+        ['RG-15', 'Les données enregistrées sur un appareil sont chiffrées ; le code de verrouillage ne quitte jamais l\'appareil ; le code de récupération n\'est lisible que par un administrateur habilité, avec journal.'],
       ],
     }),
 
@@ -139,7 +165,7 @@ export default {
         ['Données personnelles', 'Accès limité selon le profil ; données de démonstration fictives pour les formations et la recette ; hébergement et durée de conservation à arrêter par la mairie.'],
         ['Disponibilité et sauvegarde', 'Sauvegarde de la base et des pièces ; commandes de sauvegarde et de restauration fournies ; procédure en cas de panne documentée.'],
         ['Ergonomie', 'Interface en français, simple, conçue pour ordinateur et pour écrans étroits (téléphone) ; messages d\'erreur compréhensibles.'],
-        ['Compatibilité', 'Navigateurs récents ; aucun logiciel à installer sur le poste. Vérifié avec Microsoft Edge et Google Chrome ; Firefox et Safari non vérifiés.'],
+        ['Compatibilité', 'Navigateurs récents ; aucun logiciel à installer sur le poste. Vérifié avec Microsoft Edge et Google Chrome sur ordinateur ; installation sur l\'écran d\'accueil d\'Android (Chrome) et d\'iPhone (Safari) prévue, à vérifier en recette sur appareils réels ; Firefox non vérifié.'],
         ['Performance', 'Listes paginées, chargement différé des écrans ; aucune mesure de charge n\'a été réalisée (voir le rapport de tests).'],
         ['Maintenabilité', 'Code organisé par domaine métier, tests automatisés, migrations de base versionnées, documentation fournie.'],
       ],
@@ -149,12 +175,15 @@ export default {
     table({
       head: ['Couche', 'Technologie', 'Justification'], widths: [2, 3.4, 4.6], small: true,
       rows: [
-        ['Interface', 'Angular 17, TypeScript, Chart.js', 'Application web monopage, composants réutilisables, typage strict'],
+        ['Interface', 'Angular 21, TypeScript, Chart.js', 'Application web monopage, composants réutilisables, typage strict'],
         ['API', 'Python 3.12+, Django 5.2, Django REST Framework', 'Cadre éprouvé, administration des modèles, écosystème de sécurité'],
         ['Authentification', 'JSON Web Tokens (SimpleJWT) avec rotation et liste noire', 'Sessions sans état, révocation à la déconnexion'],
         ['Base de données', 'PostgreSQL (SQLite en développement)', 'Fiabilité transactionnelle, verrous pour la numérotation'],
         ['Hébergement actuel', 'Vercel (interface et API) et Neon (PostgreSQL)', 'Mise en ligne rapide à coût nul ; hébergement à confirmer par la mairie'],
         ['Documentation de l\'API', 'OpenAPI (drf-spectacular)', 'Disponible en développement, désactivée en production'],
+        ['Travail hors connexion', 'Service worker Angular, IndexedDB (Dexie), Web Crypto (AES-GCM, PBKDF2)', 'Application installable (PWA), données locales chiffrées par le navigateur, sans dépendance externe'],
+        ['Double authentification', 'Codes à usage unique TOTP (RFC 6238)', 'Fonctionne sans réseau ni SMS, avec les applications d\'authentification courantes'],
+        ['Secrets en base', 'Chiffrement Fernet (bibliothèque cryptography)', 'Codes de récupération et secrets de double authentification illisibles dans une copie de la base'],
       ],
     }),
 
@@ -182,6 +211,11 @@ export default {
         ['8', 'Hébergement et lieu de stockage', 'Vercel et Neon (hébergement de démarrage)', 'Choix définitif'],
         ['9', 'Établissements préremplis', 'Sept structures de Ratoma documentées par des sources publiques', 'Validation de la liste'],
         ['10', 'Valeurs par défaut géographiques', 'Région et préfecture : Conakry ; commune : Ratoma ; centre : Centre d\'état civil de Ratoma', 'Libellés officiels'],
+        ['11', 'Étendue du travail hors connexion', 'Tous les profils, 3 appareils par compte, saisie de plus de 7 jours signalée', 'Périmètre, limites, avenant au cahier des charges'],
+        ['12', 'Contrôle des doublons', 'Seuils et pondérations initiaux, décision par le secrétariat et l\'administrateur', 'Calibrage sur des cas réels, qui décide'],
+        ['13', 'Double authentification', 'Facultative ; exigible par rôle (paramètre `security.two_factor_roles`)', 'Profils concernés (au moins administrateur et validateurs)'],
+        ['14', 'Code de récupération d\'un appareil', 'Lisible par l\'administrateur habilité (mot de passe + motif, journalisé)', 'Qui peut le lire, procédure de vérification de l\'identité de l\'agent'],
+        ['15', 'Délai de 6 mois et séparation des tâches', 'Appliqués (délai : 6 mois ; soumettre et valider par deux personnes)', 'Confirmation, ou dérogation pour un très petit service'],
       ],
     }),
 
@@ -191,6 +225,7 @@ export default {
       'Le code source complet et son historique.',
       'Le dossier de documentation : cahier des charges, dossier technique, manuel utilisateur, guide d\'installation et d\'exploitation, rapport de tests, procès-verbal de recette, procès-verbal de livraison.',
       'La formation des utilisateurs par profil.',
+      'Le guide d\'installation du mode hors connexion sur ordinateur, Android et iPhone (fichier imprimable `docs/hors-ligne/guide-installation-appareils`).',
     ]),
   ],
 };

@@ -1,9 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRouteSnapshot, Router, RouterStateSnapshot, UrlTree, provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { errorMessage, fieldErrors } from './api.service';
-import { AuthService } from './auth.service';
+import { AuthService, needsTwoFactorCode } from './auth.service';
 import { authGuard, permissionGuard } from './guards';
 import { Me, STATUS_LABELS, STATUS_TONE } from './models';
 
@@ -55,11 +55,52 @@ describe('Guards', () => {
     expect(TestBed.inject(Router).serializeUrl(r as UrlTree)).toContain('/profile');
   });
 
+  it('sends an account whose role requires the second factor to its profile until it is set up', () => {
+    sessionStorage.setItem('wk_access_token', 'x');
+    auth.user.set(me({ must_set_up_two_factor: true }));
+    const r = TestBed.runInInjectionContext(() => authGuard({} as ActivatedRouteSnapshot, state('/declarations')));
+    expect(TestBed.inject(Router).serializeUrl(r as UrlTree)).toContain('/profile?force2fa=1');
+    expect(TestBed.runInInjectionContext(() => authGuard({} as ActivatedRouteSnapshot, state('/profile')))).toBeTrue();
+    auth.user.set(me({ must_set_up_two_factor: false, two_factor_enabled: true }));
+    expect(TestBed.runInInjectionContext(() => authGuard({} as ActivatedRouteSnapshot, state('/declarations')))).toBeTrue();
+  });
+
   it('allows a user holding one of the required permissions, refuses otherwise', () => {
     auth.user.set(me());
     expect(TestBed.runInInjectionContext(() => permissionGuard(route(['declaration.view']), state('/x')))).toBeTrue();
     const denied = TestBed.runInInjectionContext(() => permissionGuard(route(['user.view']), state('/users')));
     expect(TestBed.inject(Router).serializeUrl(denied as UrlTree)).toBe('/forbidden');
+  });
+});
+
+describe('Sign-in with the second factor', () => {
+  let auth: AuthService;
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    sessionStorage.clear(); localStorage.clear();
+    TestBed.configureTestingModule({ providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()] });
+    auth = TestBed.inject(AuthService);
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  it('recognises the server asking for the code', () => {
+    expect(needsTwoFactorCode({ status: 403, error: { code: 'two_factor_required' } })).toBeTrue();
+    expect(needsTwoFactorCode({ status: 403, error: { code: 'device_revoked' } })).toBeFalse();
+    expect(needsTwoFactorCode({ status: 401, error: { code: 'two_factor_invalid' } })).toBeFalse();
+    expect(needsTwoFactorCode(null)).toBeFalse();
+  });
+
+  it('sends the code only when there is one', () => {
+    auth.login('agent', 'pw', false).subscribe({ error: () => undefined });
+    const first = http.expectOne(r => r.url.endsWith('/auth/login/'));
+    expect(first.request.body.code).toBeUndefined();
+    first.flush({ code: 'two_factor_required' }, { status: 403, statusText: 'Forbidden' });
+    auth.login('agent', 'pw', false, ' 123 456 ').subscribe();
+    const second = http.expectOne(r => r.url.endsWith('/auth/login/'));
+    expect(second.request.body.code).toBe('123 456');
+    second.flush({ access: 'a', refresh: 'r', user: me() });
+    expect(auth.user()?.username).toBe('agent');
   });
 });
 

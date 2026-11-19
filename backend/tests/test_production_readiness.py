@@ -150,3 +150,28 @@ class ProductionReadinessCommandTests(WakaraTestCase):
         from io import StringIO
         with self.assertRaises(SystemExit):
             call_command('check_production', stdout=StringIO())   # tests run with SQLite and no Redis: not production
+
+
+class ReadinessAdviceTests(WakaraTestCase):
+    def labels(self):
+        from core.management.commands.check_production import run_checks
+        return {label: (level, detail) for level, label, detail in run_checks()}
+
+    def test_a_custom_role_that_can_add_pieces_but_not_remove_them_is_reported(self):
+        from accounts.models import Permission, Role, RolePermission
+        role = Role.objects.create(codename='collecteur_perso', name='Collecteur personnalisé')
+        RolePermission.objects.create(role=role, permission=Permission.objects.get(codename='document.upload'))
+        level, detail = self.labels()['Rôles personnalisés : retrait des pièces envoyées']
+        self.assertEqual(level, 'warn')
+        self.assertIn('Collecteur personnalisé', detail)
+        RolePermission.objects.create(role=role, permission=Permission.objects.get(codename='document.archive'))
+        self.assertEqual(self.labels()['Rôles personnalisés : retrait des pièces envoyées'][0], 'ok')
+
+    def test_the_default_roles_are_never_reported(self):
+        self.assertEqual(self.labels()['Rôles personnalisés : retrait des pièces envoyées'][0], 'ok')
+
+    def test_the_encryption_key_of_the_small_secrets_is_advised(self):
+        label = 'FIELD_ENCRYPTION_KEY définie (codes de récupération, double authentification)'
+        self.assertEqual(self.labels()[label][0], 'warn')
+        with override_settings(FIELD_ENCRYPTION_KEY='x' * 50):
+            self.assertEqual(self.labels()[label][0], 'ok')

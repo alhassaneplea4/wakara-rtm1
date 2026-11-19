@@ -5,7 +5,7 @@ import { APIRequestContext, BrowserContext, Page, expect, test } from '@playwrig
  * and the network really cut (BrowserContext.setOffline). Fictional data only.
  */
 const PASSWORD = process.env['E2E_PASSWORD']!;
-const PIN = '482915';
+const PIN = 'Fatou4827';   // 8 characters minimum, letters and digits (see vault.ts)
 const AGENT = 'agent.e2e';
 
 const day = (offset = -2) => { const d = new Date(Date.now() + offset * 86_400_000); return d.toISOString().slice(0, 10); };
@@ -156,6 +156,8 @@ test('transmission et photo de la fiche préparées hors connexion', async ({ pa
   const staff = await browser.newContext();
   const admin = await staff.newPage();
   await signIn(admin, 'admin.e2e');
+  await expect(admin).toHaveURL(/\/verrouillage/);                 // every role may protect its device: this admin works online only
+  await admin.getByRole('button', { name: 'Continuer sans le mode hors connexion sur cet appareil' }).click();
   await expect(admin).toHaveURL(/\/dashboard/);
   const card = admin.locator('section.offline');
   await expect(card).toContainText('Dossiers transmis hors ligne');
@@ -241,39 +243,97 @@ test.describe('pannes du serveur simulées', () => {
   });
 });
 
-test('déconnexion bloquée tant que des opérations attendent, et autre compte refusé sur l\'appareil', async ({ page, context }) => {
+test("déconnexion avec des opérations en attente : elles restent chiffrées sur l'appareil, un autre compte est refusé, le propriétaire les envoie à sa reconnexion", async ({ page, context }) => {
   await setUpDevice(page);
   await waitForOfflineShell(page);
   await goOffline(context, page);
   await saveDraft(page, 'Bloquee');
 
+  // signing out is always possible: nothing is lost, the entry stays on the device (encrypted) with the code chosen once
   await page.locator('.sidebar .logout').click();
-  const dialog = page.locator('.modal');
-  await expect(dialog).toContainText('Déconnexion impossible');
-  await expect(dialog).toContainText('1 opération');
-  await dialog.getByRole('button', { name: 'Annuler' }).click();
-  await expect(page).toHaveURL(/\/declarations\//);
+  await expect(page).toHaveURL(/\/login/);
+  expect(await page.evaluate(() => localStorage.getItem('wk_vault'))).not.toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('wk_vault_session'))).toBeNull();   // only the saved session is gone
 
-  // the device is locked (nothing lost), then somebody else tries to use it
-  await pill(page).click();
-  await page.getByRole('button', { name: "Verrouiller l'appareil" }).click();
-  await expect(page).toHaveURL(/\/verrouillage/);
-  await page.getByRole('button', { name: 'Utiliser un autre compte' }).click();
-  await expect(page.locator('.alert-danger')).toContainText('Impossible de changer de compte');
-
+  // somebody else tries to use the device while the entry waits: refused
   await context.setOffline(false);
   await signIn(page, 'agent2.e2e');
   await expect(page).toHaveURL(/\/login\?blocked=1/);
   await expect(page.locator('.alert-danger')).toContainText('non synchronisées');
 
-  // the owner comes back, synchronises, and may then sign out — which leaves the device clean
-  await page.goto('/verrouillage');
+  // the owner signs in again, unlocks with the code he chose (not created again), and the entry goes out
+  await signIn(page, AGENT);
+  await expect(page).toHaveURL(/\/verrouillage/);
+  await expect(page.getByRole('heading', { name: 'Appareil verrouillé' })).toBeVisible();
   await page.locator('#code').fill(PIN);
   await page.getByRole('button', { name: 'Déverrouiller' }).click();
   await expect(page).toHaveURL(/\/declarations/);
   await expect(page.locator('tbody tr', { hasText: 'Bloquee' }).locator('wk-sync')).toContainText('En ligne');
+
+  // nothing waits any more: another account may take the device over (it must create its own code)
   await page.locator('.sidebar .logout').click();
-  await expect(page).toHaveURL(/\/login/);
-  expect(await page.evaluate(() => localStorage.getItem('wk_vault'))).toBeNull();
-  expect(await page.evaluate(async () => (await indexedDB.databases()).filter(d => d.name?.startsWith('wakara-offline-')).length)).toBe(0);
+  await signIn(page, 'agent2.e2e');
+  await expect(page).toHaveURL(/\/verrouillage/);
+  await expect(page.getByRole('heading', { name: 'Protégez cet appareil' })).toBeVisible();
+});
+
+test("code oublié : l'administrateur communique le code de récupération, la saisie hors connexion est conservée", async ({ page, context, request }) => {
+  await setUpDevice(page);
+  await waitForOfflineShell(page);
+
+  // at its first synchronisation the device gave the server a recovery code (the agent never sees it)
+  const adminLogin = await request.post('/api/auth/login/', { data: { username: 'admin.e2e', password: PASSWORD } });
+  const adminHeaders = { Authorization: `Bearer ${(await adminLogin.json()).access}` };
+  const deviceId = await page.evaluate(() => localStorage.getItem('wk_device_id'));
+  const myDevice = async () => {
+    const list = await (await request.get('/api/sync/devices/', { headers: adminHeaders })).json();
+    return list.results.find((d: any) => d.device_id === deviceId);
+  };
+  await expect.poll(async () => !!(await myDevice())?.has_recovery, { timeout: 30_000 }).toBe(true);
+  const before = await myDevice();
+
+  await goOffline(context, page);
+  await saveDraft(page, 'Oubliee');
+
+  // the device is locked and the code is forgotten
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Appareil verrouillé' })).toBeVisible();
+  await page.getByRole('button', { name: 'Code oublié ?' }).click();
+  await page.getByRole('button', { name: "J'ai un code de récupération" }).click();
+
+  // the administrator checks who is calling, then reads the code (password + reason, audited) and dictates it
+  const read = await request.post(`/api/sync/devices/${before.id}/recovery/`, {
+    headers: adminHeaders, data: { password: PASSWORD, reason: "L'agent a oublié son code, identité vérifiée par téléphone." } });
+  expect(read.status()).toBe(200);
+  const { code } = await read.json();
+  expect(code).toMatch(/^([0-9A-Z]{4}-){5}[0-9A-Z]{4}$/);
+
+  await page.locator('#rcode').fill('AAAA-AAAA-AAAA-AAAA-AAAA-AAAA');
+  await page.locator('#rpin').fill('Nouveau7391');
+  await page.locator('#rpin2').fill('Nouveau7391');
+  await page.getByRole('button', { name: "Ouvrir l'appareil et enregistrer le nouveau code" }).click();
+  await expect(page.locator('.alert-danger')).toContainText("n'est pas le bon");
+  await page.locator('#rcode').fill(code.toLowerCase().replace(/-/g, ' '));
+  await page.locator('#rpin').fill('Nouveau7391');
+  await page.locator('#rpin2').fill('Nouveau7391');
+  await page.getByRole('button', { name: "Ouvrir l'appareil et enregistrer le nouveau code" }).click();
+  await expect(page).toHaveURL(/\/declarations/);
+
+  // nothing was lost, and the new code works from now on
+  await page.locator('.sidebar nav').getByRole('link', { name: 'Déclarations' }).click();
+  const row = page.locator('tbody tr', { hasText: 'Oubliee' });
+  await expect(row.locator('wk-sync')).toContainText('Sur cet appareil');
+  await page.reload();
+  await page.locator('#code').fill('Nouveau7391');
+  await page.getByRole('button', { name: 'Déverrouiller' }).click();
+  await expect(page).toHaveURL(/\/declarations/);
+
+  // the connection returns: the entry reaches the server, and a NEW recovery code replaces the one the administrator read
+  await goOnline(context, page);
+  await expect(row.locator('wk-sync')).toContainText('En ligne');
+  expect((await serverRows(request, 'Oubliee')).rows).toHaveLength(1);
+  await expect.poll(async () => { const d = await myDevice(); return d.has_recovery && !d.recovery_revealed_at && d.recovery_set_at !== before.recovery_set_at; }, { timeout: 30_000 }).toBe(true);
+  const again = await request.post(`/api/sync/devices/${before.id}/recovery/`, {
+    headers: adminHeaders, data: { password: PASSWORD, reason: 'Contrôle : le code a bien été remplacé.' } });
+  expect((await again.json()).code).not.toBe(code);
 });

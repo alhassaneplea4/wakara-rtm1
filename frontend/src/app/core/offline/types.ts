@@ -70,7 +70,7 @@ export const DEFAULT_RULES: SyncRules = {
 };
 
 /** Answer of GET /sync/reference/: what the forms need whatever the state of the dossiers. */
-export interface ReferenceResponse { server_time: string; offline_enabled: boolean; hospitals: HospitalRef[]; rules: SyncRules; }
+export interface ReferenceResponse { server_time: string; offline_enabled: boolean; hospitals: HospitalRef[]; rules: SyncRules; recovery_registered?: boolean; }
 
 export interface SyncInfo { sync_state: SyncState; sync_error?: OpError | null; }
 export type LocalDeclaration = DeclarationDetail & SyncInfo & { sync_version?: number; is_archived?: boolean };

@@ -29,6 +29,11 @@ def run_checks():
         "Sans SECRET_KEY elle est dérivée de l'adresse de la base : définissez-la (valeur aléatoire de 50 caractères ou plus). "
         "Attention : la changer ferme toutes les sessions ouvertes.", blocking=False)
     add(len(settings.SECRET_KEY) >= 32, 'SECRET_KEY assez longue', 'Moins de 32 caractères.')
+    add(bool(getattr(settings, 'FIELD_ENCRYPTION_KEY', '')), 'FIELD_ENCRYPTION_KEY définie (codes de récupération, double authentification)',
+        "Sans elle, ces secrets sont chiffrés avec une clé dérivée de SECRET_KEY : changer SECRET_KEY les rend illisibles "
+        "(chaque appareil enregistre alors un nouveau code de récupération à son prochain déverrouillage avec Internet ; "
+        "la double authentification de chaque compte est à réinitialiser). "
+        "Définissez-la une fois (valeur aléatoire de 50 caractères ou plus) et ne la changez plus.", blocking=False)
 
     local_hosts = [h for h in settings.ALLOWED_HOSTS if h in LOCAL_HOSTS]
     add(not local_hosts or settings.ON_VERCEL, 'ALLOWED_HOSTS limité aux domaines réels',
@@ -68,6 +73,28 @@ def run_checks():
             blocking=False)
     except Exception as exc:  # noqa: BLE001
         add(False, 'Base de données lisible', exc.__class__.__name__)
+
+    try:
+        from accounts.models import Role
+        from core.permissions import DEFAULT_ROLES, permissions_of_role
+        custom = [r.name for r in Role.objects.filter(is_active=True).exclude(codename__in=DEFAULT_ROLES)
+                  if {'document.upload', 'document.archive'} & permissions_of_role(r) == {'document.upload'}]
+        add(not custom, 'Rôles personnalisés : retrait des pièces envoyées',
+            f"Ces rôles peuvent ajouter des pièces mais pas retirer une pièce déjà envoyée (droit « document.archive ») : "
+            f"{', '.join(custom)}. Ajoutez le droit à ceux qui doivent pouvoir le faire (écran Rôles).", blocking=False)
+    except Exception as exc:  # noqa: BLE001
+        add(False, 'Rôles lisibles', exc.__class__.__name__, blocking=False)
+    if connection.vendor == 'postgresql':
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute('SELECT pg_database_size(current_database())')
+                size_mb = cursor.fetchone()[0] / 1_048_576
+            add(size_mb < settings.DATABASE_SIZE_WARN_MB, 'Volume de la base',
+                f"La base occupe {size_mb:.0f} Mo (seuil d'alerte {settings.DATABASE_SIZE_WARN_MB} Mo ; l'offre gratuite de Neon "
+                f"s'arrête à 512 Mo). Les photos des fiches sont dans la base : passez à une offre supérieure ou "
+                f"déplacez les pièces vers un bucket privé (DOCUMENTS_S3_BUCKET).", blocking=False)
+        except Exception as exc:  # noqa: BLE001
+            add(False, 'Volume de la base lisible', exc.__class__.__name__, blocking=False)
 
     add(settings.DOCUMENTS_STORAGE in ('s3', 'database') or not settings.ON_VERCEL, 'Stockage des pièces durable',
         'Sur un hébergement sans disque persistant, les pièces doivent être dans la base ou un bucket privé.')

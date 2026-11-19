@@ -21,6 +21,8 @@ const env = {
   DEBUG: 'True', SECRET_KEY: randomBytes(48).toString('hex'), DATABASE_URL: '', DB_ENGINE: 'django.db.backends.sqlite3',
   SQLITE_PATH: path.join(dir, 'e2e.sqlite3'), DOCUMENTS_STORAGE: 'database', LOGIN_THROTTLE_RATE: '1000/min',
   ALLOWED_HOSTS: 'localhost,127.0.0.1', PYTHONUNBUFFERED: '1',
+  // every test opens a new browser context = a new device for the same fictional agent (the real limit is 3 per account)
+  SYNC_MAX_DEVICES_PER_USER: '50',
 };
 
 function manage(...args) {

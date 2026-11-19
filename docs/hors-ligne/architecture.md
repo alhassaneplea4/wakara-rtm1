@@ -1,6 +1,6 @@
 # Mode hors connexion — architecture technique
 
-> Branche `wakara-hors-ligne`. Tout le chantier (code, migrations, tests, documentation, correctifs) vit sur cette branche ; rien n'est fusionné dans `main` sans décision explicite.
+> Chantier terminé et **fusionné dans `main`** (la branche `wakara-hors-ligne` est conservée pour l'aperçu Vercel). Mis à jour le 19/11/2026 : code de récupération des appareils.
 
 ## 1. Ce que fait le mode hors connexion
 
@@ -56,7 +56,8 @@ Les écrans existants ne sont presque pas modifiés : un intercepteur HTTP (`cor
 | `declarations/models.py` | `sync_version`, `device_created_at`, `device_transmitted_at` |
 | `documents/services.py` | Validation et stockage d'une pièce, partagés entre l'API et la synchronisation |
 | `audit/models.py`, `audit/middleware.py` | Origine « hors ligne », appareil, opération, date sur l'appareil |
-| `tests/test_offline_sync.py`, `tests/test_offline_roles.py` | 54 + 17 tests |
+| `sync/recovery.py`, `core/secretbox.py` | Code de récupération d'un appareil : format, chiffrement (Fernet) sous `FIELD_ENCRYPTION_KEY` |
+| `tests/test_offline_sync.py`, `test_offline_roles.py`, `test_offline_audit_fixes.py`, `test_device_recovery.py` | 58 + 21 + 13 + 25 tests |
 
 **Frontend** (`frontend/src/app/core/offline/`)
 
@@ -71,7 +72,7 @@ Les écrans existants ne sont presque pas modifiés : un intercepteur HTTP (`cor
 | `materialize.ts` | Ce que l'agent voit = dernier état du serveur + opérations en attente rejouées |
 | `local-api.ts` | Réponses locales aux appels API des écrans (dossiers, actes, pièces, établissements) et copie chiffrée des autres pages consultées |
 | `sync.ts` | Push / pull |
-| `offline.spec.ts` | 74 tests unitaires |
+| `offline.spec.ts` | 85 tests unitaires (dont le code de récupération, 12, et une mesure sur 2 000 dossiers) |
 
 Écrans : `features/lock.component.ts` (PIN), `features/sync-center.component.ts` (opérations et journal), `features/devices.component.ts` (administration des appareils), `shared/sync-ui.ts` (indicateur par dossier, bandeau, pastille de connexion, reconnexion).
 
@@ -147,6 +148,7 @@ Les opérations partent dans l'ordre où elles ont été faites. Les photos part
 | Ce qui est chiffré | Contenu des opérations, dossiers reçus, photos (contenu et nom), établissements, session (jetons et profil) |
 | Ce qui reste en clair | Identifiants techniques, type et état des opérations, dates : ce qu'il faut pour ordonner et compter la file sans le PIN |
 | PIN | 8 caractères au minimum mêlant lettres et chiffres, ou une phrase de 14 caractères ; codes triviaux ou courants refusés ; un code faible créé auparavant doit être remplacé au déverrouillage suivant. Après 5 erreurs, blocage temporaire croissant (1 à 30 min). Le compteur est sur l'appareil et peut être effacé par celui qui le détient : la vraie protection est la dérivation de clé (PBKDF2, 600 000 itérations) et la force du code |
+| Code de récupération | La clé de données est enveloppée une seconde fois par un code aléatoire de 120 bits (HKDF) généré sur l'appareil, **jamais montré à l'agent**, enregistré chiffré sur le serveur (`Device.recovery_blob`). Seul l'administrateur habilité (`device.recover`) le lit, avec son mot de passe et un motif, et chaque lecture est journalisée (voir § 8) |
 | Verrouillage | Manuel (« Verrouiller l'appareil ») ou automatique après 15 min d'inactivité ; tout rechargement de la page redemande le PIN |
 | Base locale | Une base IndexedDB par utilisateur |
 | Permissions | Vérifiées par le serveur à chaque opération ; l'appareil n'a aucun pouvoir propre |
@@ -179,10 +181,36 @@ En dernier recours (service worker défectueux empêchant le chargement), publie
 
 ## 7. Limites connues
 
-- **PIN oublié** : les opérations non synchronisées de l'appareil sont perdues (le code ne peut pas être récupéré, par conception). L'écran l'annonce avant toute réinitialisation.
+- **PIN oublié** : l'administrateur communique le **code de récupération** de l'appareil (§ 8) : l'appareil s'ouvre sans rien perdre. Sans code de récupération enregistré (appareil jamais déverrouillé avec Internet depuis la mise en service), les opérations non synchronisées sont perdues ; l'écran l'annonce avant toute réinitialisation.
 - **Compte désactivé ou appareil révoqué avec des opérations en attente** : voir la procédure de secours dans [exploitation.md](./exploitation.md).
 - **Pièces déjà sur le serveur** : leur liste est lisible hors connexion (dernière consultation en ligne) ; leur contenu ne l'est pas (seules les photos en attente d'envoi sont sur l'appareil).
 - **Suppression d'une pièce déjà envoyée** : en ligne uniquement.
-- **Politique CSP** : non ajoutée dans cette phase. Une CSP stricte demande de tester toutes les pages (styles en ligne d'Angular, images `blob:`, impression de l'acte) ; à traiter séparément.
+- **Politique CSP** : en place dans `vercel.json` (aucun script en ligne) ; vérifier les en-têtes avec `curl -I` après chaque déploiement.
 - **iOS / Safari** : le navigateur peut effacer le stockage d'un site non installé après plusieurs jours sans visite. Installer l'application sur l'écran d'accueil et synchroniser régulièrement.
 - **Stockage Neon** : les photos sont dans la base (0,5 Go en offre gratuite) ; surveiller le volume.
+
+## 8. Code de récupération d'un appareil
+
+Le code de verrouillage ne quitte jamais l'appareil : il sert à dériver la clé qui enveloppe la clé de données. Pour qu'un
+oubli ne fasse pas perdre les saisies non envoyées, l'appareil **enveloppe aussi** la clé de données sous un code de
+récupération aléatoire (24 caractères Crockford base32 = 120 bits, `crypto.ts`).
+
+1. **Création** : à la création du coffre (ou au premier déverrouillage d'un coffre plus ancien, ou quand le serveur dit
+   qu'il n'a pas de code lisible), l'appareil génère le code. Il le garde **chiffré avec la clé de données** dans l'en-tête
+   du coffre (`recPending`) tant que le serveur ne l'a pas confirmé. L'agent ne le voit jamais.
+2. **Enregistrement** : à chaque cycle de synchronisation, `POST /api/sync/recovery/` (`device_id`, `code`). Le serveur le
+   chiffre (Fernet, clé dérivée par finalité de `FIELD_ENCRYPTION_KEY`, à défaut de `SECRET_KEY`) dans `Device.recovery_blob`,
+   journalise `device_recovery_registered` (jamais le code) et répond ; l'appareil efface alors `recPending`. L'écran
+   « Appareils » affiche « Enregistré ».
+3. **Auto-guérison** : `reference/` et `pull/` renvoient `recovery_registered` ; s'il est faux (clé de chiffrement changée,
+   sauvegarde restaurée), l'appareil fait un nouveau code à son prochain déverrouillage (`recRenew`).
+4. **Lecture par l'administrateur** : `POST /api/sync/devices/{id}/recovery/` (`device.recover`) avec `password` (le sien) et
+   `reason` (10 caractères au moins) ; limité à 10 par minute ; mot de passe faux → `device_recovery_denied` ; succès →
+   `device_recovery_revealed` avec le motif, et l'écran garde « Communiqué le … par … ».
+5. **Utilisation** : écran de code → « Code oublié ? » → « J'ai un code de récupération » : `recoverVault` déroule la clé de
+   données avec le code, l'enveloppe sous le **nouveau** code de verrouillage et fabrique un **nouveau** code de
+   récupération (celui que l'administrateur a lu ne sert plus). Rien de ce qui est stocké sur l'appareil n'est rechiffré.
+
+Ce que ça ne change pas : le code ne sert **qu'avec l'appareil** (le serveur n'a jamais les données non synchronisées) ;
+un appareil volé se révoque. Une sauvegarde de secours restaurée ne reprend pas l'ancien code de récupération : l'appareil
+en refait un.

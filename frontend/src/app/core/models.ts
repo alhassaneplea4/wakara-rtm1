@@ -8,6 +8,8 @@ export interface Me {
   uuid: string; username: string; email: string; first_name: string; last_name: string;
   phone: string; address: string; hospital: string | null; hospital_name?: string | null;
   roles: RoleBrief[]; permissions: string[]; must_change_password: boolean;
+  /** Second factor (authentication application): set up, and required of this account but not set up yet. */
+  two_factor_enabled?: boolean; must_set_up_two_factor?: boolean;
   date_joined: string; last_login: string | null;
 }
 
@@ -110,7 +112,7 @@ export interface DeliverySummary { total: number; first: number; duplicates: num
 export interface UserRow {
   uuid: string; username: string; email: string; first_name: string; last_name: string; phone: string;
   is_active: boolean; hospital: string | null; hospital_name: string | null; roles: RoleBrief[];
-  date_joined: string; last_login: string | null; is_locked: boolean;
+  date_joined: string; last_login: string | null; is_locked: boolean; two_factor_enabled?: boolean;
   // detail only
   address?: string; must_change_password?: boolean; permission_overrides?: { codename: string; granted: boolean }[];
   effective_permissions?: string[];

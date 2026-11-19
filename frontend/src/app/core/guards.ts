@@ -15,6 +15,10 @@ export const authGuard: CanActivateFn = (_route, state) => {
   if (auth.user()!.must_change_password && !state.url.startsWith('/profile')) {
     return router.createUrlTree(['/profile'], { queryParams: { force: 1 } });
   }
+  // the roles of this account must use the second factor: only the profile page opens until it is set up
+  if (auth.user()!.must_set_up_two_factor && !state.url.startsWith('/profile')) {
+    return router.createUrlTree(['/profile'], { queryParams: { force2fa: 1 } });
+  }
   return true;
 };
 

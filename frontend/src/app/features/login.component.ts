@@ -5,7 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { environment } from '@env/environment';
 import { errorMessage } from '../core/api.service';
-import { AuthService } from '../core/auth.service';
+import { AuthService, needsTwoFactorCode } from '../core/auth.service';
 import { readVaultHeader } from '../core/offline/vault-header';
 import { IconComponent } from '../shared/ui';
 
@@ -46,6 +46,13 @@ const FALLBACK: PublicSettings = {
                 <wk-icon [name]="show() ? 'eyeoff' : 'eye'" [size]="20" />
               </button>
             </div>
+            @if (needCode()) {
+              <div class="control" [class.invalid]="submitted && !code">
+                <wk-icon name="shield" [size]="20" />
+                <input name="code" [(ngModel)]="code" inputmode="text" autocomplete="one-time-code" placeholder="Code de l'application d'authentification" aria-label="Code de vérification" autofocus />
+              </div>
+              <p class="hint">Saisissez les 6 chiffres affichés par votre application d'authentification, ou l'un de vos codes de secours.</p>
+            }
             <div class="opts">
               <label class="check"><input type="checkbox" name="remember" [(ngModel)]="remember" /> Se souvenir de moi</label>
               <button type="button" class="link" (click)="forgot.set(true)">Mot de passe oublié ?</button>
@@ -119,6 +126,7 @@ const FALLBACK: PublicSettings = {
     .eye{border:0;background:none;color:var(--wk-text-mute);cursor:pointer;display:grid;place-items:center;padding:6px}
     .link{background:none;border:0;padding:0;font:inherit;color:var(--wk-royal);cursor:pointer}
     .link:hover{text-decoration:underline}
+    .hint{margin:-4px 0 0;font-size:12.5px;color:var(--wk-text-soft)}
     .opts{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;font-size:13px}
     .submit{height:56px;font-size:16px;border-radius:12px;background:linear-gradient(180deg,#2a67e0,#14449f)}
     .go{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.22)}
@@ -175,6 +183,8 @@ export class LoginComponent implements OnInit {
 
   username = '';
   password = '';
+  code = '';
+  needCode = signal(false);
   remember = false;
   submitted = false;
   show = signal(false);
@@ -215,14 +225,20 @@ export class LoginComponent implements OnInit {
     this.error.set('');
     if (!this.username.trim() || !this.password) { this.error.set('Veuillez saisir votre identifiant et votre mot de passe.'); return; }
     this.loading.set(true);
-    this.auth.login(this.username.trim(), this.password, this.remember).subscribe({
+    if (this.needCode() && !this.code.trim()) { this.loading.set(false); this.error.set('Saisissez le code de votre application d\'authentification.'); return; }
+    this.auth.login(this.username.trim(), this.password, this.remember, this.code).subscribe({
       next: user => {
         this.loading.set(false);
         if (user.must_change_password) { this.router.navigate(['/profile'], { queryParams: { force: 1 } }); return; }
         const next = this.route.snapshot.queryParamMap.get('next');
         this.router.navigateByUrl(next && next.startsWith('/') ? next : this.auth.can('stats.view') ? '/dashboard' : '/declarations');
       },
-      error: err => { this.loading.set(false); this.error.set(errorMessage(err, 'Connexion impossible.')); },
+      error: err => {
+        this.loading.set(false);
+        if (needsTwoFactorCode(err)) { this.needCode.set(true); this.error.set(''); return; }   // password accepted: the code is asked next
+        this.code = '';
+        this.error.set(errorMessage(err, 'Connexion impossible.'));
+      },
     });
   }
 }

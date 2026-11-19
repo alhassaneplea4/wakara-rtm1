@@ -8,7 +8,7 @@ export default {
   toc: false,
   blocks: [
     h1('Objet du procès-verbal'),
-    p(`Le présent procès-verbal constate la remise, par le prestataire à la ${META.clientCourt}, de la **première version fonctionnelle (v${META.version})** de la plateforme **Wakara** de gestion des déclarations et des actes de naissance, ainsi que des éléments listés ci-dessous. Il précise les éventuelles réserves du client et les modalités de maintenance.`),
+    p(`Le présent procès-verbal constate la remise, par le prestataire à la ${META.clientCourt}, de la **version ${META.version}** de la plateforme **Wakara** de gestion des déclarations et des actes de naissance, ainsi que des éléments listés ci-dessous. Il précise les éventuelles réserves du client et les modalités de maintenance.`),
     p('Il est établi en **deux exemplaires originaux**, un pour chaque partie. La réception de la solution suppose que le procès-verbal de recette (document 06) ait été signé.'),
 
     h1('Parties et circonstances de la remise'),
@@ -24,10 +24,10 @@ export default {
 
     h1('Solution livrée'),
     form([
-      ['Nom et version', `Wakara — version ${META.version} (première version fonctionnelle)`],
+      ['Nom et version', `Wakara — version ${META.version} (mode hors connexion, contrôle des doublons, double authentification)`],
       ['Adresse de l’application', META.url],
       ['Hébergement actuel', 'Interface et API : Vercel · Base de données : Neon (PostgreSQL)'],
-      ['Technologies', 'Angular 17 (interface), Django 5.2 et Django REST Framework (API), PostgreSQL'],
+      ['Technologies', 'Angular 21 (interface, application installable PWA avec mode hors connexion), Django 5.2 et Django REST Framework (API), PostgreSQL'],
       ['Code source', `Dépôt Git ${META.depot}, branche main`],
       ['Référence du code livré (identifiant du dernier commit)', ''],
       ['Date de mise en ligne', ''],
@@ -48,6 +48,8 @@ export default {
         ['7', 'Données initiales', 'Rôles et permissions par défaut, paramètres de l\'application, établissements de santé de Ratoma préremplis (liste à valider par la mairie).', `${BOX} Remis\n${BOX} Réserve`],
         ['8', 'Formation des utilisateurs', 'Séance(s) de prise en main par profil : agents de collecte, secrétariat, administrateur technique (voir le tableau de formation).', `${BOX} Remis\n${BOX} Réserve`],
         ['9', 'Rapport de tests et PV de recette', 'Rapport de tests (document 05) et procès-verbal de recette signé (document 06).', `${BOX} Remis\n${BOX} Réserve`],
+        ['10', 'Mode hors connexion', 'Application installable sur ordinateur, Android et iPhone ; guide d\'installation illustré à imprimer (`docs/hors-ligne/guide-installation-appareils`) ; guide de l\'agent ; procédure du code de récupération pour l\'administrateur (document 04).', `${BOX} Remis\n${BOX} Réserve`],
+        ['11', 'Réglages de production', 'Liste des variables d\'environnement à renseigner (`SECRET_KEY`, `FIELD_ENCRYPTION_KEY`, `REDIS_URL`, `NUM_PROXIES`) et rapport `python manage.py check_production` (document 04).', `${BOX} Remis\n${BOX} Réserve`],
       ],
     }),
 
@@ -91,7 +93,7 @@ export default {
     ], [4, 6]),
 
     h1('Points contractuels à préciser'),
-    p('Wakara traite des données personnelles d\'état civil. Les quatre points suivants doivent être arrêtés par écrit avant la mise en exploitation réelle.'),
+    p('Wakara traite des données personnelles d\'état civil. Les points suivants doivent être arrêtés par écrit avant la mise en exploitation réelle.'),
     table({
       head: ['Sujet', 'Décision des parties', 'Précisions'],
       widths: [3, 4, 3],
@@ -101,6 +103,9 @@ export default {
         ['**Protection des données** : responsabilité sur les informations des enfants et des parents, accès, hébergement, conservation', `${BOX} Responsabilités définies dans le contrat\n${BOX} À définir avant l'exploitation réelle`, ''],
         ['**Continuité du service** : sauvegardes, restauration, conduite à tenir en cas de panne', `${BOX} Procédure du document 04 adoptée\n${BOX} Procédure à compléter`, ''],
         ['**Validité administrative** : modèle d\'acte, numérotation, signatures, circuit de délivrance', `${BOX} Approuvés par l'autorité compétente\n${BOX} En attente d'approbation`, ''],
+        ['**Périmètre étendu** : mode hors connexion pour tous les profils, contrôle des doublons, double authentification (version 1.1), au-delà du cahier des charges initial', `${BOX} Avenant au cahier des charges signé\n${BOX} À formaliser`, ''],
+        ['**Code de récupération des appareils** : qui peut le lire, comment l\'identité de l\'agent est vérifiée, conservation du journal de lecture', `${BOX} Procédure du document 04 adoptée\n${BOX} À compléter`, ''],
+        ['**Essais sur appareils réels** (Android, iPhone) et sur PostgreSQL de production avant la généralisation', `${BOX} Réalisés et consignés dans le document 06\n${BOX} À programmer`, ''],
       ],
     }),
 

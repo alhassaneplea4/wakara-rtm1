@@ -25,6 +25,12 @@ class Device(NoHardDeleteMixin, models.Model):
     revoked_at = models.DateTimeField("Révoqué le", null=True, blank=True)
     revoked_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    # Recovery code of the device (see sync.recovery): encrypted, readable only through the audited admin endpoint.
+    recovery_blob = models.TextField("Code de récupération (chiffré)", blank=True, default='')
+    recovery_set_at = models.DateTimeField("Code de récupération enregistré le", null=True, blank=True)
+    recovery_revealed_at = models.DateTimeField("Code de récupération communiqué le", null=True, blank=True)
+    recovery_revealed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
 
     class Meta:
         verbose_name = "Appareil"

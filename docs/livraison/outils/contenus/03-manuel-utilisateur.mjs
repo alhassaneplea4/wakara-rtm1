@@ -14,6 +14,7 @@ export default {
         ['**Agent de collecte** — vous recevez les déclarations des hôpitaux et les saisissez', '2'],
         ['**Secrétaire d\'état civil** — vous complétez les dossiers, préparez l\'acte, imprimez et délivrez', '3'],
         ['**Administrateur technique** — vous validez, gérez les comptes, les droits et suivez l\'activité', '4'],
+        ['**Tous les profils** — travailler sans Internet, installer l\'application sur ordinateur ou téléphone, code de verrouillage, double authentification', '5'],
       ],
     }),
     note('Les captures d\'écran de ce manuel utilisent des **données fictives** (noms et dossiers inventés).', 'info'),
@@ -27,6 +28,7 @@ export default {
       '**À la première connexion**, ou après une réinitialisation par l\'administrateur, l\'application vous demande de choisir un nouveau mot de passe : il doit être long et difficile à deviner. Vous ne pouvez rien faire d\'autre avant de l\'avoir changé.',
     ]),
     note('Après plusieurs mots de passe erronés, le compte est **bloqué 15 minutes**. Le message d\'erreur est le même que le compte existe ou non. Mot de passe oublié : contactez l\'administrateur technique.', 'warn'),
+    note('Si la **double authentification** est activée sur votre compte, après votre mot de passe l\'application vous demande un **code à 6 chiffres** (ou un code de secours) : voir le chapitre 5.', 'info'),
 
     h2('Se repérer dans l\'écran'),
     ul([
@@ -266,6 +268,79 @@ export default {
     img('admin-parametres.jpg', 'Paramètres', 90),
     p('Menu **Paramètres** : modifiez les **textes de la page de connexion** (étiquette, titre, description, pied de page ; mettez un mot entre *étoiles* pour le colorer) et les **valeurs par défaut des actes** (région, préfecture, commune, centre). Enregistrez : la modification est visible tout de suite.'),
 
+    // ───────────────────────── TOUS LES PROFILS ─────────────────────────
+    h1('Tous les profils — travailler sans Internet et protéger son compte'),
+    p('Wakara fonctionne **même sans Internet** : vous pouvez créer, modifier et transmettre des déclarations dans une zone sans réseau ; tout est envoyé automatiquement au retour de la connexion. Ce chapitre vaut pour tous les profils (agent, secrétariat, administrateur).'),
+
+    h2('Installer l\'application sur votre appareil'),
+    p('Wakara ne se télécharge pas dans un magasin d\'applications : c\'est le site lui-même qui s\'installe. **La toute première ouverture se fait avec Internet.**'),
+    table({
+      head: ['Appareil', 'Que faire'], widths: [2.4, 7.6], small: true,
+      rows: [
+        ['**Ordinateur** (Chrome ou Edge)', `Ouvrez ${META.url}, connectez-vous, choisissez votre code de verrouillage, attendez 10 secondes, puis cliquez sur l'icône « Installer » à droite de la barre d'adresse (ou menu ⋮ → Installer Wakara).`],
+        ['**Android** (Chrome)', `Ouvrez ${META.url} dans Chrome, connectez-vous, choisissez votre code, attendez 10 secondes, puis menu ⋮ → « Installer l'application ». Ouvrez ensuite Wakara depuis son icône.`],
+        ['**iPhone / iPad** (Safari)', `Ouvrez ${META.url} dans Safari, touchez Partager → « Sur l'écran d'accueil » → Ajouter, puis **ouvrez Wakara depuis la nouvelle icône** et connectez-vous. L'installation est indispensable sur iPhone : sans elle, Safari peut effacer les données après 7 jours sans usage.`],
+      ],
+    }),
+    note('Un guide illustré à imprimer, avec le test à faire sur chaque appareil, est fourni : « Wakara — Travailler sans Internet ».', 'info'),
+
+    h2('Le code de verrouillage'),
+    ol([
+      'À la première ouverture sur un appareil, Wakara vous demande de choisir un **code de verrouillage** : 8 caractères au minimum, avec des lettres **et** des chiffres (ou une phrase de 14 caractères). Les codes trop simples sont refusés.',
+      'Ce code chiffre les déclarations enregistrées sur l\'appareil. Il vous est demandé à chaque ouverture, **même sans Internet**, et après 15 minutes d\'inactivité.',
+      '**Notez-le** dans un endroit sûr (pas sur le téléphone). Après 5 erreurs, l\'appareil se bloque quelques minutes.',
+      'Sur un ordinateur partagé, choisissez « Continuer sans le mode hors connexion » : vous travaillerez seulement en ligne.',
+    ]),
+
+    h2('Au quotidien'),
+    ul([
+      'En haut de l\'écran, la pastille indique **En ligne** ou **Hors connexion** et le nombre d\'opérations en attente.',
+      'Sans connexion, vous pouvez créer et modifier des déclarations, prendre la fiche en photo et transmettre (selon votre profil). Le dossier porte une référence `LOCAL-…` et l\'indicateur orange « Sur cet appareil ».',
+      'Au retour du réseau, tout part **automatiquement** ; le dossier reçoit sa vraie référence `WKR-…`. Vous pouvez aussi appuyer sur **Synchroniser**. Synchronisez **au moins une fois par jour**.',
+      'Un indicateur rouge signale une opération **refusée** (ouvrez le dossier : le motif est affiché) ou un **conflit** (le dossier a changé sur le serveur : choisissez la version à garder ; rien n\'est écrasé sans votre choix).',
+      'Si le téléphone se verrouille pendant une saisie, Wakara la propose à la réouverture (« Reprendre cette saisie »).',
+      'La page **Synchronisation** contient la liste des opérations et une **sauvegarde de secours** à garder ailleurs que sur le téléphone.',
+      '**Déconnexion** : toujours possible ; vos déclarations non envoyées restent chiffrées sur l\'appareil et partent à votre prochaine connexion. Un autre compte ne peut pas utiliser l\'appareil tant qu\'elles n\'ont pas été envoyées.',
+    ]),
+    note('Seules les actions de gestion (utilisateurs, rôles, paramètres, décisions du contrôle des doublons, délivrance, impressions et exports) exigent la connexion : l\'écran le dit.', 'info'),
+
+    h2('J\'ai oublié mon code de verrouillage'),
+    ol([
+      'Sur l\'écran de code, touchez **« Code oublié ? »**.',
+      '**Appelez l\'administrateur.** Après avoir vérifié qui vous êtes, il vous communique un **code de récupération** (24 caractères, par groupes de 4).',
+      'Touchez « J\'ai un code de récupération », saisissez-le, puis choisissez un **nouveau code de verrouillage**.',
+      'L\'appareil s\'ouvre avec **toutes vos déclarations non envoyées**. Le code de récupération utilisé ne vaut plus rien : l\'appareil en prépare un nouveau.',
+    ]),
+    note('Sans code de récupération, la seule solution est d\'effacer les données de l\'appareil avec le mot de passe de votre compte : les déclarations non envoyées sont alors **perdues**. L\'écran vous l\'annonce avant.', 'warn'),
+
+    h2('La double authentification'),
+    p('Elle ajoute une seconde étape à la connexion : un **code à 6 chiffres** calculé par une application sur votre téléphone (Google Authenticator, Microsoft Authenticator, Aegis…), qui fonctionne sans Internet. Elle est facultative, ou **exigée** pour certains profils : dans ce cas, vous ne pouvez rien faire d\'autre que la configurer à votre prochaine connexion.'),
+    ol([
+      'Ouvrez **Mon profil** → « Double authentification » → **Activer**, et saisissez votre mot de passe.',
+      'Dans votre application d\'authentification, ajoutez un compte et saisissez la **clé** affichée (ou touchez « Ouvrir directement dans l\'application » sur le téléphone).',
+      'Saisissez le code à 6 chiffres affiché par l\'application, puis **Activer**.',
+      '**Conservez les 8 codes de secours** affichés une seule fois : chacun remplace une fois le code de l\'application si vous perdez votre téléphone.',
+    ]),
+    p('À chaque connexion, après le mot de passe, saisissez le code du moment (ou un code de secours). Un code ne sert qu\'une fois. Téléphone **et** codes de secours perdus : contactez l\'administrateur, qui réinitialise la double authentification de votre compte.'),
+
+    h2('Administrateur : appareils et code de récupération'),
+    ul([
+      'Le menu **Appareils hors connexion** liste les appareils de chaque agent : dernier contact, dernière synchronisation, état. **Révoquer** un appareil perdu ou volé coupe ses sessions aussitôt ; rien n\'est supprimé.',
+      'Quand un agent a oublié son code de verrouillage : **vérifiez son identité** (rappel sur un numéro que vous connaissez), puis cliquez sur **Code de récupération** à côté de son appareil, saisissez un **motif** et **votre mot de passe**, puis dictez le code à l\'agent.',
+      'Chaque lecture est inscrite au journal d\'audit avec votre nom et le motif. Le code n\'est valable qu\'une fois : dès que l\'agent s\'en sert, un nouveau est enregistré.',
+      'Ne communiquez **jamais** ce code pour un appareil volé : révoquez-le plutôt.',
+      'Utilisateurs → ouvrir un compte → **Réinitialiser la double authentification** (motif obligatoire) pour un collègue qui a perdu son téléphone et ses codes de secours. Vous ne pouvez pas le faire pour votre propre compte : demandez à un autre administrateur.',
+    ]),
+
+    h2('Secrétariat et administrateur : contrôle des doublons'),
+    p('Pour qu\'une même naissance ne produise jamais deux actes, Wakara compare chaque déclaration aux autres. Lorsqu\'une ressemblance est trouvée, un **dossier d\'investigation** (DUP-AAAA-NNNN) s\'ouvre dans le **Centre de contrôle des doublons** : le circuit normal continue, mais **aucun numéro officiel ne peut être attribué** tant qu\'un responsable n\'a pas décidé.'),
+    ul([
+      'Ouvrez le dossier, lisez la comparaison critère par critère et le score (une aide, jamais une conclusion), ajoutez vos observations et vérifications.',
+      'Décidez avec un **motif obligatoire** : doublon confirmé, deux enfants distincts, naissance multiple, erreur de saisie, informations insuffisantes ou vérification complémentaire.',
+      'Une saisie redondante confirmée est rejetée avec motif ; un acte déjà numéroté n\'est jamais modifié automatiquement.',
+      'Les agents de collecte ne voient pas ces alertes.',
+    ]),
+
     // ───────────────────────── AIDE-MEMOIRE ─────────────────────────
     h1('Aide-mémoire'),
     h2('Je veux… alors je…'),
@@ -283,6 +358,11 @@ export default {
         ['Renvoyer un dossier', 'Retourner à la collecte (ou au secrétariat) → écrire le motif', 'Administrateur'],
         ['Créer un compte', 'Utilisateurs → Nouvel utilisateur → attribuer un rôle', 'Administrateur'],
         ['Savoir qui a modifié un dossier', 'Historiques des actes → ouvrir le dossier', 'Administrateur'],
+        ['Travailler sans Internet', 'Installer Wakara, choisir le code de verrouillage une fois avec Internet ; ensuite tout fonctionne hors connexion', 'Tous'],
+        ['Retrouver l\'accès après un code oublié', 'Code oublié ? → appeler l\'administrateur → saisir le code de récupération → nouveau code', 'Tous'],
+        ['Activer la double authentification', 'Mon profil → Double authentification → Activer', 'Tous'],
+        ['Donner un code de récupération à un agent', 'Appareils hors connexion → Code de récupération (motif + mon mot de passe)', 'Administrateur'],
+        ['Traiter une ressemblance entre deux dossiers', 'Centre de contrôle des doublons → ouvrir → décider avec motif', 'Secrétariat, administrateur'],
       ],
     }),
     h2('Messages fréquents'),
@@ -295,6 +375,10 @@ export default {
         ['Numéro d\'acte refusé', 'Il existe déjà pour la même année et le même registre ; vérifiez le registre ou le numéro'],
         ['Photo refusée', 'Formats acceptés : JPG, PNG, PDF ; 4 Mo maximum (les photos sont réduites automatiquement)'],
         ['La page ne réagit plus', 'Rechargez avec Ctrl+F5 ; l\'application s\'est peut-être mise à jour pendant que l\'onglet restait ouvert'],
+        ['« Session expirée » avec un indicateur rouge', 'Touchez « Se reconnecter » et saisissez votre mot de passe : vos saisies sont intactes et l\'envoi reprend'],
+        ['Bandeau rouge : nombre maximum d\'appareils atteint', 'Votre compte a déjà 3 appareils : demandez à l\'administrateur de révoquer un ancien appareil'],
+        ['Bandeau « Appareil révoqué »', 'Contactez l\'administrateur ; vos déclarations restent sur l\'appareil en attendant'],
+        ['« Code de vérification incorrect »', 'Vérifiez l\'heure de votre téléphone (réglage automatique) et attendez le code suivant ; un code ne sert qu\'une fois'],
       ],
     }),
     h2('Bonnes pratiques'),

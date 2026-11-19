@@ -20,7 +20,7 @@ django.setup()
 from django.apps import apps  # noqa: E402
 
 models = []
-for app in ('accounts', 'hospitals', 'declarations', 'actes', 'documents', 'audit', 'core'):
+for app in ('accounts', 'hospitals', 'declarations', 'actes', 'documents', 'audit', 'core', 'sync', 'duplicates'):
     for m in apps.get_app_config(app).get_models():
         fields = []
         for f in m._meta.get_fields():

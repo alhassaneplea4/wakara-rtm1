@@ -28,6 +28,14 @@ class CustomUser(NoHardDeleteMixin, AbstractUser):
         "Version des sessions", default=0,
         help_text="Augmente à chaque changement ou réinitialisation de mot de passe et à chaque désactivation : "
                   "les jetons portant une ancienne version sont refusés aussitôt.")
+    # Second factor (TOTP application, see accounts/two_factor.py). The secret is encrypted; ``two_factor_enabled``
+    # only becomes True once the user has proved he holds the application (a code of the pending secret).
+    totp_secret = models.TextField("Secret de la double authentification (chiffré)", blank=True, default='')
+    two_factor_enabled = models.BooleanField("Double authentification activée", default=False)
+    two_factor_enabled_at = models.DateTimeField("Double authentification activée le", null=True, blank=True)
+    totp_last_step = models.BigIntegerField(
+        "Dernier pas TOTP accepté", default=0,
+        help_text="Un code ne sert qu'une fois : tout pas inférieur ou égal est refusé.")
     created_by = models.ForeignKey(
         'self', on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
     )
@@ -41,6 +49,14 @@ class CustomUser(NoHardDeleteMixin, AbstractUser):
 
     def __str__(self):
         return f"{self.get_full_name() or self.username} ({self.username})"
+
+    @property
+    def must_set_up_two_factor(self) -> bool:
+        """The roles of this account must use the second factor (setting ``security.two_factor_roles``) and it is not set up yet."""
+        if self.two_factor_enabled:
+            return False
+        from .two_factor import required_for
+        return required_for(self)
 
     @property
     def is_locked(self) -> bool:
@@ -171,3 +187,16 @@ class UserPermission(TimeStampedMixin):
 
     def __str__(self):
         return f"{self.user.username} {'+' if self.granted else '-'} {self.permission.codename}"
+
+
+class TwoFactorBackupCode(models.Model):
+    """A one-time code that replaces the application when the phone is lost. Only a keyed hash is kept."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='backup_codes')
+    code_hash = models.CharField(max_length=64)
+    used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Code de secours"
+        verbose_name_plural = "Codes de secours"
+        constraints = [models.UniqueConstraint(fields=['user', 'code_hash'], name='uniq_backup_code')]

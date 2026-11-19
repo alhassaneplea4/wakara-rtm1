@@ -43,7 +43,7 @@ export async function deriveKek(pin: string, salt: Bytes, iterations = PBKDF2_IT
     { name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, material, { name: 'AES-GCM', length: 256 }, false, ['wrapKey', 'unwrapKey']);
 }
 
-async function wrapDataKey(key: CryptoKey, kek: CryptoKey): Promise<Cipher> {
+export async function wrapDataKey(key: CryptoKey, kek: CryptoKey): Promise<Cipher> {
   const iv = randomBytes(12);
   return { iv, ct: await crypto.subtle.wrapKey('raw', key, kek, { name: 'AES-GCM', iv }) };
 }
@@ -83,4 +83,54 @@ export async function decryptJson<T>(key: CryptoKey, c: Cipher): Promise<T> {
 export async function sha256Hex(data: ArrayBuffer): Promise<string> {
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', data));
   return Array.from(digest, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/* ── Recovery code ──
+ * A second wrapping of the data key, under a random code (120 bits) that the agent never sees: the device gives it to
+ * the server, where only the administrator can read it back (audited) to hand it to an agent who forgot the PIN.
+ * The code is long and random, so a single HKDF step is enough to turn it into a key. */
+const RECOVERY_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';   // Crockford base32: no I, L, O, U
+export const RECOVERY_LENGTH = 24;
+
+/** 24 random characters (120 bits), grouped by 4: `ABCD-EFGH-…`. */
+export function generateRecoveryCode(): string {
+  const bytes = randomBytes(RECOVERY_LENGTH);
+  let chars = '';
+  for (const b of bytes) chars += RECOVERY_ALPHABET[b & 31];   // 256 is a multiple of 32: no bias
+  return chars.match(/.{4}/g)!.join('-');
+}
+
+/** The code as it is stored (`ABCD-EFGH-…`), or '' when `raw` is not a valid recovery code. Same rules as the server. */
+export function normalizeRecoveryCode(raw: string): string {
+  const text = (raw ?? '').replace(/[^0-9A-Za-z]/g, '').toUpperCase().replace(/O/g, '0').replace(/[IL]/g, '1');
+  if (text.length !== RECOVERY_LENGTH || [...text].some(c => !RECOVERY_ALPHABET.includes(c))) return '';
+  return text.match(/.{4}/g)!.join('-');
+}
+
+async function deriveRecoveryKek(code: string, salt: Bytes): Promise<CryptoKey> {
+  const material = await crypto.subtle.importKey('raw', text.encode(code), 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt, info: text.encode('wakara-recovery-v1') }, material,
+    { name: 'AES-GCM', length: 256 }, false, ['wrapKey', 'unwrapKey']);
+}
+
+export interface RecoveryWrap { code: string; salt: Bytes; wrapped: Cipher; }
+
+/** A new recovery code and the data key wrapped under it (`dataKey` must be extractable). */
+export async function wrapForRecovery(dataKey: CryptoKey): Promise<RecoveryWrap> {
+  const code = generateRecoveryCode();
+  const salt = randomBytes(16);
+  return { code, salt, wrapped: await wrapDataKey(dataKey, await deriveRecoveryKek(code, salt)) };
+}
+
+/** Throws when the code is not the one that wrapped the key. */
+export async function unwrapWithRecovery(wrapped: Cipher, code: string, salt: Bytes): Promise<CryptoKey> {
+  return unwrapDataKey(wrapped, await deriveRecoveryKek(code, salt), true);
+}
+
+/** A fresh data key: wrapped under the PIN, wrapped under a recovery code, and usable (non-extractable). */
+export async function createDataKeyWithRecovery(kek: CryptoKey): Promise<{ wrapped: Cipher; key: CryptoKey; recovery: RecoveryWrap }> {
+  const extractable = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+  const wrapped = await wrapDataKey(extractable, kek);
+  return { wrapped, key: await unwrapDataKey(wrapped, kek), recovery: await wrapForRecovery(extractable) };
 }

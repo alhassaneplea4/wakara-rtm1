@@ -114,11 +114,17 @@ import { ConfirmComponent, IconComponent, PageHeaderComponent, PaginationCompone
                 @else { <button class="btn btn-sm btn-success" (click)="setActive(u, true)">Réactiver</button> }
               }
               @if (auth.can('user.reset_password') && !isSelf(u)) { <button class="btn btn-sm" (click)="reset(u)">Réinitialiser le mot de passe</button> }
+              @if (auth.can('user.reset_two_factor') && !isSelf(u) && u.two_factor_enabled) { <button class="btn btn-sm" (click)="resettingTwoFactor.set(u)">Réinitialiser la double authentification</button> }
             </div>
             <button class="btn" (click)="sel.set(null)">Fermer</button>
           </div>
         </div>
       </div>
+    }
+    @if (resettingTwoFactor(); as u) {
+      <wk-confirm title="Réinitialiser la double authentification" confirmLabel="Réinitialiser" [danger]="true" [askReason]="true" reasonLabel="Motif (téléphone perdu, identité vérifiée…)" (cancel)="resettingTwoFactor.set(null)" (confirm)="resetTwoFactor(u, $event)">
+        La double authentification de {{ u.username }} sera désactivée et ses sessions prendront fin. À sa prochaine connexion, il pourra se connecter avec son mot de passe seul (ou devra la configurer de nouveau si son rôle l'exige). Vérifiez son identité avant de continuer.
+      </wk-confirm>
     }
     @if (deactivating(); as u) {
       <wk-confirm title="Désactiver le compte" confirmLabel="Désactiver" [danger]="true" [askReason]="true" [reasonRequired]="false" reasonLabel="Motif (facultatif)" (cancel)="deactivating.set(null)" (confirm)="deactivate(u, $event)">
@@ -146,6 +152,7 @@ export class UsersComponent implements OnInit {
   sel = signal<UserRow | null>(null);
   create = signal<any>(null);
   deactivating = signal<UserRow | null>(null);
+  resettingTwoFactor = signal<UserRow | null>(null);
   formError = signal(''); errs = signal<Record<string, string>>({}); busy = signal(false); tempPassword = signal('');
   ovCode = '';
   edit = { first_name: '', last_name: '', email: '', phone: '' };
@@ -205,6 +212,12 @@ export class UsersComponent implements OnInit {
   setActive(u: UserRow, on: boolean) { this.api.post(`/users/${u.uuid}/${on ? 'activate' : 'deactivate'}/`).subscribe({ next: () => { this.toast.success('Compte mis à jour.'); this.refresh(u); }, error: e => this.formError.set(errorMessage(e)) }); }
   deactivate(u: UserRow, reason: string) {
     this.api.post(`/users/${u.uuid}/deactivate/`, { reason }).subscribe({ next: () => { this.deactivating.set(null); this.toast.success('Compte désactivé.'); this.refresh(u); }, error: e => { this.deactivating.set(null); this.formError.set(errorMessage(e)); } });
+  }
+  resetTwoFactor(u: UserRow, reason: string) {
+    this.api.post(`/users/${u.uuid}/reset-two-factor/`, { reason }).subscribe({
+      next: () => { this.resettingTwoFactor.set(null); this.toast.success('Double authentification réinitialisée.'); this.refresh(u); },
+      error: e => { this.resettingTwoFactor.set(null); this.formError.set(errorMessage(e)); },
+    });
   }
   reset(u: UserRow) {
     this.api.post<{ temporary_password: string }>(`/users/${u.uuid}/reset-password/`).subscribe({ next: r => this.tempPassword.set(r.temporary_password), error: e => this.formError.set(errorMessage(e)) });

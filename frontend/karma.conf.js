@@ -19,5 +19,7 @@ module.exports = function (config) {
       ChromeHeadlessCI: { base: 'ChromeHeadless', flags: ['--no-sandbox', '--disable-gpu', '--user-data-dir=' + path.join(os.tmpdir(), 'wakara-karma-profile')] },
     },
     restartOnFileChange: true,
+    // the measurement of thousands of dossiers (offline.spec.ts) takes a while without any message to the runner
+    browserNoActivityTimeout: 180000, browserDisconnectTimeout: 30000,
   });
 };

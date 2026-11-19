@@ -3,17 +3,18 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { AuthService } from '../core/auth.service';
+import { AuthService, needsTwoFactorCode } from '../core/auth.service';
 import { OfflineGate } from '../core/offline/offline-gate.service';
 import { IconComponent, LogoComponent } from '../shared/ui';
 
-type Mode = 'setup' | 'unlock' | 'reset' | 'upgrade';
+type Mode = 'setup' | 'unlock' | 'reset' | 'upgrade' | 'recover';
 
 /**
  * PIN screen of the offline mode.
  *   setup   first use on this device: the signed-in agent chooses the code that encrypts the local data
  *   unlock  every time the application is reopened (works without network)
  *   reset   code forgotten: sign in again online, the local data are erased, a new code is chosen
+ *   recover code forgotten: the administrator gives the recovery code of the device; the data are KEPT, a new code is chosen
  *   upgrade the code that has just unlocked the device does not meet the current rules: a stronger one is chosen
  */
 @Component({
@@ -81,13 +82,24 @@ type Mode = 'setup' | 'unlock' | 'reset' | 'upgrade';
 
         @if (mode() === 'reset') {
           <h1 id="lock-title">Code oublié</h1>
-          <p class="soft">Le code ne peut pas être retrouvé. Pour en choisir un nouveau, reconnectez-vous avec le mot de passe de <strong>{{ owner()?.username }}</strong> : les données enregistrées sur cet appareil seront effacées.</p>
+          @if (gate.hasRecovery()) {
+            <div class="alert alert-success recover-box" role="note">
+              <strong>Vos déclarations peuvent être conservées.</strong>
+              <span>Appelez l'administrateur : après avoir vérifié qui vous êtes, il vous communiquera un <strong>code de récupération</strong>. Vous choisirez ensuite un nouveau code de verrouillage, sans rien perdre.</span>
+              <button type="button" class="btn btn-primary" (click)="go('recover')">J'ai un code de récupération</button>
+            </div>
+          }
+          <p class="soft">Sans code de récupération, le code ne peut pas être retrouvé. Pour en choisir un nouveau, reconnectez-vous avec le mot de passe de <strong>{{ owner()?.username }}</strong> : les données enregistrées sur cet appareil seront effacées.</p>
           @if (gate.unsynced()) {
             <p class="warn strong"><wk-icon name="alert" [size]="16" /> {{ gate.unsynced() }} opération(s) non synchronisée(s) seront définitivement perdues. Si vous retrouvez votre code, déverrouillez l'appareil et synchronisez d'abord.</p>
           }
           <form (ngSubmit)="reset()" novalidate>
             <div class="field"><label for="pw">Mot de passe du compte</label>
               <input id="pw" class="input" type="password" name="pw" autocomplete="current-password" [(ngModel)]="password" /></div>
+            @if (needCode()) {
+              <div class="field"><label for="otp">Code de l'application d'authentification</label>
+                <input id="otp" class="input" type="text" name="otp" autocomplete="one-time-code" [(ngModel)]="otp" /></div>
+            }
             @if (gate.unsynced()) {
               <label class="check"><input type="checkbox" name="ack" [(ngModel)]="ack" /> J'ai compris que ces opérations seront perdues.</label>
             }
@@ -96,6 +108,23 @@ type Mode = 'setup' | 'unlock' | 'reset' | 'upgrade';
               @if (busy()) { <span class="spinner"></span> } Effacer les données locales et choisir un nouveau code</button>
           </form>
           <button type="button" class="link" (click)="go('unlock')">Retour</button>
+        }
+
+        @if (mode() === 'recover') {
+          <h1 id="lock-title">Récupérer avec l'administrateur</h1>
+          <p class="soft">Saisissez le code de récupération que l'administrateur vient de vous communiquer (24 caractères, par groupes de 4), puis choisissez un nouveau code de verrouillage. Vos déclarations non synchronisées sont conservées{{ gate.unsynced() ? ' (' + gate.unsynced() + ' en attente)' : '' }}.</p>
+          <form (ngSubmit)="recover()" novalidate>
+            <div class="field"><label for="rcode">Code de récupération</label>
+              <input id="rcode" class="input code rec" type="text" name="rcode" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" [(ngModel)]="recoveryCode" autofocus /></div>
+            <div class="field"><label for="rpin">Nouveau code de verrouillage (8 caractères minimum, lettres et chiffres)</label>
+              <input id="rpin" class="input code" type="password" name="rpin" autocomplete="new-password" [(ngModel)]="pin" /></div>
+            <div class="field"><label for="rpin2">Confirmez le nouveau code</label>
+              <input id="rpin2" class="input code" type="password" name="rpin2" autocomplete="new-password" [(ngModel)]="confirm" /></div>
+            @if (error()) { <div class="alert alert-danger" role="alert">{{ error() }}</div> }
+            <button class="btn btn-primary big" type="submit" [disabled]="busy() || !recoveryCode || !pin">
+              @if (busy()) { <span class="spinner"></span> } Ouvrir l'appareil et enregistrer le nouveau code</button>
+          </form>
+          <button type="button" class="link" (click)="go('reset')">Retour</button>
         }
       </section>
     </main>`,
@@ -112,6 +141,8 @@ type Mode = 'setup' | 'unlock' | 'reset' | 'upgrade';
     .links{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
     .link{background:none;border:0;padding:6px 0;color:var(--wk-royal);font:inherit;font-size:13px;cursor:pointer;text-align:left}
     .link:hover{text-decoration:underline}
+    .recover-box{display:flex;flex-direction:column;gap:8px;align-items:flex-start;font-size:13px}
+    .rec{font-size:15px;letter-spacing:.08em}
   `]
 })
 export class LockComponent implements OnInit {
@@ -124,7 +155,8 @@ export class LockComponent implements OnInit {
   busy = signal(false);
   error = signal('');
   notice = signal('');
-  pin = ''; confirm = ''; password = ''; ack = false; private oldPin = '';
+  pin = ''; confirm = ''; password = ''; otp = ''; recoveryCode = ''; ack = false; private oldPin = '';
+  needCode = signal(false);
 
   owner = () => this.gate.header()?.user ?? null;
 
@@ -137,7 +169,7 @@ export class LockComponent implements OnInit {
     else void this.router.navigate(['/login']);
   }
 
-  go(mode: Mode) { this.error.set(''); this.pin = this.confirm = this.password = ''; this.ack = false; if (mode !== 'upgrade') this.oldPin = ''; this.mode.set(mode); }
+  go(mode: Mode) { this.error.set(''); this.pin = this.confirm = this.password = this.otp = this.recoveryCode = ''; this.ack = false; this.needCode.set(false); if (mode !== 'upgrade') this.oldPin = ''; this.mode.set(mode); }
 
   private leave() {
     const next = this.route.snapshot.queryParamMap.get('next');
@@ -180,6 +212,18 @@ export class LockComponent implements OnInit {
     finally { this.busy.set(false); }
   }
 
+  /** The administrator gave the recovery code: the device opens with it, the data are kept, a new code replaces the forgotten one. */
+  async recover() {
+    this.error.set('');
+    const problem = await this.gate.pinProblem(this.pin);
+    if (problem) { this.error.set(problem); return; }
+    if (this.pin !== this.confirm) { this.error.set('Les deux codes ne sont pas identiques.'); return; }
+    this.busy.set(true);
+    try { await this.gate.recover(this.recoveryCode, this.pin); this.leave(); }
+    catch (e: any) { this.error.set(e?.message ?? "Impossible d'ouvrir l'appareil avec ce code."); }
+    finally { this.busy.set(false); }
+  }
+
   skip() { this.gate.skip(); this.leave(); }
 
   /** A backup file brings back the unsent work of a device whose data were erased; the original code opens it. */
@@ -213,11 +257,12 @@ export class LockComponent implements OnInit {
     if (!owner || !this.password) return;
     this.error.set(''); this.busy.set(true);
     try {
-      const me = await firstValueFrom(this.auth.login(owner.username, this.password, false));
+      const me = await firstValueFrom(this.auth.login(owner.username, this.password, false, this.otp));
       if (me.uuid !== owner.uuid) { this.auth.clearForLock(); throw new Error("Ce compte n'est pas celui de cet appareil."); }
       await this.gate.destroy();
       this.go('setup');
     } catch (e: any) {
+      if (needsTwoFactorCode(e)) { this.needCode.set(true); this.error.set(''); return; }
       this.error.set(e?.status === 0 ? 'Une connexion Internet est nécessaire pour réinitialiser le code.'
         : e?.error?.detail ?? e?.message ?? 'Mot de passe incorrect.');
     } finally { this.busy.set(false); }

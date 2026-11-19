@@ -156,11 +156,29 @@ export class OfflineGate {
     this.engine!.sync.kick(0);
   }
 
+  /** Does this device hold a recovery code the administrator can give back (see crypto.ts)? */
+  readonly hasRecovery = computed(() => !!this.header()?.rec);
+
   /** Opens the device with the PIN. Throws PinError (message ready to display) when the code is wrong. */
   async unlock(pin: string) {
     const m = await this.module();
     let key: CryptoKey;
     try { key = await m.vault.open(pin); } finally { this.header.set(readVaultHeader()); }
+    await this.finishUnlock(key);
+  }
+
+  /**
+   * The PIN was forgotten: the recovery code given by the administrator opens the device and `newPin` replaces the
+   * old code. The data of the device are kept. Throws RecoveryError (message ready to display) when the code is wrong.
+   */
+  async recover(code: string, newPin: string) {
+    const m = await this.module();
+    let key: CryptoKey;
+    try { key = await m.vault.recover(code, newPin); } finally { this.header.set(readVaultHeader()); }
+    await this.finishUnlock(key);
+  }
+
+  private async finishUnlock(key: CryptoKey) {
     const header = this.header()!;
     await this.openEngine(key);
     const live = this.auth.user();
@@ -257,7 +275,7 @@ export class OfflineGate {
    */
   async checkAccess(url: string): Promise<true | UrlTree> {
     const user = this.auth.user();
-    if (!user || user.must_change_password) return true;
+    if (!user || user.must_change_password || user.must_set_up_two_factor) return true;
     let h = this.header();
     if (h && h.user.uuid !== user.uuid) {
       if ((await this.refreshCounts()) > 0) {
@@ -301,10 +319,10 @@ export class OfflineGate {
   }
 
   /** New sign-in of the SAME agent after the session expired; the queue then resumes. */
-  async reauthenticate(password: string) {
+  async reauthenticate(password: string, code = '') {
     const h = this.header();
     if (!h) throw new Error('Aucune session protégée sur cet appareil.');
-    const me = await firstValueFrom(this.auth.login(h.user.username, password, false));
+    const me = await firstValueFrom(this.auth.login(h.user.username, password, false, code));
     if (me.uuid !== h.user.uuid) { this.auth.clearForLock(); throw new Error("Ce compte n'est pas celui de cet appareil."); }
     await this.engine?.saveSession();
     this.engine?.sync.kick(0);

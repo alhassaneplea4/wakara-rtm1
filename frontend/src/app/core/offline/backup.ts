@@ -71,6 +71,8 @@ export async function restoreBackup(text: string): Promise<VaultHeader> {
     for (const row of file.operations) await db.operations.add({ ...row, enc: row.enc ? back(row.enc) : null } as OpRow);
     for (const f of file.files) await db.files.put({ ...f, meta: back(f.meta), data: back(f.data) } as FileRow);
   } finally { db.close(); }
-  writeVaultHeader({ ...file.header, fails: 0, lockedUntil: 0 });
+  // the recovery code of the original device may have been replaced since: the restored device makes a new one at its first unlock
+  const { rec: _rec, recPending: _pending, recRenew: _renew, ...header } = file.header;
+  writeVaultHeader({ ...header, fails: 0, lockedUntil: 0 });
   return file.header;
 }

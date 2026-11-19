@@ -11,6 +11,7 @@ const TYPES = {
   CharField: (f) => `Texte (${f.max})`, EmailField: () => 'E-mail', TextField: () => 'Texte long', DateField: () => 'Date',
   DateTimeField: () => 'Date et heure', TimeField: () => 'Heure', BooleanField: () => 'Oui / non', UUIDField: () => 'UUID',
   BigAutoField: () => 'Entier (auto)', PositiveIntegerField: () => 'Entier', PositiveSmallIntegerField: () => 'Entier',
+  BigIntegerField: () => 'Entier (long)', IntegerField: () => 'Entier', FloatField: () => 'Nombre décimal',
   JSONField: () => 'JSON', GenericIPAddressField: () => 'Adresse IP', BinaryField: () => 'Binaire', FileField: () => 'Fichier',
   ForeignKey: (f) => `Lien → ${f.rel}`, OneToOneField: (f) => `Lien 1-1 → ${f.rel}`,
 };
@@ -18,7 +19,7 @@ const TYPES = {
 const MODELS = {
   CustomUser: ['Utilisateur', 'Compte de connexion (identifiant, coordonnées, état du compte).'],
   Role: ['Rôle', 'Ensemble de permissions (administrateur, secrétaire, agent de collecte, ou rôle créé par l\'administrateur).'],
-  Permission: ['Permission', 'Droit élémentaire (32 au catalogue), identifié par un code.'],
+  Permission: ['Permission', 'Droit élémentaire (40 au catalogue), identifié par un code.'],
   RolePermission: ['Permission d\'un rôle', 'Associe un rôle à une permission.'],
   UserRole: ['Rôle d\'un utilisateur', 'Associe un utilisateur à un rôle, avec l\'auteur et la date de l\'attribution.'],
   UserPermission: ['Ajustement de permission', 'Permission accordée ou retirée à un utilisateur en plus (ou à la place) de ses rôles.'],
@@ -36,6 +37,19 @@ const MODELS = {
   StoredFile: ['Fichier stocké', 'Contenu binaire d\'une pièce lorsque les pièces sont conservées dans la base.'],
   SupportingDocument: ['Pièce justificative', 'Photo ou fichier joint à un dossier (fiche physique, pièce d\'identité).'],
   AuditLog: ['Journal d\'audit', 'Trace de chaque opération : auteur, action, objet, modifications, motif, adresse IP (ajout seul).'],
+  LoginAttempt: ['Tentatives de connexion', 'Mots de passe erronés d\'un compte depuis une adresse : le verrouillage est tenu par couple (compte, adresse).'],
+  RevokedAccessToken: ['Jeton d\'accès révoqué', 'Jeton d\'accès arrêté par une déconnexion : refusé jusqu\'à son expiration naturelle, puis la ligne est purgée.'],
+  TwoFactorBackupCode: ['Code de secours (double authentification)', 'Code à usage unique qui remplace l\'application d\'authentification en cas de perte du téléphone ; seule une empreinte est conservée.'],
+  Device: ['Appareil hors connexion', 'Navigateur ou téléphone d\'un utilisateur qui travaille hors connexion ; révocable par l\'administrateur. Porte aussi le code de récupération (chiffré).'],
+  SyncOperation: ['Opération synchronisée', 'Trace de chaque opération reçue d\'un appareil et de ce que le serveur en a fait (le contenu n\'est pas conservé : seule son empreinte).'],
+  DuplicateCounter: ['Compteur des dossiers de doublons', 'Compteur verrouillé qui produit les références DUP-AAAA-NNNN.'],
+  BirthIdentity: ['Identité normalisée d\'une naissance', 'Version normalisée (sans accents ni majuscules, formes phonétiques) des informations d\'une déclaration, servant uniquement à la comparaison. Les données saisies ne sont jamais modifiées.'],
+  DuplicateCheck: ['Analyse de doublons', 'Chaque analyse faite sur une déclaration : déclencheur, candidats examinés, meilleur score (ajout seul).'],
+  DuplicateMatch: ['Correspondance', 'Ressemblance trouvée entre deux déclarations : score sur 100, critères, niveau de risque, signaux d\'alerte.'],
+  DuplicateCase: ['Dossier d\'investigation', 'Dossier DUP-AAAA-NNNN ouvert pour une correspondance moyenne ou élevée, jusqu\'à la décision d\'un responsable.'],
+  DuplicateDecision: ['Décision sur un dossier de doublons', 'Décision humaine motivée, avec son auteur et la date (ajout seul).'],
+  DuplicateEvidence: ['Élément de preuve', 'Observation, vérification ou pièce ajoutée à un dossier d\'investigation.'],
+  DuplicateReviewHistory: ['Historique d\'un dossier de doublons', 'Chaque action sur un dossier d\'investigation (prise en charge, observation, décision, réouverture).'],
   SiteSetting: ['Paramètre du site', 'Paramètre modifiable dans l\'application (textes de connexion, valeurs par défaut).'],
 };
 
@@ -100,6 +114,59 @@ const SPECIFIC = {
   'SiteSetting.key': 'Clé du paramètre', 'SiteSetting.value': 'Valeur', 'SiteSetting.is_public': 'Visible sur la page de connexion', 'SiteSetting.updated_by': 'Auteur de la modification',
 };
 
+const dupSide = (who, label) => ({
+  [`BirthIdentity.${who}_name_key`]: `Nom et prénoms ${label}, normalisés`, [`BirthIdentity.${who}_phonetic`]: `Forme phonétique du nom ${label}`,
+  [`BirthIdentity.${who}_dob`]: `Date de naissance ${label}`, [`BirthIdentity.${who}_birth_place_norm`]: `Lieu de naissance ${label}, normalisé`,
+  [`BirthIdentity.${who}_phone_norm`]: `Téléphone ${label}, normalisé (indicatif 224)`, [`BirthIdentity.${who}_address_norm`]: `Domicile ${label}, normalisé`,
+  [`BirthIdentity.${who}_id_norm`]: `Numéro de pièce ou NPI ${label}, normalisé`,
+});
+Object.assign(SPECIFIC, {
+  'CustomUser.session_version': 'Version des sessions : augmente à chaque changement de mot de passe ou désactivation, les jetons plus anciens sont refusés',
+  'CustomUser.totp_secret': 'Secret de la double authentification, chiffré (jamais en clair)', 'CustomUser.two_factor_enabled': 'Oui : le code de l\'application d\'authentification est demandé à la connexion',
+  'CustomUser.two_factor_enabled_at': 'Date d\'activation de la double authentification', 'CustomUser.totp_last_step': 'Dernier code accepté (un code ne sert qu\'une fois)',
+  'LoginAttempt.ip_address': 'Adresse du client', 'LoginAttempt.failed_count': 'Échecs consécutifs depuis cette adresse', 'LoginAttempt.locked_until': 'Adresse verrouillée jusqu\'à cette date',
+  'RevokedAccessToken.jti': 'Identifiant du jeton arrêté', 'RevokedAccessToken.expires_at': 'Date d\'expiration naturelle du jeton (la ligne est ensuite purgée)',
+  'TwoFactorBackupCode.code_hash': 'Empreinte du code (le code n\'est affiché qu\'une fois)', 'TwoFactorBackupCode.used_at': 'Date d\'utilisation (vide : encore valable)',
+  'Declaration.sync_version': 'Numéro de version, augmenté à chaque modification : détecte les conflits avec un appareil hors connexion',
+  'Declaration.device_created_at': 'Date de saisie sur l\'appareil (après contrôle de l\'horloge)', 'Declaration.device_transmitted_at': 'Date de la dernière transmission faite depuis un appareil hors connexion',
+  'Parent.marital_status': 'Situation matrimoniale', 'Declarant.marital_status': 'Situation matrimoniale',
+  'Acte.commune_type': 'Commune urbaine ou rurale', 'Acte.centre_type': 'Centre principal ou secondaire',
+  'AuditLog.origin': 'Origine : « offline » pour un événement appliqué par la synchronisation', 'AuditLog.device_id': 'Appareil concerné (hors connexion)',
+  'AuditLog.sync_op_id': 'Opération de synchronisation concernée', 'AuditLog.device_time': 'Date de l\'action sur l\'appareil',
+  'Device.device_id': 'Identifiant aléatoire de l\'appareil', 'Device.label': 'Libellé (ex. Chrome · Android)', 'Device.user_agent': 'Navigateur utilisé',
+  'Device.last_seen_at': 'Dernier contact', 'Device.last_sync_at': 'Dernière synchronisation', 'Device.is_revoked': 'Oui : le serveur refuse tout ce que cet appareil envoie',
+  'Device.revoked_at': 'Date de la révocation', 'Device.revoked_by': 'Administrateur qui a révoqué', 'Device.recovery_blob': 'Code de récupération de l\'appareil, chiffré (lisible seulement par l\'administrateur habilité, avec journal)',
+  'Device.recovery_set_at': 'Date d\'enregistrement du code de récupération', 'Device.recovery_revealed_at': 'Date de la dernière communication du code à l\'agent', 'Device.recovery_revealed_by': 'Administrateur qui l\'a communiqué',
+  'SyncOperation.op_id': 'Identifiant de l\'opération, créé sur l\'appareil (rejouer ne crée jamais de doublon)', 'SyncOperation.device': 'Appareil d\'origine',
+  'SyncOperation.op_type': 'Type (création, modification, transmission, changement d\'étape, pièce)', 'SyncOperation.entity_uuid': 'Objet concerné', 'SyncOperation.declaration_uuid': 'Déclaration concernée',
+  'SyncOperation.payload_hash': 'Empreinte du contenu reçu', 'SyncOperation.status': 'Résultat : appliquée, refusée ou conflit', 'SyncOperation.result': 'Résumé du résultat', 'SyncOperation.error': 'Motif en cas de refus ou de conflit',
+  'SyncOperation.device_time': 'Date sur l\'appareil, telle que reçue', 'SyncOperation.effective_time': 'Date retenue après contrôle de l\'horloge', 'SyncOperation.clock_skew_seconds': 'Écart mesuré entre l\'horloge de l\'appareil et le serveur (secondes)',
+  'SyncOperation.date_anomaly': 'Anomalie de date constatée (horloge corrigée, date future, saisie ancienne…)', 'SyncOperation.attempts': 'Nombre de tentatives', 'SyncOperation.received_at': 'Date de réception par le serveur', 'SyncOperation.applied_at': 'Date d\'application',
+  'BirthIdentity.child_name_key': 'Nom et prénoms de l\'enfant, normalisés', 'BirthIdentity.child_phonetic': 'Forme phonétique du nom de l\'enfant', 'BirthIdentity.gender': 'Sexe', 'BirthIdentity.birth_date': 'Date de naissance',
+  'BirthIdentity.birth_time': 'Heure de naissance', 'BirthIdentity.birth_rank': 'Rang de naissance', 'BirthIdentity.birth_place_norm': 'Lieu de naissance, normalisé', 'BirthIdentity.hospital': 'Établissement',
+  'BirthIdentity.hospital_ref_norm': 'Référence hospitalière, normalisée', 'BirthIdentity.data_hash': 'Empreinte des données comparées (détecte un changement)', 'BirthIdentity.data_quality': 'Qualité des données (0 à 100)',
+  'BirthIdentity.missing_fields': 'Critères non renseignés', 'BirthIdentity.engine_version': 'Version du moteur de comparaison', 'BirthIdentity.computed_at': 'Date du calcul',
+  ...dupSide('mother', 'de la mère'), ...dupSide('father', 'du père'),
+  'DuplicateCheck.trigger': 'Déclencheur (création, modification, synchronisation, validation, manuel)', 'DuplicateCheck.identity_hash': 'Empreinte de l\'identité analysée', 'DuplicateCheck.performed_by': 'Auteur de l\'analyse',
+  'DuplicateCheck.performed_at': 'Date de l\'analyse', 'DuplicateCheck.candidates_examined': 'Candidats comparés', 'DuplicateCheck.candidates_truncated': 'Oui : un plafond a limité la recherche (journalisé)',
+  'DuplicateCheck.matches_found': 'Correspondances trouvées', 'DuplicateCheck.highest_score': 'Meilleur score', 'DuplicateCheck.data_quality': 'Qualité des données', 'DuplicateCheck.engine_version': 'Version du moteur', 'DuplicateCheck.config_snapshot': 'Réglages en vigueur au moment de l\'analyse',
+  'DuplicateMatch.pair_key': 'Clé du couple de déclarations', 'DuplicateMatch.candidate': 'Déclaration ressemblante', 'DuplicateMatch.analysis': 'Analyse qui l\'a trouvée', 'DuplicateMatch.score': 'Score sur 100 (aide à la décision)',
+  'DuplicateMatch.raw_points': 'Points obtenus', 'DuplicateMatch.comparable_points': 'Points réellement comparables', 'DuplicateMatch.data_quality': 'Qualité des données comparées', 'DuplicateMatch.risk_level': 'Niveau : faible, moyen ou élevé',
+  'DuplicateMatch.criteria': 'Détail critère par critère', 'DuplicateMatch.flags': 'Signaux (naissance multiple possible, données insuffisantes…)', 'DuplicateMatch.candidate_has_official_act': 'Oui : la déclaration ressemblante porte déjà un acte numéroté',
+  'DuplicateMatch.declaration_hash': 'Empreinte de la déclaration au moment de l\'analyse', 'DuplicateMatch.candidate_hash': 'Empreinte de l\'autre déclaration', 'DuplicateMatch.detected_at': 'Date de détection',
+  'DuplicateCase.reference': 'Référence DUP-AAAA-NNNN', 'DuplicateCase.pair_key': 'Clé du couple de déclarations', 'DuplicateCase.match': 'Correspondance d\'origine', 'DuplicateCase.other_declaration': 'Autre déclaration du couple',
+  'DuplicateCase.risk_level': 'Niveau de risque', 'DuplicateCase.score': 'Score', 'DuplicateCase.anomaly_type': 'Nature de l\'anomalie', 'DuplicateCase.status': 'État du dossier (ouvert, en cours, résolu…)', 'DuplicateCase.assigned_to': 'Responsable de l\'investigation',
+  'DuplicateCase.detected_at': 'Date de détection', 'DuplicateCase.resolved_at': 'Date de résolution', 'DuplicateCase.final_decision': 'Décision finale', 'DuplicateCase.resolution_hashes': 'Empreintes des données au moment de la décision',
+  'DuplicateCase.principal_declaration': 'Déclaration principale retenue', 'DuplicateCase.duplicate_declaration': 'Déclaration redondante désignée',
+  'DuplicateDecision.case': 'Dossier concerné', 'DuplicateDecision.decision': 'Décision (doublon confirmé, enfants distincts, naissance multiple, erreur de saisie…)', 'DuplicateDecision.reason': 'Motif obligatoire', 'DuplicateDecision.decided_by': 'Auteur',
+  'DuplicateDecision.decided_by_name': 'Nom de l\'auteur, conservé tel quel', 'DuplicateDecision.decided_at': 'Date et heure', 'DuplicateDecision.principal_declaration': 'Déclaration principale', 'DuplicateDecision.duplicate_declaration': 'Déclaration redondante',
+  'DuplicateDecision.resulting_status': 'Statut pris par la déclaration redondante (rejet motivé)',
+  'DuplicateEvidence.case': 'Dossier concerné', 'DuplicateEvidence.kind': 'Nature (observation, vérification, pièce)', 'DuplicateEvidence.document': 'Pièce jointe', 'DuplicateEvidence.title': 'Titre', 'DuplicateEvidence.content': 'Contenu',
+  'DuplicateEvidence.added_by': 'Auteur', 'DuplicateEvidence.added_by_name': 'Nom de l\'auteur, conservé tel quel', 'DuplicateEvidence.added_at': 'Date et heure',
+  'DuplicateReviewHistory.case': 'Dossier concerné', 'DuplicateReviewHistory.action': 'Action', 'DuplicateReviewHistory.actor': 'Auteur', 'DuplicateReviewHistory.actor_name': 'Nom de l\'auteur, conservé tel quel',
+  'DuplicateReviewHistory.at': 'Date et heure', 'DuplicateReviewHistory.note': 'Commentaire', 'DuplicateReviewHistory.detail': 'Détail de l\'action',
+});
+
 const COMMON_BUSINESS = new Set(['uuid', 'created_at', 'updated_at', 'created_by', 'updated_by', 'is_archived', 'archived_at', 'archived_by']);
 const SKIP = new Set(['CustomUser.groups', 'CustomUser.user_permissions']);
 
@@ -108,8 +175,8 @@ export const missing = [];
 /** Blocs de tableaux (un par modèle), groupés par domaine. */
 export function dictionary(table, h3) {
   const blocks = [];
-  const order = ['accounts', 'hospitals', 'declarations', 'actes', 'documents', 'audit', 'core'];
-  const groups = { accounts: 'Utilisateurs, rôles et permissions', hospitals: 'Établissements', declarations: 'Déclarations', actes: 'Actes', documents: 'Pièces justificatives', audit: 'Audit', core: 'Paramètres' };
+  const order = ['accounts', 'hospitals', 'declarations', 'actes', 'documents', 'audit', 'core', 'sync', 'duplicates'];
+  const groups = { accounts: 'Utilisateurs, rôles et permissions', hospitals: 'Établissements', declarations: 'Déclarations', actes: 'Actes', documents: 'Pièces justificatives', audit: 'Audit', core: 'Paramètres', sync: 'Mode hors connexion', duplicates: 'Contrôle des doublons' };
   for (const app of order) {
     for (const m of SCHEMA.filter((x) => x.app === app)) {
       const [title, desc] = MODELS[m.model] || [m.model, ''];

@@ -31,6 +31,12 @@ export interface SyncHost {
   accessLost(message: string): void;
   /** The server wants a new sign-in (session not bound to this device): same screen as an expired session. */
   signInRequired(): void;
+  /** The recovery code of the vault waiting to be given to the server (null: nothing waits). */
+  recoveryPending?(): Promise<string | null>;
+  /** The server holds the recovery code of this device. */
+  recoveryRegistered?(): void;
+  /** The server holds no readable recovery code for this device. */
+  recoveryMissing?(): void;
   changed(): Promise<void> | void;
   sessionExpired(): boolean;
 }
@@ -39,7 +45,7 @@ export interface SyncIdentity { apiUrl: string; deviceId: string; deviceLabel: s
 
 interface PullResponse {
   server_time: string; offline_enabled: boolean; cursor: string | null; has_more: boolean;
-  declarations: LocalDeclaration[]; hospitals: HospitalRef[]; rules: SyncRules;
+  declarations: LocalDeclaration[]; hospitals: HospitalRef[]; rules: SyncRules; recovery_registered?: boolean;
 }
 
 export class SyncEngine {
@@ -81,6 +87,7 @@ export class SyncEngine {
       await this.reference();
       const sent = await this.push();
       const received = await this.pull();
+      await this.registerRecovery();
       await this.store.purge();
       const at = new Date().toISOString();
       await this.store.setClear('lastSync', at);
@@ -324,7 +331,24 @@ export class SyncEngine {
     if (res.hospitals?.length) await this.store.setSecret('hospitals', res.hospitals);
     if (res.rules) await this.store.setSecret('rules', res.rules);
     if (typeof res.offline_enabled === 'boolean') this.conn.offlineEnabled.set(res.offline_enabled);
+    if (res.recovery_registered === false) this.host.recoveryMissing?.();
     await this.store.setClear('referenceAt', new Date().toISOString());
+  }
+
+  /**
+   * Gives the server the recovery code the vault made (see crypto.ts): the administrator can then read it back to an
+   * agent who forgot the PIN. The code waits, encrypted, in the vault header until the server confirms. A failure here
+   * never stops the synchronisation: it is tried again at the next cycle.
+   */
+  private async registerRecovery() {
+    try {
+      const code = await this.host.recoveryPending?.();
+      if (!code) return;
+      await firstValueFrom(this.http.post(`${this.id.apiUrl}/sync/recovery/`, {
+        device_id: this.id.deviceId, device_label: this.id.deviceLabel, code,
+      }).pipe(timeout(REQUEST_TIMEOUT_MS)));
+      this.host.recoveryRegistered?.();
+    } catch { /* retried at the next cycle */ }
   }
 
   /* ── pull ── */

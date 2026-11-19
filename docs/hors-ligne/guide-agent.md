@@ -4,7 +4,7 @@
 
 1. Connectez-vous **avec Internet**, comme d'habitude.
 2. Wakara vous demande de choisir un **code de verrouillage** (6 caractères au minimum). Ce code protège les déclarations enregistrées sur l'appareil.
-3. Retenez-le : **il ne peut pas être récupéré**. Si vous l'oubliez, les déclarations de l'appareil qui n'ont pas encore été envoyées seront perdues.
+3. **Notez-le** dans un endroit sûr (pas sur le téléphone). Si vous l'oubliez, l'administrateur peut vous aider (voir « Code oublié » plus bas) ; sans cette aide, les déclarations de l'appareil qui n'ont pas encore été envoyées seraient perdues.
 
 Vous pouvez choisir « Continuer sans le mode hors connexion » sur un ordinateur partagé : vous travaillerez alors uniquement en ligne.
 
@@ -56,7 +56,8 @@ Une photo en attente porte l'indicateur « Sur cet appareil » ; elle est suppri
 ## En cas de problème
 
 - **« Session expirée »** : vos saisies sont intactes. Appuyez sur « Se reconnecter » et saisissez votre mot de passe ; l'envoi reprend.
-- **Code oublié** : écran de verrouillage → « Code oublié ? ». Il faut Internet et votre mot de passe ; les déclarations non envoyées seront perdues.
+- **Code oublié** : écran de verrouillage → « Code oublié ? » → **appelez l'administrateur**. Après avoir vérifié qui vous êtes, il vous dicte un **code de récupération** (24 caractères, par groupes de 4). Touchez « J'ai un code de récupération », saisissez-le et choisissez un nouveau code de verrouillage : l'appareil s'ouvre avec **toutes vos déclarations non envoyées**. Ce code ne sert qu'une fois (l'appareil en prépare un nouveau). Si l'écran ne propose pas de code de récupération, la seule issue est d'effacer les données de l'appareil avec le mot de passe de votre compte : les déclarations non envoyées seraient alors perdues.
+- **Double authentification** : si votre compte l'utilise, après le mot de passe saisissez le code à 6 chiffres de votre application d'authentification (ou un code de secours). Téléphone perdu : contactez l'administrateur.
 - **Appareil révoqué** : contactez l'administrateur. Vos déclarations restent sur l'appareil en attendant.
 - **Appareil perdu ou volé** : prévenez tout de suite l'administrateur, qui le révoquera.
 

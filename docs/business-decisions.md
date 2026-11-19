@@ -121,3 +121,13 @@ Décisions prises avec le porteur du projet (novembre 2026) ; à faire confirmer
 Le rôle « Secrétaire d'état civil » reçoit `dossier.validate` et `dossier.reject` : il accède à la **file de validation**, valide définitivement (numéro officiel), retourne ou rejette un dossier, comme l'administrateur. Pour les installations existantes, `setup_initial_data` accorde ces droits **une seule fois** ; l'administrateur peut ensuite les retirer d'un rôle ou d'une personne depuis « Rôles et permissions ».
 
 À valider par la mairie : une même personne peut désormais compléter **puis** valider un dossier (pas de séparation des tâches). Le contrôle des doublons reste applicable : un dossier suspect ne reçoit pas de numéro tant qu'un responsable n'a pas décidé ; la décision elle-même (`duplicate.decide`) reste réservée à l'administrateur.
+
+## Code de récupération des appareils et double authentification (19/11/2026)
+
+Décisions prises avec le porteur du projet ; à faire confirmer par la mairie.
+
+- **Code de récupération** : un agent qui a oublié son code de verrouillage garde ses saisies non envoyées. L'appareil génère un code de récupération aléatoire (jamais montré à l'agent) que **seul l'administrateur habilité** (`device.recover`) peut lire, avec **son mot de passe** et un **motif** ; chaque lecture est au journal d'audit. On ne stocke **pas** le code de verrouillage lui-même (un code choisi par l'agent est souvent réutilisé ailleurs et dévoilerait ses habitudes).
+- **Vérification d'identité** : l'administrateur appelle l'agent sur un numéro qu'il connaît avant de communiquer le code. *À préciser par la mairie : procédure officielle.*
+- **Appareil volé ou perdu** : on **révoque** l'appareil, on ne communique jamais le code.
+- **Double authentification** : par application d'authentification (TOTP), sans SMS (réseau mobile peu fiable, coût, dépendance à un opérateur). **Facultative par défaut** ; exigible par rôle (`security.two_factor_roles`). *À décider : les rôles concernés (au moins administrateur et validateurs).*
+- **Réinitialisation de la double authentification** : par un **autre** administrateur, avec motif ; jamais pour son propre compte. Seul administrateur : commande serveur `reset_two_factor`.
