@@ -1,6 +1,7 @@
 """Turn Django ValidationError / hard-delete attempts into clean API errors."""
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import status
+from rest_framework.exceptions import ParseError
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
@@ -44,6 +45,9 @@ def wakara_exception_handler(exc, context):
         if code:
             body['code'] = code
         return Response(body, status=status.HTTP_400_BAD_REQUEST)
+    if isinstance(exc, ParseError):
+        # the parser's own message names the offending byte or position: nobody needs it
+        return Response({'detail': "Corps de la requête invalide."}, status=status.HTTP_400_BAD_REQUEST)
     if isinstance(exc, HardDeleteForbidden):
         return Response({'detail': str(exc)}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
     return exception_handler(exc, context)

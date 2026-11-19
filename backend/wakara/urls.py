@@ -4,10 +4,9 @@ from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
-from core.views import InboxView, PublicSettingsView, SettingsView
+from core.views import AudienceView, InboxView, PublicHitView, PublicSettingsView, SettingsView
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.urls_auth')),
     path('api/users/', include('accounts.urls_users')),
     path('api/roles/', include('accounts.urls_roles')),
@@ -22,9 +21,15 @@ urlpatterns = [
     path('api/stats/', include('stats.urls')),
     path('api/sync/', include('sync.urls')),
     path('api/public/settings/', PublicSettingsView.as_view(), name='public-settings'),
+    path('api/public/hit/', PublicHitView.as_view(), name='public-hit'),
+    path('api/stats/audience/', AudienceView.as_view(), name='audience'),
     path('api/settings/', SettingsView.as_view(), name='settings'),
     path('api/inbox/', InboxView.as_view(), name='inbox'),
 ]
+
+# Django administration: maintenance only, off in production unless ENABLE_DJANGO_ADMIN (see settings).
+if settings.ENABLE_DJANGO_ADMIN:
+    urlpatterns += [path('admin/', admin.site.urls)]
 
 # API documentation is exposed only in development.
 if settings.DEBUG:

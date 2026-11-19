@@ -77,3 +77,22 @@ Cloudflare n'est pas requis. S'il est placé devant Vercel :
 - **Code de récupération d'un appareil** : lu par l'administrateur habilité (`device.recover`) avec son mot de passe et un motif, chaque lecture au journal ; ne jamais le communiquer pour un appareil volé (révoquer l'appareil).
 - **Volume de la base** : les photos sont dans la base (Neon gratuit : 512 Mo) ; `check_production` alerte au-delà de `DATABASE_SIZE_WARN_MB` (350 Mo par défaut).
 - **Rôles personnalisés** : `check_production` signale ceux qui peuvent ajouter des pièces mais pas retirer une pièce envoyée (`document.archive`).
+
+## 5. Revue avant ouverture au public (19/11/2026)
+
+| Contrôle | Résultat |
+|---|---|
+| Secrets hors du code | Aucun secret dans le dépôt ni dans son historique (54 commits analysés) ; `.env` ignoré par git ; tout passe par des variables d'environnement (`backend/.env.example`) |
+| Secrets côté interface | Aucun dans le paquet construit ; l'interface ne connaît que l'adresse relative `/api` |
+| Base de données | Connexion chiffrée imposée pour toute base distante (`sslmode=require` par défaut) ; base des aperçus séparée de la production ; sauvegarde chiffrée quotidienne (inactive tant que ses secrets ne sont pas créés) |
+| Accès aux données | Droits vérifiés par le serveur à chaque requête (refus par défaut) ; chaque utilisateur ne voit que ce que son rôle permet ; pages d'administration protégées par le serveur et par les gardes de l'interface |
+| Connexion | Seule la connexion par identifiant et mot de passe existe (aucun service tiers) ; limitation des essais par adresse et par compte ; double authentification ; jeton de 30 minutes ; **déconnexion automatique après 30 minutes d'inactivité** ; champ piège anti-robot sur le formulaire de connexion |
+| Saisies et fichiers | Validation côté serveur (sérialiseurs) ; ORM Django (aucune requête SQL construite à la main) ; pièces : type, signature et taille contrôlés (4 Mo sur Vercel) |
+| En-têtes | CSP stricte (aucun script en ligne), HSTS, anti-cadre, pas de référent, `nosniff`, cache interdit sur l'API, `Access-Control-Allow-Origin` limité au domaine du site ; CORS de l'API **vide par défaut** en production |
+| Erreurs et journaux | Réponses d'erreur génériques ; aucun nom ni donnée personnelle dans les journaux techniques (configuration `LOGGING`) ; le journal d'audit garde qui/quoi/quand/IP, jamais un mot de passe |
+| Surface exposée | Console d'administration Django **désactivée en production** (`ENABLE_DJANGO_ADMIN`) ; documentation de l'API absente ; `/.git`, `/.env`, `package.json` et `/admin` répondent 404 |
+| Paquets | Les 60 paquets de l'interface et les paquets Python verrouillés existent réellement sur leurs registres (aucun nom inventé) ; `npm audit --omit=dev` : 0 ; `pip-audit` : 0 (reste, en développement seulement, 21 avis modérés sur l'outil de construction Angular CLI) |
+| HTTPS | Redirection HTTP → HTTPS (308), HSTS 1 an ; certificat géré par Vercel |
+| Pages légales | Confidentialité, conditions d'utilisation, mentions légales, cookies : publiques, textes éditables (Paramètres) ; mention « version provisoire » tant que `legal.validated` ≠ `true` |
+| Cookies | Aucun cookie de suivi ; bandeau d'information et de choix ; mesure d'audience facultative, sans cookie ni identifiant, uniquement sur les pages publiques |
+| Référencement | `robots.txt` (seules les pages publiques sont indexables), `sitemap.xml`, `/.well-known/security.txt`, titres, descriptions, image de partage ; toutes les pages de l'application en `noindex` |

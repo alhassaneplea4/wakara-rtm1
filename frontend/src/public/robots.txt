@@ -1,0 +1,13 @@
+# Wakara — application of the mairie de Ratoma. Only the public pages may be indexed;
+# everything else needs a sign-in and carries personal data.
+User-agent: *
+Allow: /login
+Allow: /confidentialite
+Allow: /conditions
+Allow: /mentions-legales
+Allow: /cookies
+Allow: /assets/og-image.png
+Disallow: /api/
+Disallow: /
+
+Sitemap: https://wakara-rtm.vercel.app/sitemap.xml

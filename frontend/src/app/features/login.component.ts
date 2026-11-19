@@ -7,6 +7,7 @@ import { environment } from '@env/environment';
 import { errorMessage } from '../core/api.service';
 import { AuthService, needsTwoFactorCode } from '../core/auth.service';
 import { readVaultHeader } from '../core/offline/vault-header';
+import { RouterLink } from '@angular/router';
 import { IconComponent } from '../shared/ui';
 
 interface PublicSettings { [key: string]: string; }
@@ -20,7 +21,7 @@ const FALLBACK: PublicSettings = {
 
 @Component({
     selector: 'wk-login',
-    imports: [FormsModule, IconComponent],
+    imports: [FormsModule, IconComponent, RouterLink],
     template: `
     <div class="login">
       <section class="left">
@@ -53,6 +54,8 @@ const FALLBACK: PublicSettings = {
               </div>
               <p class="hint">Saisissez les 6 chiffres affichés par votre application d'authentification, ou l'un de vos codes de secours.</p>
             }
+            <!-- anti-spam trap: invisible to people (and to screen readers), filled in by robots -->
+            <div class="trap" aria-hidden="true"><label>Ne pas remplir <input name="website" [(ngModel)]="website" tabindex="-1" autocomplete="off" /></label></div>
             <div class="opts">
               <label class="check"><input type="checkbox" name="remember" [(ngModel)]="remember" /> Se souvenir de moi</label>
               <button type="button" class="link" (click)="forgot.set(true)">Mot de passe oublié ?</button>
@@ -62,6 +65,9 @@ const FALLBACK: PublicSettings = {
             </button>
           </form>
           <p class="foot"><span></span>{{ cfg()['login.footer'] }}<span></span></p>
+          <nav class="legal-links" aria-label="Informations légales">
+            <a routerLink="/confidentialite">Confidentialité</a><a routerLink="/conditions">Conditions</a><a routerLink="/mentions-legales">Mentions légales</a><a routerLink="/cookies">Cookies</a>
+          </nav>
         </div>
       </section>
 
@@ -126,6 +132,9 @@ const FALLBACK: PublicSettings = {
     .eye{border:0;background:none;color:var(--wk-text-mute);cursor:pointer;display:grid;place-items:center;padding:6px}
     .link{background:none;border:0;padding:0;font:inherit;color:var(--wk-royal);cursor:pointer}
     .link:hover{text-decoration:underline}
+    .trap{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
+    .legal-links{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;font-size:12.5px}
+    .legal-links a{color:var(--wk-text-soft)} .legal-links a:hover{color:var(--wk-royal)}
     .hint{margin:-4px 0 0;font-size:12.5px;color:var(--wk-text-soft)}
     .opts{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;font-size:13px}
     .submit{height:56px;font-size:16px;border-radius:12px;background:linear-gradient(180deg,#2a67e0,#14449f)}
@@ -183,6 +192,7 @@ export class LoginComponent implements OnInit {
 
   username = '';
   password = '';
+  website = '';   // trap field
   code = '';
   needCode = signal(false);
   remember = false;
@@ -226,7 +236,7 @@ export class LoginComponent implements OnInit {
     if (!this.username.trim() || !this.password) { this.error.set('Veuillez saisir votre identifiant et votre mot de passe.'); return; }
     this.loading.set(true);
     if (this.needCode() && !this.code.trim()) { this.loading.set(false); this.error.set('Saisissez le code de votre application d\'authentification.'); return; }
-    this.auth.login(this.username.trim(), this.password, this.remember, this.code).subscribe({
+    this.auth.login(this.username.trim(), this.password, this.remember, this.code, this.website).subscribe({
       next: user => {
         this.loading.set(false);
         if (user.must_change_password) { this.router.navigate(['/profile'], { queryParams: { force: 1 } }); return; }

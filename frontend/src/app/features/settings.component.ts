@@ -4,7 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { ApiService, errorMessage } from '../core/api.service';
 import { ToastService } from '../core/toast.service';
 import { PageHeaderComponent } from '../shared/ui';
+import { AuthService } from '../core/auth.service';
 
+interface Audience { since: string; total: number; pages: { path: string; visits: number }[]; days: { day: string; visits: number }[]; }
 interface Setting { key: string; value: string; description: string; is_public: boolean; }
 
 @Component({
@@ -25,14 +27,27 @@ interface Setting { key: string; value: string; description: string; is_public: 
         </div>
         <div class="modal-actions"><button class="btn btn-primary" [disabled]="busy()" (click)="save()">Enregistrer</button></div>
       </section>
+      @if (audience(); as a) {
+        <section class="card" style="margin-top:16px">
+          <div class="card-title"><h2>Audience des pages publiques</h2></div>
+          <p class="soft">Visites des 30 derniers jours (page de connexion et pages légales), pour les visiteurs qui ont accepté la mesure. Compteur anonyme : aucune adresse, aucun identifiant ; les pages de l'application ne sont jamais comptées.</p>
+          <p><strong>{{ a.total }}</strong> visite(s) depuis le {{ a.since }}.</p>
+          <table class="table"><thead><tr><th>Page</th><th>Visites</th></tr></thead>
+            <tbody>@for (p of a.pages; track p.path) { <tr><td class="mono">{{ p.path }}</td><td>{{ p.visits }}</td></tr> } @empty { <tr><td colspan="2" class="muted">Aucune visite comptée.</td></tr> }</tbody></table>
+        </section>
+      }
     </div>
   `
 })
 export class SettingsComponent implements OnInit {
   private api = inject(ApiService);
   private toast = inject(ToastService);
-  items = signal<Setting[]>([]); error = signal(''); busy = signal(false);
-  ngOnInit() { this.api.get<Setting[]>('/settings/').subscribe({ next: s => this.items.set(s), error: e => this.error.set(errorMessage(e)) }); }
+  private auth = inject(AuthService);
+  items = signal<Setting[]>([]); error = signal(''); busy = signal(false); audience = signal<Audience | null>(null);
+  ngOnInit() {
+    this.api.get<Setting[]>('/settings/').subscribe({ next: s => this.items.set(s), error: e => this.error.set(errorMessage(e)) });
+    if (this.auth.can('stats.view')) this.api.get<Audience>('/stats/audience/').subscribe({ next: a => this.audience.set(a), error: () => undefined });
+  }
   save() {
     this.busy.set(true);
     this.api.patch<Setting[]>('/settings/', Object.fromEntries(this.items().map(s => [s.key, s.value]))).subscribe({

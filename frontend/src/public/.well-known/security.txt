@@ -1,0 +1,6 @@
+# RFC 9116 — signaler un problème de sécurité de Wakara
+Contact: https://wakara-rtm.vercel.app/mentions-legales
+Expires: 2027-11-19T00:00:00.000Z
+Preferred-Languages: fr
+Canonical: https://wakara-rtm.vercel.app/.well-known/security.txt
+Policy: https://wakara-rtm.vercel.app/mentions-legales

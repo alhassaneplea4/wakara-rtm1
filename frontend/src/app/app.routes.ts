@@ -6,7 +6,17 @@ import { inject } from '@angular/core';
 import { AuthService } from './core/auth.service';
 import { Router } from '@angular/router';
 
+const legal = (path: string, title: string) => ({
+  path, title: `${title} — Wakara`, data: { page: path },
+  loadComponent: () => import('./features/legal.component').then(m => m.LegalComponent),
+});
+
 export const routes: Routes = [
+  // public pages: no sign-in, reachable from the login page and the footer of every screen
+  legal('confidentialite', 'Politique de confidentialité'),
+  legal('conditions', "Conditions d'utilisation"),
+  legal('mentions-legales', 'Mentions légales'),
+  legal('cookies', 'Cookies et stockage'),
   { path: 'login', canActivate: [guestGuard], component: LoginComponent, title: 'Connexion — Wakara' },
   // offline mode: choose or type the code that protects the data kept on this device
   { path: 'verrouillage', canActivate: [lockGuard], title: 'Verrouillage — Wakara', loadComponent: () => import('./features/lock.component').then(m => m.LockComponent) },

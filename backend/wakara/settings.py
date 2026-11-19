@@ -125,6 +125,9 @@ if DATABASE_URL:
     # Hosted PostgreSQL (Neon, Supabase, Vercel Postgres…). Serverless: no persistent connection is kept,
     # and server-side cursors are disabled so that connection poolers (pgbouncer) work.
     _url = urlparse(DATABASE_URL)
+    _db_options = {k: v[0] for k, v in parse_qs(_url.query).items() if k in ('sslmode', 'options')}
+    if (_url.hostname or 'localhost') not in ('localhost', '127.0.0.1', '::1'):
+        _db_options.setdefault('sslmode', 'require')   # never an unencrypted connection to a remote database
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -135,7 +138,7 @@ if DATABASE_URL:
             'PORT': str(_url.port or 5432),
             'CONN_MAX_AGE': 0,
             'DISABLE_SERVER_SIDE_CURSORS': True,
-            'OPTIONS': {k: v[0] for k, v in parse_qs(_url.query).items() if k in ('sslmode', 'options')},
+            'OPTIONS': _db_options,
         }
     }
 elif DB_ENGINE == 'django.db.backends.sqlite3':
@@ -259,6 +262,7 @@ REST_FRAMEWORK = {
         'user': config('USER_THROTTLE_RATE', default='1200/min'),
         'sync': config('SYNC_THROTTLE_RATE', default='240/min'),            # push, photos, pull of one agent
         'sync_ping': config('SYNC_PING_THROTTLE_RATE', default='60/min'),   # public reachability probe
+        'public_hit': config('PUBLIC_HIT_THROTTLE_RATE', default='30/min'),  # audience counter (public pages)
         'recovery': config('RECOVERY_THROTTLE_RATE', default='10/min'),     # reading a recovery code (admin)
         'two_factor': config('TWO_FACTOR_THROTTLE_RATE', default='10/min'), # second-factor codes
         'duplicates_heavy': config('DUPLICATES_HEAVY_THROTTLE_RATE', default='20/min'),  # analyses and comparisons
@@ -387,11 +391,14 @@ DOSSIER_DEADLINE_MONTHS = config('DOSSIER_DEADLINE_MONTHS', default=6, cast=int)
 # ──────────────────────────────────────────────
 # CORS
 # ──────────────────────────────────────────────
+# The interface and the API are served from ONE domain: no other origin needs to call the API in production, so
+# nothing is allowed unless CORS_ALLOWED_ORIGINS names it (the development server of the interface is allowed in DEBUG only).
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:4200',
+    default='http://localhost:4200' if DEBUG else '',
     cast=Csv(),
 )
+CORS_ALLOW_CREDENTIALS = False
 
 # ──────────────────────────────────────────────
 # drf-spectacular
@@ -433,3 +440,29 @@ if REDIS_URL:
     CACHES = {'default': {'BACKEND': 'django.core.cache.backends.redis.RedisCache', 'LOCATION': REDIS_URL}}
 else:
     CACHES = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}
+
+# ──────────────────────────────────────────────
+# Django administration (maintenance only)
+# ──────────────────────────────────────────────
+# The Django admin is NOT reachable in production unless ENABLE_DJANGO_ADMIN=True: the business roles never need it
+# (users, roles and settings have their own screens) and a forgotten maintenance login page is a needless target.
+ENABLE_DJANGO_ADMIN = config('ENABLE_DJANGO_ADMIN', default=DEBUG, cast=bool)
+
+# ──────────────────────────────────────────────
+# Logs: no personal data, no secret
+# ──────────────────────────────────────────────
+# Errors go to the console (Vercel runtime logs). Django already logs only the METHOD and PATH of a failed request
+# (never a body, never a query string, never a header); the application writes identifiers, not names. The details of
+# an error (traceback) stay in the server logs: the API only ever answers a generic message (core.exceptions).
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {'plain': {'format': '%(levelname)s %(name)s: %(message)s'}},
+    'handlers': {'console': {'class': 'logging.StreamHandler', 'formatter': 'plain'}},
+    'root': {'handlers': ['console'], 'level': config('LOG_LEVEL', default='WARNING')},
+    'loggers': {
+        # a request body or a query string is never part of what these loggers print
+        'django.request': {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
+        'django.security': {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
+    },
+}

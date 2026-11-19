@@ -1,0 +1,57 @@
+name: Sauvegarde automatique de la base
+
+# Sauvegarde quotidienne de la base PostgreSQL (Neon) : dump complet, chiffré (AES-256) avant d'être gardé.
+# INACTIF tant que les deux secrets ci-dessous ne sont pas créés (Settings → Secrets and variables → Actions) :
+#   BACKUP_DATABASE_URL  adresse PostgreSQL d'un accès en LECTURE SEULE (rôle dédié), avec ?sslmode=require
+#   BACKUP_PASSPHRASE    phrase de passe longue (≥ 30 caractères) ; à garder AUSSI hors de GitHub, sans elle la sauvegarde est illisible
+# Le dump contient des données personnelles d'état civil : il n'est jamais stocké en clair, et l'artefact n'est lisible
+# que par les personnes ayant accès au dépôt. Voir docs/backup-restore.md (restauration, alternative Neon, décision à prendre).
+on:
+  schedule:
+    - cron: '0 2 * * *'      # tous les jours à 02:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      PG_IMAGE: postgres:17-alpine     # même version majeure que la base Neon
+    steps:
+      - name: Vérifier la configuration
+        id: config
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::notice::Secrets BACKUP_DATABASE_URL / BACKUP_PASSPHRASE absents : sauvegarde ignorée."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Dump chiffré
+        if: steps.config.outputs.run == 'true'
+        run: |
+          set -euo pipefail
+          umask 077
+          FILE="wakara-$(date -u +%Y-%m-%d).dump.gpg"
+          docker run --rm -e DATABASE_URL "$PG_IMAGE" sh -c 'pg_dump --no-owner --no-privileges --format=custom "$DATABASE_URL"' \
+            | gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase-fd 3 -o "$FILE" 3<<<"$BACKUP_PASSPHRASE"
+          test -s "$FILE"
+          sha256sum "$FILE" > "$FILE.sha256"
+          ls -l "$FILE"
+
+      - name: Garder la sauvegarde (14 jours)
+        if: steps.config.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sauvegarde-base
+          path: |
+            wakara-*.dump.gpg
+            wakara-*.dump.gpg.sha256
+          retention-days: 14
+          if-no-files-found: error

@@ -10,6 +10,10 @@ from .models import Child, Declarant, Declaration, Parent, StatusHistory
 from .services import can_edit_data, user_transitions
 
 
+# free text of a paper form never needs more than this; a ceiling keeps a single request from filling the database
+NOTES_MAX = 4000
+
+
 class PhoneMixin:
     """Optional phone number: malformed values are refused, valid ones stored as ``+224 624 62 94 77``."""
 
@@ -210,6 +214,11 @@ class DeclarationWriteSerializer(serializers.ModelSerializer):
             'birth_date', 'birth_time', 'birth_place', 'notes',
             'child', 'mother', 'father', 'declarant', 'acte',
         ]
+
+    def validate_notes(self, value):
+        if len(value) > NOTES_MAX:
+            raise serializers.ValidationError(f"Les observations sont limitées à {NOTES_MAX} caractères.")
+        return value
 
     def validate_hospital(self, hospital):
         if hospital is not None and not hospital.is_active:

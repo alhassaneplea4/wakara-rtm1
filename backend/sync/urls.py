@@ -6,6 +6,7 @@ from .views import (
 )
 
 router = DefaultRouter()
+router.include_root_view = False   # no index of routes (and no absolute URLs built from the internal host)
 router.register('operations', SyncOperationViewSet, basename='sync-operation')
 router.register('devices', DeviceViewSet, basename='sync-device')
 

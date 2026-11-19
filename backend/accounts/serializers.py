@@ -19,6 +19,8 @@ class LoginSerializer(serializers.Serializer):
     device_id = serializers.UUIDField(required=False, allow_null=True, default=None)
     # second factor: the six digits of the application, or a backup code (only asked when the account uses it)
     code = serializers.CharField(required=False, allow_blank=True, max_length=32, default='')
+    # anti-spam trap: hidden from people, filled in by bots that complete every field
+    website = serializers.CharField(required=False, allow_blank=True, max_length=200, default='')
 
 
 class ChangePasswordSerializer(serializers.Serializer):

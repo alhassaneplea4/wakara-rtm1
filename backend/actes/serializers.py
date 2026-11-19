@@ -49,6 +49,11 @@ class ActeUpdateSerializer(serializers.ModelSerializer):
         # unique-together validator would wrongly make the three fields mandatory
         validators = []
 
+    def validate_mentions(self, value):
+        if len(value) > 4000:
+            raise serializers.ValidationError("Les mentions sont limitées à 4000 caractères.")
+        return value
+
 
 def _person_name(user):
     return (user.get_full_name() or user.username) if user else ''
@@ -130,6 +135,11 @@ class DeliveryCreateSerializer(serializers.ModelSerializer):
         model = Delivery
         fields = ['delivered_at', 'recipient_name', 'recipient_relationship',
                   'recipient_id_type', 'recipient_id_number', 'notes']
+
+    def validate_notes(self, value):
+        if len(value) > 4000:
+            raise serializers.ValidationError("Les observations sont limitées à 4000 caractères.")
+        return value
 
 
 class PrintLogSerializer(serializers.ModelSerializer):

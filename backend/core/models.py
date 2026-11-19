@@ -24,6 +24,26 @@ class SiteSetting(TimeStampedMixin):
         return self.key
 
 
+
+class PageHit(models.Model):
+    """
+    Audience of the PUBLIC pages (login, privacy policy, terms…): a count per day and per page, nothing else.
+    No address, no identifier, no cookie, nothing that could single out a visitor; never the pages of the application.
+    """
+    day = models.DateField("Jour", db_index=True)
+    path = models.CharField("Page", max_length=60)
+    count = models.PositiveIntegerField("Visites", default=0)
+
+    class Meta:
+        verbose_name = "Audience d'une page publique"
+        verbose_name_plural = "Audience des pages publiques"
+        constraints = [models.UniqueConstraint(fields=['day', 'path'], name='uniq_pagehit_day_path')]
+        ordering = ['-day', 'path']
+
+    def __str__(self):
+        return f"{self.day} {self.path} : {self.count}"
+
+
 DEFAULT_SETTINGS = [
     ('institution.name', "Mairie de Ratoma", "Nom de l'institution", True),
     ('login.tag', 'ÉTAT CIVIL', 'Étiquette du panneau de présentation', True),
@@ -45,6 +65,14 @@ DEFAULT_SETTINGS = [
     # Roles that must sign in with a second factor (authentication application): codes separated by commas, e.g.
     # « admin,secretary », or « all ». Empty = optional for everybody. An account concerned that has not set it up yet
     # can only reach its profile page until it does.
+    # Public pages (privacy policy, terms, legal notice): who is responsible and how to reach them. Shown to everybody.
+    ('legal.controller', "Mairie de Ratoma — Centre d'état civil et de l'identification (CECI Ratoma)", "Responsable du traitement (pages légales)", True),
+    ('legal.address', "Ratoma, Conakry, République de Guinée", "Adresse du responsable (pages légales)", True),
+    ('legal.contact_email', '', "E-mail pour exercer ses droits et signaler un problème de sécurité (pages légales)", True),
+    ('legal.contact_phone', '', "Téléphone du responsable (pages légales)", True),
+    ('legal.data_officer', '', "Nom du responsable de la protection des données (pages légales)", True),
+    ('legal.validated', 'false', "Pages légales relues et validées par la mairie (true) : retire la mention « version provisoire »", True),
+    ('legal.updated', '19 novembre 2026', "Date de dernière mise à jour des pages légales", True),
     ('security.two_factor_roles', '', "Rôles qui doivent utiliser la double authentification (codes séparés par des virgules, ex. admin,secretary ; « all » pour tous ; vide = facultative)", False),
 ]
 

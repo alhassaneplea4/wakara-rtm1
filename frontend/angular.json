@@ -28,7 +28,12 @@
             "inlineStyleLanguage": "scss",
             "assets": [
               "src/assets",
-              "src/manifest.webmanifest"
+              "src/manifest.webmanifest",
+              {
+                "glob": "**/*",
+                "input": "src/public",
+                "output": "/"
+              }
             ],
             "styles": [
               "@fontsource/inter/latin-300.css",
@@ -45,7 +50,7 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "650kb",
+                  "maximumWarning": "720kb",
                   "maximumError": "1mb"
                 },
                 {
@@ -57,7 +62,10 @@
               "outputHashing": "all",
               "optimization": {
                 "scripts": true,
-                "styles": { "minify": true, "inlineCritical": false },
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
                 "fonts": false
               },
               "fileReplacements": [

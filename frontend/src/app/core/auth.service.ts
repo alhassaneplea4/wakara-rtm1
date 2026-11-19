@@ -73,8 +73,8 @@ export class AuthService {
   canAny(...codes: string[]): boolean { return codes.some(c => this.can(c)); }
 
   /** `code`: the six digits of the authentication application (or a backup code), only when the account uses the second factor. */
-  login(username: string, password: string, remember: boolean, code = ''): Observable<Me> {
-    return this.http.post<{ access: string; refresh: string; user: Me }>(`${this.api}/auth/login/`, { username, password, device_id: deviceId(), ...(code.trim() ? { code: code.trim() } : {}) }).pipe(
+  login(username: string, password: string, remember: boolean, code = '', trap = ''): Observable<Me> {
+    return this.http.post<{ access: string; refresh: string; user: Me }>(`${this.api}/auth/login/`, { username, password, device_id: deviceId(), ...(code.trim() ? { code: code.trim() } : {}), ...(trap ? { website: trap } : {}) }).pipe(
       tap(r => {
         this.signedOut = false; this.sessionExpired.set(false); this.offlineSession.set(false);
         this.user.set(r.user); this.save(r.access, r.refresh, remember);

@@ -94,6 +94,10 @@ class LoginView(APIView):
         password = serializer.validated_data['password']
 
         ip = client_ip(request) or ''
+        if serializer.validated_data.get('website'):
+            # a bot filled the hidden field: it is answered like a wrong password, and counted
+            audit.log(AuditAction.LOGIN_FAILED, username='robot', object_type='User', reason='Champ piège rempli')
+            return self._unknown_identifier(identifier, ip)
         user = _find_user(identifier)
         if user is None:
             return self._unknown_identifier(identifier, ip)

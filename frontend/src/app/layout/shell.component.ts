@@ -57,6 +57,7 @@ const NAV: NavItem[] = [
         <div class="bottom">
           <a routerLink="/profile" routerLinkActive="active" (click)="navOpen.set(false)"><wk-icon name="user" /><span>Mon profil</span></a>
           <button type="button" class="logout" (click)="logout()"><wk-icon name="logout" /><span>Déconnexion</span></button>
+          <p class="legal"><a routerLink="/confidentialite" target="_blank" rel="noopener">Confidentialité</a> · <a routerLink="/conditions" target="_blank" rel="noopener">Conditions</a> · <a routerLink="/mentions-legales" target="_blank" rel="noopener">Mentions</a></p>
         </div>
       </aside>
       <div class="backdrop" (click)="navOpen.set(false)"></div>
@@ -146,6 +147,7 @@ const NAV: NavItem[] = [
     .close{display:none;border:0;background:rgba(255,255,255,.1);color:#fff;width:36px;height:36px;border-radius:10px;font-size:24px;line-height:1;cursor:pointer}
     nav{display:flex;flex-direction:column;gap:4px;flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
     .sidebar a,.sidebar .logout{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:12px;color:rgba(255,255,255,.82);font:inherit;font-weight:500;text-decoration:none;transition:background .15s;background:none;border:0;width:100%;text-align:left;cursor:pointer}
+    .sidebar .legal{margin:8px 14px 0;font-size:11.5px;color:rgba(255,255,255,.6)} .sidebar .legal a{display:inline;padding:0;color:rgba(255,255,255,.75);text-decoration:underline;background:none}
     .sidebar a:hover,.sidebar .logout:hover{background:rgba(255,255,255,.08);text-decoration:none}
     .sidebar a.active{background:var(--wk-royal);color:#fff;box-shadow:0 6px 16px rgba(31,94,216,.4)}
     .sidebar a:focus-visible,.sidebar .logout:focus-visible{outline:2px solid #fff;outline-offset:-2px}

@@ -1,12 +1,17 @@
 """Public login-page settings, editable settings, and the internal "inbox" counters."""
+import datetime
+
+from django.db.models import F, Sum
+from django.utils import timezone
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
 from audit import service as audit
 from audit.models import AuditAction
-from core.models import DEFAULT_SETTINGS, SiteSetting, get_setting
+from core.models import DEFAULT_SETTINGS, PageHit, SiteSetting, get_setting
 from core.permissions import HasWakaraPermission, user_has_perm
 from core.workflow import Status
 
@@ -19,6 +24,49 @@ class PublicSettingsView(APIView):
     def get(self, request):
         keys = [k for k, _v, _d, public in DEFAULT_SETTINGS if public]
         return Response({k: get_setting(k) for k in keys})
+
+
+# The only pages whose visits are counted: the public ones. The pages of the application (they carry identifiers of
+# dossiers) are never counted, never sent anywhere.
+PUBLIC_PAGES = ('/login', '/confidentialite', '/conditions', '/mentions-legales', '/cookies')
+
+
+class PublicHitRateThrottle(AnonRateThrottle):
+    scope = 'public_hit'
+
+
+class PublicHitView(APIView):
+    """
+    POST /api/public/hit/ {path} — one more visit of a public page. First-party and cookieless: only a counter per
+    day and per page is kept. A visitor who refused the audience measurement (cookie banner) sends nothing, and a
+    request carrying « Do Not Track » or « Global Privacy Control » is not counted.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [PublicHitRateThrottle]
+
+    def post(self, request):
+        data = request.data if isinstance(request.data, dict) else {}
+        path = data.get('path') if isinstance(data.get('path'), str) else ''
+        refused = request.META.get('HTTP_DNT') == '1' or request.META.get('HTTP_SEC_GPC') == '1'
+        if path in PUBLIC_PAGES and not refused:
+            today = timezone.localdate()
+            row, _ = PageHit.objects.get_or_create(day=today, path=path)
+            PageHit.objects.filter(pk=row.pk).update(count=F('count') + 1)
+        return Response(status=status.HTTP_204_NO_CONTENT)   # same answer whatever happened: nothing to learn
+
+
+class AudienceView(APIView):
+    """GET /api/stats/audience/ — visits of the public pages over the last 30 days (administrators and statisticians)."""
+    permission_classes = [HasWakaraPermission]
+    required_permission = 'stats.view'
+
+    def get(self, request):
+        since = timezone.localdate() - datetime.timedelta(days=29)
+        rows = PageHit.objects.filter(day__gte=since)
+        per_page = list(rows.values('path').annotate(visits=Sum('count')).order_by('-visits'))
+        per_day = list(rows.values('day').annotate(visits=Sum('count')).order_by('day'))
+        return Response({'since': since, 'total': sum(r['visits'] for r in per_page), 'pages': per_page, 'days': per_day})
 
 
 class SettingSerializer(serializers.ModelSerializer):
