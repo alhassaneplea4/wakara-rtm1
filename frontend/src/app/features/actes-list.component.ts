@@ -2,9 +2,10 @@
 import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { AuthService } from '../core/auth.service';
 import { ApiService, Query, errorMessage } from '../core/api.service';
 import { AutoRefreshService } from '../core/auto-refresh.service';
-import { Acte, Page, STATUS_LABELS, Status } from '../core/models';
+import { Acte, Page, Status, statusLabelsFor } from '../core/models';
 import { PageHeaderComponent, PaginationComponent, StatusBadgeComponent } from '../shared/ui';
 
 @Component({
@@ -45,12 +46,13 @@ import { PageHeaderComponent, PaginationComponent, StatusBadgeComponent } from '
 })
 export class ActesListComponent implements OnInit {
   private api = inject(ApiService);
+  private auth = inject(AuthService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private destroyRef = inject(DestroyRef);
   private autoRefresh = inject(AutoRefreshService);
   private last: Query | null = null;
-  labels = STATUS_LABELS;
+  get labels() { return statusLabelsFor(this.auth.can('declaration.view_all')); }
   statuses: Status[] = ['PENDING_VALIDATION', 'VALIDATED'];
   search = ''; status = ''; annee: number | null = null; page = 1;
   /** Filters coming from the dashboard figures (`?from=&to=&hospital=&agent=`), in the URL so the link can be shared. */

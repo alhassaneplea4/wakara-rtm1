@@ -2,6 +2,7 @@
 from rest_framework import serializers
 
 from core.permissions import user_has_perm
+from core.workflow import Status
 from duplicates.models import (
     AnomalyType, Decision, DuplicateCase, DuplicateDecision, DuplicateEvidence,
     DuplicateMatch, DuplicateReviewHistory, RiskLevel,
@@ -26,7 +27,7 @@ def declaration_brief(d) -> dict:
     child = getattr(d, 'child', None)
     acte = getattr(d, 'acte', None)
     return {
-        'uuid': str(d.uuid), 'reference': d.reference, 'status': d.status, 'status_label': d.get_status_display(),
+        'uuid': str(d.uuid), 'reference': d.reference, 'status': d.status, 'status_label': Status.SECRETARIAT_LABELS[d.status],
         'child_name': str(child) if child else '', 'birth_date': d.birth_date,
         'mother_name': _mother_name(d), 'agent_name': _name(d.created_by),
         'hospital_name': d.hospital.name if d.hospital else '',

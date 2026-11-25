@@ -23,14 +23,14 @@ from core.pagination import StandardPagination
 from core.permissions import HasWakaraPermission
 from core.workflow import Status
 from declarations.models import Declaration
-from declarations.services import FIELD_LABELS
+from declarations.services import FIELD_LABELS, status_label
 from documents.models import SupportingDocument
 
 from .models import AuditAction as A
 from .models import AuditLog
 
 TYPES = ('Declaration', 'Acte', 'SupportingDocument')
-STATUS_LABELS = dict(Status.CHOICES)
+STATUS_LABELS = Status.SECRETARIAT_LABELS  # the history is a back-office screen
 
 # Filter « type d'action » → what it keeps in the log
 KIND_FILTERS = {
@@ -268,7 +268,7 @@ class DossierHistoryViewSet(viewsets.ViewSet):
             ev = latest.get(str(d.uuid))
             data.append({
                 'uuid': str(d.uuid), 'reference': d.reference, 'child_name': _child_name(d), 'status': d.status,
-                'status_label': d.get_status_display(), 'hospital_name': d.hospital.name if d.hospital else '',
+                'status_label': status_label(d.status, request.user), 'hospital_name': d.hospital.name if d.hospital else '',
                 'official_number': d.acte.numero_acte if getattr(d, 'acte', None) else None,
                 'created_by_name': person_name(d.created_by), 'created_at': d.created_at, 'is_archived': d.is_archived,
                 'last_event_at': last, 'event_count': n,
@@ -340,7 +340,7 @@ class DossierHistoryViewSet(viewsets.ViewSet):
         return Response({
             'dossier': {
                 'uuid': str(d.uuid), 'reference': d.reference, 'child_name': _child_name(d), 'status': d.status,
-                'status_label': d.get_status_display(), 'hospital_name': d.hospital.name if d.hospital else '',
+                'status_label': status_label(d.status, request.user), 'hospital_name': d.hospital.name if d.hospital else '',
                 'birth_date': d.birth_date, 'official_number': acte.numero_acte if acte else None,
                 'annee': acte.annee if acte else None, 'registre': acte.registre if acte else '',
                 'acte_uuid': str(acte.uuid) if acte else None, 'is_archived': d.is_archived,

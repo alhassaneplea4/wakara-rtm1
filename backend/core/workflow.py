@@ -40,6 +40,8 @@ class Status:
         (DELIVERED, 'Acte délivré'),
     ]
     ALL = [c for c, _ in CHOICES]
+    # Same wording seen by the secretariat / administrator: a transmitted dossier is, for them, being processed.
+    SECRETARIAT_LABELS = {**dict(CHOICES), TRANSMITTED: 'Traitement en cours'}
 
     # Statuses in which the hospital declaration data may still be edited.
     DECLARATION_EDITABLE = (DRAFT, TO_CORRECT_COLLECTION)

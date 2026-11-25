@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from declarations.services import status_label
+
 from .models import Acte, Delivery, PrintLog
 
 
@@ -7,7 +9,7 @@ class ActeListSerializer(serializers.ModelSerializer):
     declaration_uuid = serializers.UUIDField(source='declaration.uuid', read_only=True)
     reference = serializers.CharField(source='declaration.reference', read_only=True)
     status = serializers.CharField(source='declaration.status', read_only=True)
-    status_label = serializers.CharField(source='declaration.get_status_display', read_only=True)
+    status_label = serializers.SerializerMethodField()
     child_name = serializers.SerializerMethodField()
     hospital_name = serializers.CharField(source='declaration.hospital.name', read_only=True, default=None)
 
@@ -15,6 +17,9 @@ class ActeListSerializer(serializers.ModelSerializer):
         model = Acte
         fields = ['uuid', 'declaration_uuid', 'reference', 'status', 'status_label', 'child_name',
                   'hospital_name', 'annee', 'registre', 'feuillet', 'numero_acte', 'updated_at']
+
+    def get_status_label(self, obj):
+        return status_label(obj.declaration.status, self.context['request'].user)
 
     def get_child_name(self, obj):
         child = getattr(obj.declaration, 'child', None)
@@ -105,7 +110,7 @@ class DeliveryDetailSerializer(DeliverySerializer):
         d = a.declaration
         child = getattr(d, 'child', None)
         return {
-            'status': d.status, 'status_label': d.get_status_display(),
+            'status': d.status, 'status_label': status_label(d.status, self.context['request'].user),
             'numero_acte': a.numero_acte, 'annee': a.annee, 'registre': a.registre, 'feuillet': a.feuillet,
             'declaration_date': a.declaration_date, 'officer_name': a.officer_name,
             'numero_assigned_by_name': _person_name(a.numero_assigned_by), 'numero_assigned_at': a.numero_assigned_at,

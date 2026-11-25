@@ -154,7 +154,7 @@ class DeclarationViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin,
             child = getattr(d, 'child', None)
             acte = getattr(d, 'acte', None)
             writer.writerow(safe_row([
-                d.reference, d.get_status_display(), d.hospital.name if d.hospital else '',
+                d.reference, services.status_label(d.status, request.user), d.hospital.name if d.hospital else '',
                 str(child) if child else '', d.birth_date, d.received_at,
                 acte.numero_acte if acte and acte.numero_acte else '',
             ]))

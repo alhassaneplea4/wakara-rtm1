@@ -25,6 +25,12 @@ from .models import Child, Declarant, Declaration, Parent, ReferenceCounter, Sta
 
 # ── Visibility & edit rights ──────────────────────
 
+def status_label(status, user) -> str:
+    """Status wording for this user (`declaration.view_all` = secretariat side)."""
+    labels = Status.SECRETARIAT_LABELS if user_has_perm(user, 'declaration.view_all') else dict(Status.CHOICES)
+    return labels.get(status, status)
+
+
 def visible_declarations(user, queryset=None):
     """
     Declarations the user may see: everything with view_all, otherwise only own.

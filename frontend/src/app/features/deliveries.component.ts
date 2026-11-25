@@ -6,7 +6,7 @@ import { forkJoin } from 'rxjs';
 import { ApiService, Query, errorMessage } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { AutoRefreshService } from '../core/auto-refresh.service';
-import { AuditEntry, Delivery, DeliveryDetail, DeliverySummary, Hospital, Page, STATUS_LABELS, Status } from '../core/models';
+import { AuditEntry, Delivery, DeliveryDetail, DeliverySummary, Hospital, Page, Status, statusLabelsFor } from '../core/models';
 import { IconComponent, PageHeaderComponent, PaginationComponent } from '../shared/ui';
 
 /**
@@ -194,7 +194,7 @@ export class DeliveriesComponent implements OnInit {
 
   /** Whoever may read the audit log (the administrator) sees the most: validator, printed copies, audit trail. */
   admin = () => this.auth.can('audit.view');
-  label(s: string) { return STATUS_LABELS[s as Status] ?? s; }
+  label(s: string) { return statusLabelsFor(this.auth.can('declaration.view_all'))[s as Status] ?? s; }
   hasFilters = () => !!(this.search || this.type || this.hospital || this.from || this.to);
 
   counters = () => {

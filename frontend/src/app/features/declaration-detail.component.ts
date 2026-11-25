@@ -6,7 +6,7 @@ import { forkJoin } from 'rxjs';
 import { ApiService, errorMessage } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { AutoRefreshService } from '../core/auto-refresh.service';
-import { Acte, AuditEntry, AvailableTransition, DeclarationDetail, Page, STATUS_LABELS, Status, SupportingDocument } from '../core/models';
+import { Acte, AuditEntry, AvailableTransition, DeclarationDetail, Page, Status, SupportingDocument, statusLabelsFor } from '../core/models';
 import { OfflineGate } from '../core/offline/offline-gate.service';
 import { ToastService } from '../core/toast.service';
 import { SyncBannerComponent, SyncChipComponent } from '../shared/sync-ui';
@@ -325,7 +325,7 @@ export class DeclarationDetailComponent implements OnInit {
   private uuid() { return this.route.snapshot.paramMap.get('uuid')!; }
   kindLabel(k: string) { return ({ PAPER_FORM: 'Fiche de déclaration physique', HOSPITAL_FORM: 'Déclaration hospitalière', PARENT_ID: "Pièce d'un parent", DECLARANT_ID: 'Pièce du déclarant', OTHER: 'Autre pièce' } as Record<string, string>)[k] ?? k; }
   sizeLabel(bytes: number) { return bytes < 1024 ? '< 1 Ko' : bytes < 1048576 ? `${Math.round(bytes / 1024)} Ko` : `${(bytes / 1048576).toFixed(1)} Mo`; }
-  label(s: string) { return STATUS_LABELS[s as Status] ?? s; }
+  label(s: string) { return statusLabelsFor(this.auth.can('declaration.view_all'))[s as Status] ?? s; }
   marital(v: string | undefined, kind: 'father' | 'mother' | 'other') { return maritalLabel(v, kind) || '—'; }
   meta(t: AvailableTransition) { return ACTION[t.target] ?? { label: t.target, icon: 'arrow', cls: '' }; }
   isDecision(d: DeclarationDetail) { return d.status === 'PENDING_VALIDATION'; }

@@ -7,7 +7,7 @@ from core.workflow import Status
 from hospitals.models import Hospital
 
 from .models import Child, Declarant, Declaration, Parent, StatusHistory
-from .services import can_edit_data, user_transitions
+from .services import can_edit_data, status_label, user_transitions
 
 
 # free text of a paper form never needs more than this; a ceiling keeps a single request from filling the database
@@ -74,7 +74,7 @@ class DeclarationListSerializer(serializers.ModelSerializer):
     hospital_name = serializers.CharField(source='hospital.name', read_only=True, default=None)
     hospital_code = serializers.CharField(source='hospital.code', read_only=True, default=None)
     child_name = serializers.SerializerMethodField()
-    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    status_label = serializers.SerializerMethodField()
     assigned_to_name = serializers.SerializerMethodField()
     official_number = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
@@ -90,6 +90,10 @@ class DeclarationListSerializer(serializers.ModelSerializer):
             'can_edit', 'overdue', 'updated_at', 'created_at', 'sync_version',
             'transmitted_offline', 'entered_offline', 'device_created_at', 'device_transmitted_at',
         ]
+
+    def get_status_label(self, obj):
+        request = self.context.get('request')
+        return status_label(obj.status, request.user) if request else obj.get_status_display()
 
     def get_transmitted_offline(self, obj):
         """Last transmission made from the agent's device (offline queue), not online."""

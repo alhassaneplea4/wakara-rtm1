@@ -307,7 +307,7 @@ def _update(user, op, effective, now, anomaly):
     if not declaration_services.can_edit_data(user, declaration):
         raise OperationRefused(
             OpStatus.CONFLICT, 'not_editable',
-            f"Le dossier est maintenant « {declaration.get_status_display()} » : il ne peut plus être modifié "
+            f"Le dossier est maintenant « {declaration_services.status_label(declaration.status, user)} » : il ne peut plus être modifié "
             "depuis l'appareil.")
     expected = _expected_version(user, op)
     if expected is None:
@@ -343,7 +343,7 @@ def _transition(user, op, effective, now, anomaly):
     if seen and declaration.status != seen:
         raise OperationRefused(
             OpStatus.CONFLICT, 'status_changed',
-            f"Le dossier est passé de « {dict(Status.CHOICES).get(seen, seen)} » à « {declaration.get_status_display()} » "
+            f"Le dossier est passé de « {declaration_services.status_label(seen, user)} » à « {declaration_services.status_label(declaration.status, user)} » "
             "sur le serveur depuis votre décision : elle n'est pas appliquée.")
     expected = _expected_version(user, op)
     if expected is not None and declaration.sync_version != expected:
@@ -361,7 +361,7 @@ def _transmit(user, op, effective, now, anomaly):
     if declaration.status not in Status.DECLARATION_EDITABLE:
         raise OperationRefused(
             OpStatus.CONFLICT, 'invalid_transition',
-            f"Le dossier est déjà « {declaration.get_status_display()} » sur le serveur.")
+            f"Le dossier est déjà « {declaration_services.status_label(declaration.status, user)} » sur le serveur.")
     return declaration_services.transition_status(
         declaration.pk, Status.TRANSMITTED, user, device_time=effective,
         history_note=_offline_note('Transmise', effective, now, anomaly))

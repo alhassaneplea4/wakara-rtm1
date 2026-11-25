@@ -27,7 +27,7 @@ from rest_framework.views import APIView
 from core.permissions import HasWakaraPermission
 from core.workflow import Status
 from declarations.models import Declaration
-from declarations.services import listed_declarations, visible_declarations
+from declarations.services import listed_declarations, status_label, visible_declarations
 
 MONTHS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
 
@@ -103,9 +103,8 @@ class DashboardView(APIView):
             {'name': row['hospital__name'] or 'Non renseigné', 'count': row['n']}
             for row in qs.values('hospital__name').annotate(n=Count('id')).order_by('-n')
         ]
-        status_labels = dict(Status.CHOICES)
         by_status = [
-            {'status': row['status'], 'label': status_labels[row['status']], 'count': row['n']}
+            {'status': row['status'], 'label': status_label(row['status'], request.user), 'count': row['n']}
             for row in qs.values('status').annotate(n=Count('id')).order_by('-n')
         ]
         by_gender = None

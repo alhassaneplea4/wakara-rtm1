@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from audit.models import AuditAction
 from core.permissions import user_has_perm
+from core.workflow import Status
 from documents.models import SupportingDocument
 from duplicates import text
 from duplicates.models import (
@@ -127,7 +128,7 @@ class DuplicateReviewService:
             ]},
             {'key': 'file', 'title': 'Dossier et saisie', 'rows': [
                 _row('Référence provisoire', 'exact', a.reference, b.reference),
-                _row('Statut', 'exact', a.get_status_display(), b.get_status_display()),
+                _row('Statut', 'exact', Status.SECRETARIAT_LABELS[a.status], Status.SECRETARIAT_LABELS[b.status]),
                 _row('N° officiel de l\'acte', 'exact', g(acte_a, 'numero_acte') or '', g(acte_b, 'numero_acte') or ''),
                 _row('Agent collecteur', 'exact', _full_name(a.created_by), _full_name(b.created_by)),
                 _row('Saisie le', 'exact', timezone.localtime(a.device_created_at or a.created_at).strftime('%d/%m/%Y %H:%M'),
@@ -159,7 +160,7 @@ class DuplicateReviewService:
         acte = getattr(d, 'acte', None)
         return {
             'uuid': str(d.uuid), 'reference': d.reference, 'status': d.status,
-            'status_label': d.get_status_display(), 'child_name': str(child) if child else '',
+            'status_label': Status.SECRETARIAT_LABELS[d.status], 'child_name': str(child) if child else '',
             'birth_date': d.birth_date, 'official_number': acte.numero_acte if acte else None,
             'created_by_name': _full_name(d.created_by), 'created_at': d.created_at,
             'is_archived': d.is_archived,
