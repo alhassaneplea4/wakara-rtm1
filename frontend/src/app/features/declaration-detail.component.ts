@@ -318,7 +318,7 @@ export class DeclarationDetailComponent implements OnInit {
 
   ngOnInit() {
     this.route.paramMap.subscribe(() => this.load());
-    // every 30 s, unless the user is in the middle of a decision (confirmation dialog)
+    // every 15 s, unless the user is in the middle of a decision (confirmation dialog)
     this.autoRefresh.on(this.destroyRef, () => { if (!this.pending() && !this.incomplete() && !this.archiving() && !this.busy()) this.load(); });
   }
 

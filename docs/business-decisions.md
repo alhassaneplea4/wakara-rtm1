@@ -40,7 +40,7 @@ avant la mise en production. Légende : ⏳ à confirmer.
 - Le **secrétariat** (permission « Compléter un acte ») peut corriger les données d'une déclaration dès qu'elle est **transmise**, et pendant le complément. La modification ne change pas le statut du dossier.
 - Quand le secrétariat a fini, il **soumet à validation** : le dossier passe dans la **file de validation** de l'administrateur et le secrétariat ne peut plus le modifier.
 - L'**administrateur** peut travailler sur un dossier en attente de validation (déclaration et acte) : il **reste dans sa file de validation** jusqu'à la décision (valider, retourner ou rejeter). Après validation, plus personne ne modifie.
-- Pastilles du menu : *Déclarations* (pour l'agent : brouillons et dossiers retournés ; pour le secrétariat : dossiers transmis, actes incomplets ou à corriger — l'ancienne « File du secrétariat » est fusionnée ici), *File de validation* (en attente de décision), *Actes de naissance* (actes validés à délivrer). Les écrans et les pastilles se rafraîchissent toutes les 30 secondes tant que la session est ouverte et l'onglet visible.
+- Pastilles du menu : *Déclarations* (pour l'agent : brouillons et dossiers retournés ; pour le secrétariat : dossiers transmis, actes incomplets ou à corriger — l'ancienne « File du secrétariat » est fusionnée ici), *File de validation* (en attente de décision), *Actes de naissance* (actes validés à délivrer). Les écrans et les pastilles se rafraîchissent toutes les 15 secondes tant que la session est ouverte et l'onglet visible.
 
 ## Traitement par le secrétariat, date en lettres, déclarant
 
