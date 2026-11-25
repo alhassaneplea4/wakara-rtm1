@@ -11,8 +11,20 @@ import { AuthService } from '../core/auth.service';
 import { Inbox } from '../core/models';
 import { OfflineGate } from '../core/offline/offline-gate.service';
 import { ConnectionIndicatorComponent, ReauthComponent } from '../shared/sync-ui';
+import { NotifySoundService } from '../core/notify-sound.service';
 import { ToastService } from '../core/toast.service';
 import { IconComponent, LogoComponent } from '../shared/ui';
+
+/**
+ * Work that rings the bell when it grows between two refreshes (secretariat: transmitted dossiers and corrections;
+ * validator: dossiers awaiting validation; agent: dossiers sent back). The inbox only lists what the user may treat.
+ */
+const ALERTS: Record<string, { one: string; many: (n: number) => string }> = {
+  to_complete: { one: 'Nouveau dossier transmis à traiter.', many: n => `${n} nouveaux dossiers transmis à traiter.` },
+  to_validate: { one: 'Nouveau dossier en attente de validation.', many: n => `${n} nouveaux dossiers en attente de validation.` },
+  to_correct_secretariat: { one: 'Un dossier est à corriger (secrétariat).', many: n => `${n} dossiers à corriger (secrétariat).` },
+  to_correct_collection: { one: 'Un dossier vous est renvoyé pour correction.', many: n => `${n} dossiers vous sont renvoyés pour correction.` },
+};
 
 interface NavItem { label: string; icon: string; link: string; perms: string[]; }
 
@@ -85,6 +97,8 @@ const NAV: NavItem[] = [
                 @for (i of inbox()?.items ?? []; track i.code) {
                   <a [routerLink]="inboxLink(i.status)" [queryParams]="i.status === 'OVERDUE' ? { overdue: 1 } : null" (click)="open.set('')"><span>{{ i.label }}</span><strong>{{ i.count }}</strong></a>
                 } @empty { <p class="muted pad">Aucune tâche en attente.</p> }
+                <button type="button" class="item sound" (click)="sound.toggle()" [attr.aria-pressed]="sound.enabled()">
+                  <span>Son des notifications</span><strong>{{ sound.enabled() ? 'Activé' : 'Désactivé' }}</strong></button>
               </div>
             }
           </div>
@@ -176,6 +190,7 @@ const NAV: NavItem[] = [
     .dropdown a,.dropdown .item{display:flex;justify-content:space-between;gap:12px;padding:9px 10px;border-radius:8px;color:var(--wk-text);text-decoration:none;background:none;border:0;width:100%;text-align:left;font:inherit;cursor:pointer}
     .dropdown a:hover,.dropdown .item:hover{background:var(--wk-sky-50)}
     .pad{padding:8px 10px}
+    .dropdown .sound{border-top:1px solid var(--wk-border);border-radius:0 0 8px 8px;margin-top:6px;padding-top:12px}
     .backdrop{display:none}
     .strip{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:9px 24px;background:var(--wk-warning-bg);color:#7a4700;font-size:13px;border-bottom:1px solid #f3d39b}
     .strip.danger{background:var(--wk-danger-bg);color:#8f1f2b;border-bottom-color:#f3b6bd}
@@ -205,6 +220,7 @@ export class ShellComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
   private refresh = inject(AutoRefreshService);
   private toast = inject(ToastService);
+  sound = inject(NotifySoundService);
   gate = inject(OfflineGate);
 
   /** Sign-out refused: operations of this device are not on the server yet. */
@@ -225,21 +241,31 @@ export class ShellComponent implements OnInit {
 
   ngOnInit() {
     this.loadInbox();
-    // every 30 s: menu badges (the open screen refreshes itself)
-    this.refresh.on(this.destroyRef, () => this.loadInbox(true));
+    // every 15 s, even when the tab is hidden: menu badges and alerts (the open screen refreshes itself)
+    this.refresh.onAlert(this.destroyRef, () => this.loadInbox());
     this.router.events.pipe(filter(e => e instanceof NavigationEnd), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => { this.open.set(''); this.navOpen.set(false); this.loadInbox(); });
   }
-  private loadInbox(announce = false) {
+  private loadInbox() {
     if (!this.auth.can('declaration.view')) return;
     this.api.get<Inbox>('/inbox/').subscribe({
       next: i => {
         const before = this.inbox();
-        if (announce && before && i.total > before.total) this.toast.info('Nouveau dossier à traiter.');
+        if (before) this.announce(before, i);
         this.inbox.set(i);
       },
       error: () => this.inbox.set(null),
     });
+  }
+  /** Toast + chime for each kind of work that grew since the previous inbox; silent on the first load. */
+  private announce(before: Inbox, now: Inbox) {
+    const count = (inbox: Inbox, code: string) => inbox.items.find(i => i.code === code)?.count ?? 0;
+    let alerted = false;
+    for (const [code, text] of Object.entries(ALERTS)) {
+      const added = count(now, code) - count(before, code);
+      if (added > 0) { this.toast.info(added === 1 ? text.one : text.many(added)); alerted = true; }
+    }
+    if (alerted) this.sound.play();
   }
   toggle(menu: 'inbox' | 'account') { this.open.set(this.open() === menu ? '' : menu); }
   @HostListener('document:click') closeMenus() { this.open.set(''); }

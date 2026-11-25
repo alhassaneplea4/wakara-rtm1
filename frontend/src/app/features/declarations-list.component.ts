@@ -176,7 +176,7 @@ export class DeclarationsListComponent implements OnInit {
   ngOnInit() {
     this.mode = (this.route.snapshot.data['mode'] as Mode) ?? 'all';
     this.text = MODE_TEXT[this.mode];
-    // every 30 s: same filters as the last search the user applied, without the loading flash
+    // every 15 s: same filters as the last search the user applied, without the loading flash
     this.autoRefresh.on(this.destroyRef, () => this.silentReload());
     // the secretariat never sees the agents' drafts (they stay in the agents' own space until transmitted)
     const seesDrafts = this.auth.can('declaration.create') || this.auth.can('declaration.archive') || !this.auth.can('declaration.view_all');
