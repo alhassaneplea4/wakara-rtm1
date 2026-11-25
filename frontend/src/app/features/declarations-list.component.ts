@@ -5,7 +5,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService, Query, errorMessage } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { AutoRefreshService } from '../core/auto-refresh.service';
-import { DeclarationListItem, Hospital, Page, STATUS_LABELS, Status } from '../core/models';
+import { DeclarationListItem, Hospital, Page, STATUS_LABELS, Status, statusLabelsFor } from '../core/models';
 import { OfflineGate } from '../core/offline/offline-gate.service';
 import { ToastService } from '../core/toast.service';
 import { SyncChipComponent } from '../shared/sync-ui';
@@ -160,7 +160,7 @@ export class DeclarationsListComponent implements OnInit {
 
   mode: Mode = 'all';
   text = MODE_TEXT.all;
-  labels = STATUS_LABELS;
+  get labels() { return statusLabelsFor(this.auth.can('declaration.view_all')); }
   statusOptions: Status[] = [];
 
   search = ''; status = ''; hospital = ''; agent = ''; offline = ''; overdue = ''; from = ''; to = ''; ordering = '-updated_at'; page = 1;

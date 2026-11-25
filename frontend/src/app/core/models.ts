@@ -18,11 +18,17 @@ export type Status =
   | 'TO_CORRECT_SECRETARIAT' | 'VALIDATED' | 'REJECTED' | 'DELIVERED';
 
 export const STATUS_LABELS: Record<Status, string> = {
-  DRAFT: 'Brouillon', TRANSMITTED: 'Transmis au secrétariat', IN_COMPLETION: 'Acte incomplet',
+  DRAFT: 'Brouillon', TRANSMITTED: 'Transmis à l\'état civil', IN_COMPLETION: 'Acte incomplet',
   PENDING_VALIDATION: 'En attente de validation', TO_CORRECT_COLLECTION: 'À corriger — collecte',
   TO_CORRECT_SECRETARIAT: 'À corriger — secrétariat', VALIDATED: 'Validé définitivement',
   REJECTED: 'Rejeté', DELIVERED: 'Acte délivré',
 };
+
+/** Same labels seen by the secretariat / administrator: a transmitted dossier is, for them, being processed. */
+export const STATUS_LABELS_SECRETARIAT: Record<Status, string> = { ...STATUS_LABELS, TRANSMITTED: 'Traitement en cours' };
+
+/** Labels for the point of view of the signed-in user (`declaration.view_all` = secretariat side). */
+export const statusLabelsFor = (secretariat: boolean): Record<Status, string> => secretariat ? STATUS_LABELS_SECRETARIAT : STATUS_LABELS;
 
 export const STATUS_TONE: Record<Status, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
   DRAFT: 'neutral', TRANSMITTED: 'info', IN_COMPLETION: 'warning', PENDING_VALIDATION: 'warning',

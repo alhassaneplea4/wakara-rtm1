@@ -130,7 +130,7 @@ test('transmission et photo de la fiche préparées hors connexion', async ({ pa
   await page.getByRole('button', { name: 'Enregistrer et transmettre au secrétariat' }).click();
   await expect(page).toHaveURL(/\/declarations\/[0-9a-f-]{36}$/);
   await expect(page.locator('wk-toasts')).toContainText('Elle sera transmise au secrétariat au retour de la connexion');
-  await expect(page.locator('wk-page-header wk-status')).toContainText('Transmis au secrétariat');
+  await expect(page.locator('wk-page-header wk-status')).toContainText('Transmis à l\'état civil');
   await expect(headerChip(page)).toContainText('Sur cet appareil');
   await expect(page.locator('wk-paper-form figure wk-sync')).toContainText('Sur cet appareil');
   await expect(page.getByRole('link', { name: 'Modifier' })).toHaveCount(0);  // transmitted: locked on the device too

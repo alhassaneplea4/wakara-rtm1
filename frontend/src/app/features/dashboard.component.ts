@@ -6,7 +6,7 @@ import { ChartConfiguration } from 'chart.js';
 import { ApiService, errorMessage } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { AutoRefreshService } from '../core/auto-refresh.service';
-import { Dashboard, DeclarationListItem, Hospital, Page, STATUS_LABELS, Status } from '../core/models';
+import { Dashboard, DeclarationListItem, Hospital, Page, STATUS_LABELS, Status, statusLabelsFor } from '../core/models';
 import { ChartComponent, IconComponent, PageHeaderComponent, StatusBadgeComponent } from '../shared/ui';
 
 const PALETTE = ['#1f5ed8', '#4f9bff', '#12a36a', '#8b7cf6', '#e58a0a', '#c3cde0'];
@@ -214,7 +214,7 @@ export class DashboardComponent implements OnInit {
   auth = inject(AuthService);
 
   currentYear = new Date().getFullYear();
-  labels = STATUS_LABELS;
+  get labels() { return statusLabelsFor(this.auth.can('declaration.view_all')); }
   statuses = Object.keys(STATUS_LABELS) as Status[];
   periods = [
     { key: 'year', label: 'Cette année' },

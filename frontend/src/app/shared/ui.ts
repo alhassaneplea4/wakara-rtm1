@@ -6,7 +6,8 @@ import {
   LineController, LineElement, LinearScale, PointElement, Tooltip,
 } from 'chart.js';
 import { RouterLink } from '@angular/router';
-import { STATUS_LABELS, STATUS_TONE, Status } from '../core/models';
+import { AuthService } from '../core/auth.service';
+import { STATUS_TONE, Status, statusLabelsFor } from '../core/models';
 import { ToastService } from '../core/toast.service';
 
 Chart.register(ArcElement, BarController, BarElement, CategoryScale, DoughnutController, Filler, Legend, LineController,
@@ -98,8 +99,9 @@ export class LogoComponent {
 })
 export class StatusBadgeComponent {
   @Input() status: Status | string = 'DRAFT';
+  private auth = inject(AuthService);
   get tone() { return STATUS_TONE[this.status as Status] ?? 'neutral'; }
-  get label() { return STATUS_LABELS[this.status as Status] ?? this.status; }
+  get label() { return statusLabelsFor(this.auth.can('declaration.view_all'))[this.status as Status] ?? this.status; }
 }
 
 /* ── Pagination ──────────────────────────────────── */

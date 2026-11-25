@@ -351,7 +351,7 @@ class FakeServer {
     } else {
       if (o.type === 'declaration.create' && !row) row = serverRow({ uuid: o.entity_uuid, reference: `WKR-2026-${String(++this.counter).padStart(4, '0')}`, ...o.payload });
       else if (o.type === 'declaration.update') row = { ...row, ...o.payload, child: { ...row.child, ...(o.payload.child ?? {}) }, sync_version: row.sync_version + 1 };
-      else if (o.type === 'declaration.transmit') row = { ...row, status: 'TRANSMITTED', status_label: 'Transmis au secrétariat', sync_version: row.sync_version + 1 };
+      else if (o.type === 'declaration.transmit') row = { ...row, status: 'TRANSMITTED', status_label: 'Transmis à l\'état civil', sync_version: row.sync_version + 1 };
       this.rows.set(o.entity_uuid, row);
       this.after.set(o.op_id, row.sync_version);
       result = { ...base, status: 'applied', error: null, declaration: row };

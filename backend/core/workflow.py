@@ -30,7 +30,7 @@ class Status:
 
     CHOICES = [
         (DRAFT, 'Brouillon'),
-        (TRANSMITTED, 'Transmis au secrétariat'),
+        (TRANSMITTED, 'Transmis à l\'état civil'),
         (IN_COMPLETION, 'Acte incomplet'),
         (PENDING_VALIDATION, 'En attente de validation'),
         (TO_CORRECT_COLLECTION, 'À corriger — collecte'),

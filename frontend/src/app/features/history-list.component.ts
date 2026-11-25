@@ -4,8 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ApiService, Query, errorMessage } from '../core/api.service';
+import { AuthService } from '../core/auth.service';
 import { AutoRefreshService } from '../core/auto-refresh.service';
-import { HistoryRow, HistorySummary, Hospital, Page, STATUS_LABELS, Status, UserRow } from '../core/models';
+import { HistoryRow, HistorySummary, Hospital, Page, STATUS_LABELS, Status, UserRow, statusLabelsFor } from '../core/models';
 import { relativeTime } from '../shared/relative-time';
 import { IconComponent, PageHeaderComponent, PaginationComponent, StatusBadgeComponent } from '../shared/ui';
 
@@ -102,7 +103,8 @@ export class HistoryListComponent implements OnInit {
   private last: Query | null = null;
   private request?: Subscription;   // a newer search cancels the previous one, so a slow answer never overwrites a fresh one
 
-  labels = STATUS_LABELS;
+  private auth = inject(AuthService);
+  get labels() { return statusLabelsFor(this.auth.can('declaration.view_all')); }
   statuses = Object.keys(STATUS_LABELS) as Status[];
   kinds = KINDS;
   q = ''; status = ''; user = ''; kind = ''; hospital = ''; from = ''; to = ''; page = 1;
