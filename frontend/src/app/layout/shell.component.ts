@@ -11,6 +11,7 @@ import { AuthService } from '../core/auth.service';
 import { Inbox } from '../core/models';
 import { OfflineGate } from '../core/offline/offline-gate.service';
 import { ConnectionIndicatorComponent, ReauthComponent } from '../shared/sync-ui';
+import { NotifyDesktopService } from '../core/notify-desktop.service';
 import { NotifySoundService } from '../core/notify-sound.service';
 import { ToastService } from '../core/toast.service';
 import { IconComponent, LogoComponent } from '../shared/ui';
@@ -99,6 +100,11 @@ const NAV: NavItem[] = [
                 } @empty { <p class="muted pad">Aucune tâche en attente.</p> }
                 <button type="button" class="item sound" (click)="sound.toggle()" [attr.aria-pressed]="sound.enabled()">
                   <span>Son des notifications</span><strong>{{ sound.enabled() ? 'Activé' : 'Désactivé' }}</strong></button>
+                @if (desktop.state() !== 'unsupported') {
+                  <button type="button" class="item" (click)="toggleDesktop()" [attr.aria-pressed]="desktop.state() === 'on'"
+                          title="Pop-up du système, même quand cet onglet n'est pas au premier plan">
+                    <span>Notifications du navigateur</span><strong>{{ desktop.state() === 'on' ? 'Activées' : desktop.state() === 'blocked' ? 'Bloquées' : 'Désactivées' }}</strong></button>
+                }
               </div>
             }
           </div>
@@ -190,7 +196,7 @@ const NAV: NavItem[] = [
     .dropdown a,.dropdown .item{display:flex;justify-content:space-between;gap:12px;padding:9px 10px;border-radius:8px;color:var(--wk-text);text-decoration:none;background:none;border:0;width:100%;text-align:left;font:inherit;cursor:pointer}
     .dropdown a:hover,.dropdown .item:hover{background:var(--wk-sky-50)}
     .pad{padding:8px 10px}
-    .dropdown .sound{border-top:1px solid var(--wk-border);border-radius:0 0 8px 8px;margin-top:6px;padding-top:12px}
+    .dropdown .sound{border-top:1px solid var(--wk-border);border-radius:8px;margin-top:6px;padding-top:12px}
     .backdrop{display:none}
     .strip{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:9px 24px;background:var(--wk-warning-bg);color:#7a4700;font-size:13px;border-bottom:1px solid #f3d39b}
     .strip.danger{background:var(--wk-danger-bg);color:#8f1f2b;border-bottom-color:#f3b6bd}
@@ -221,6 +227,7 @@ export class ShellComponent implements OnInit {
   private refresh = inject(AutoRefreshService);
   private toast = inject(ToastService);
   sound = inject(NotifySoundService);
+  desktop = inject(NotifyDesktopService);
   gate = inject(OfflineGate);
 
   /** Sign-out refused: operations of this device are not on the server yet. */
@@ -260,12 +267,20 @@ export class ShellComponent implements OnInit {
   /** Toast + chime for each kind of work that grew since the previous inbox; silent on the first load. */
   private announce(before: Inbox, now: Inbox) {
     const count = (inbox: Inbox, code: string) => inbox.items.find(i => i.code === code)?.count ?? 0;
-    let alerted = false;
+    const messages: { text: string; link: string }[] = [];
     for (const [code, text] of Object.entries(ALERTS)) {
       const added = count(now, code) - count(before, code);
-      if (added > 0) { this.toast.info(added === 1 ? text.one : text.many(added)); alerted = true; }
+      if (added > 0) messages.push({ text: added === 1 ? text.one : text.many(added), link: code === 'to_validate' ? '/validation' : '/declarations' });
     }
-    if (alerted) this.sound.play();
+    if (!messages.length) return;
+    messages.forEach(m => this.toast.info(m.text));
+    this.sound.play();
+    // outside the application (other tab or window in front): the system notification, which brings the user back on click
+    this.desktop.show('Wakara — nouveau travail', messages.map(m => m.text).join('\n'), 'wk-inbox', () => this.router.navigateByUrl(messages[0].link));
+  }
+  async toggleDesktop() {
+    const problem = await this.desktop.toggle();
+    if (problem) this.toast.info(problem);
   }
   toggle(menu: 'inbox' | 'account') { this.open.set(this.open() === menu ? '' : menu); }
   @HostListener('document:click') closeMenus() { this.open.set(''); }
